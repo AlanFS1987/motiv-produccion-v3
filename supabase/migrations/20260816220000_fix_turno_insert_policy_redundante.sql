@@ -1,0 +1,29 @@
+-- =============================================================
+-- Fix: política de INSERT en `turno` sin restricción de franja,
+-- redundante con la política correcta ya existente.
+--
+-- Historia del gap: 0015_rls_turno_asignacion.sql (20260101000015)
+-- creó `turno_insert_responsable` con
+--   with check (fn_rol_actual() in ('responsable', 'suplente'))
+-- es decir, CUALQUIER responsable puede insertar CUALQUIER
+-- (fecha, tipo) de turno, sin comprobar que le toque por rotación.
+--
+-- Más tarde, 20260814140000_turno_insert_responsable_suplente.sql
+-- creó la política correcta:
+--   responsable -> tipo = fn_turno_de_letra(fecha, letra_del_usuario)
+--   suplente    -> true (exento del candado, 01-rol-responsable.md 3.1)
+--
+-- Como RLS combina políticas permisivas con OR (11-esquema-supabase.md
+-- 13.8 / CLAUDE.md), la política vieja seguía vigente en paralelo y
+-- anulaba en la práctica la restricción de la nueva: cualquier
+-- responsable podía seguir insertando el turno de cualquier otra
+-- letra/fecha, aunque la política "buena" ya estuviera aplicada.
+--
+-- Se elimina aquí la política vieja, sin tocar 0015 (ya aplicada en
+-- remoto — no se edita una migración histórica, ver CLAUDE.md). La
+-- política nueva (`turno_insert_responsable_suplente`) cubre todos
+-- los casos que cubría la vieja, más la restricción de franja que
+-- faltaba, así que no hace falta crear ninguna política de reemplazo.
+-- =============================================================
+
+drop policy if exists turno_insert_responsable on turno;

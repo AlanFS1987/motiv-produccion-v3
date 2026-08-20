@@ -1,0 +1,34 @@
+# Dependencias
+node_modules/
+frontend/node_modules/
+
+# Variables de entorno (claves de Supabase, Telegram, etc.)
+.env
+.env.local
+.env.*.local
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# .env.example SÍ se sube (sin claves reales, sirve de plantilla)
+!.env.example
+!frontend/.env.example
+
+# Build de Vite
+frontend/dist/
+frontend/build/
+
+# Supabase (cualquier carpeta .temp, a cualquier profundidad —
+# puede contener pooler-url con credenciales de la BD)
+**/.temp/
+**/supabase/.temp/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
