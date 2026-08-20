@@ -35,16 +35,27 @@ comportamiento real, luego decisiones, luego construcción.
 - **[CERRADO 20/08/2026]** `fn_turno_de_letra`/`fn_ciclo_id`/
   `fn_ciclo_rango` pasadas de immutable a stable.
 
+- **[CERRADO 20/08/2026]** `parte_update_vigente_responsable_ventana`:
+  el `with check` no impedía cambiar `completado_at`/`completado`/
+  `vigente` dentro de la ventana de corrección de 1h (solo lo
+  garantizaba la UI). Añadido trigger
+  `fn_parte_restringir_columnas_update`
+  (`20260820170000_parte_restringir_columnas_update.sql`) que bloquea
+  esos cambios a nivel de BD, tanto para el responsable en ventana de
+  corrección como para el operario (limitado a sus 5 columnas de
+  verificación).
+- **[CERRADO 20/08/2026]** `fn_rol_actual`/`fn_es_responsable_de_turno`
+  security definer sin `set search_path`. Añadido `set search_path =
+  public` a ambas (`20260820160000_fix_search_path_funciones.sql`).
+  Confirmado contra `pg_proc` en BD real: `proconfig =
+  ["search_path=public"]` en las dos.
 
-7. `fn_rol_actual` security definer sin `set search_path`. Añadirlo.
+
 
 9. Enum `rol_usuario` con `pantalla`/`jefe_rectificado` en BD y no en
    migraciones (confirmado): migración `alter type ... add value if not
    exists` y `supabase db diff` para cazar más deriva.
-11. `parte_update_vigente_responsable_ventana`: el `with check` no
-    impide cambiar `completado_at`/`completado`/`vigente`; la ventana de
-    1 h solo la garantiza la UI. Trigger `before update` si se quiere
-    garantía real.
+
 12. Cierre automático de turno: confirmar con un caso real (o forzar
     `select fn_encolar_resumenes_turno_pendientes();`).
 13. Camino "Continuar mismo lote+tono" con cambio de turno real: sin

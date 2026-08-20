@@ -115,7 +115,7 @@ Todas vacías salvo catálogos.
 
 | Función | Notas |
 |---|---|
-| `fn_rol_actual()` | security definer, stable, `search_path = public` (corregido 20/08/2026) |
+| `fn_rol_actual()` | security definer, stable, `set search_path = public` (confirmado 20/08/2026) |
 | `fn_parte_restringir_columnas_update()` | trigger before update en `parte`, no security definer; ver `05-automatismos.md` |
 | `fn_es_responsable_de_turno(uuid)` | security definer; en la práctica devuelve true para cualquier responsable/suplente; no la usa ninguna política |
 | `fn_normalizar_texto(text)` | immutable |
