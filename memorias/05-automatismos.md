@@ -13,7 +13,7 @@
 Secrets de Edge Functions: `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`,
 `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_CHAT_INCIDENCIAS_CALIDAD`,
 `TELEGRAM_CHAT_INCIDENCIAS_PRODUCCION`, `TELEGRAM_CHAT_NUEVOS_LOTES`,
-`TELEGRAM_CHAT_RESUMEN_TURNO`, `TELEGRAM_CHAT_RESUMEN_CALIDAD`
+`TELEGRAM_CHAT_RESUMEN_TURNO`, `TELEGRAM_CHAT_RESUMEN_CALIDAD`, `OPENAI_API_KEY`
 (nombres según el código de las funciones; `[VERIFICAR]` con
 `supabase secrets list`). `SUPABASE_URL`
 y `SUPABASE_SERVICE_ROLE_KEY` los inyecta Supabase.
@@ -58,6 +58,7 @@ consulta, no en el horario.
 | parte | after insert (`trg_parte_reabre_lote`) | `fn_reabrir_lote_si_finalizado(lote_id)` |
 | parte | before insert/update (`trg_parte_calibre_pct`) | recalcula `calibre_com_pct` = descuadre_com / entradas × 100 (null si entradas = 0) |
 | turno | before insert | bloquea si `fn_fabrica_cerrada(fecha)` |
+| parte | before update (`trg_parte_restringir_columnas`) | Restringe qué columnas puede tocar cada UPDATE según quién lo hace: operario (`operario_id = auth.uid()`) solo las 5 columnas `*_operario`; responsable en ventana de 1h no puede cambiar `completado`/`completado_at`/`vigente`; administrador sin restricción. Diff genérico OLD/NEW por jsonb, no lista columnas de piezas/tiempos a mano (07-pendientes.md #11, cerrado 20/08/2026). |
 
 ## Cloudinary
 
@@ -75,3 +76,13 @@ fija en el preset: `motiv_v3_partes` → `motiv-produccion/partes`
 `VITE_CLOUDINARY_PRESET_INCIDENCIAS_CALIDAD`,
 `VITE_CLOUDINARY_PRESET_INCIDENCIAS_PRODUCCION`,
 `VITE_CLOUDINARY_PRESET_LIMPIEZA`. Todas públicas por diseño.
+
+
+Seguridad de cuenta (Settings → Security, 20/08/2026): Resource list y
+el resto de tipos de entrega no usados (Authenticated, Private, Fetched
+URL, redes sociales, etc.) marcados como restringidos — solo "Uploaded"
+sin restringir. Fetch de vídeo restringido. Strict Transformations
+(imagen y vídeo) activado. PDF/ZIP delivery desactivado. Unsigned
+actions (auto-chaptering/transcription/video details) sin activar.
+Cada preset con `Allowed formats` (jpg/png/webp, sin SVG), tamaño
+máximo de archivo, y `Overwrite` desactivado.

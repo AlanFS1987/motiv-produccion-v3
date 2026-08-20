@@ -41,9 +41,6 @@ comportamiento real, luego decisiones, luego construcción.
 9. Enum `rol_usuario` con `pantalla`/`jefe_rectificado` en BD y no en
    migraciones (confirmado): migración `alter type ... add value if not
    exists` y `supabase db diff` para cazar más deriva.
-- Borrar el comentario con el secreto viejo de Telegram
-  (`**********************`, ya rotado y sin uso) en
-  `20260816214000_notificaciones_telegram.sql` — limpieza.
 11. `parte_update_vigente_responsable_ventana`: el `with check` no
     impide cambiar `completado_at`/`completado`/`vigente`; la ventana de
     1 h solo la garantiza la UI. Trigger `before update` si se quiere
@@ -65,11 +62,24 @@ comportamiento real, luego decisiones, luego construcción.
   ~150s hasta que Supabase mataba la función con error 546). La
   respuesta de `ocr-parte` incluye ahora `extraido_con: "gpt" |
   "claude"` para poder auditar cuál resolvió cada caso.
-16. Rol de la cuenta `test` en `usuario`: si tiene `rol = 'responsable'`,
-    puede aparecer mezclada en listados futuros que filtren por ese rol
-    (p. ej. un dashboard del jefe). Se decide más adelante; se borra a
-    mano desde Supabase cuando ya no haga falta.
+- **[CERRADO 20/08/2026]** `fn_rol_actual()` / `fn_es_responsable_de_turno()`
+  security definer sin `set search_path` — corregido, ambas fijadas a
+  `search_path = public` (migración `20260820160000_fix_search_path_funciones.sql`).
 
+- **[CERRADO 20/08/2026]** Restricción por fila (no por columna) en
+  `UPDATE` de `parte` — operario podía tocar cualquier columna, no solo
+  las `*_operario`; responsable en ventana de 1h podía cambiar
+  `completado`/`completado_at`/`vigente`. Resuelto con un único trigger
+  `trg_parte_restringir_columnas` (`fn_parte_restringir_columnas_update`,
+  migración `20260820170000_parte_restringir_columnas_update.sql`) que
+  compara OLD/NEW por columna y bloquea lo que no corresponde a cada
+  camino. Probado en real con responsable y operario reales.
+
+- **[VALIDADO 20/08/2026]** Cálculo de puntos de rendimiento del
+  operario confirmado correcto contra datos reales
+  (`v_puntos_operario_total_vida`) tras probar el flujo completo
+  responsable→operario con la fábrica parada por vacaciones. Sigue sin
+  pantalla que lo muestre (ver `04-gamificacion.md`).
 ## Decisiones por tomar
 
 - Alcance del lanzamiento del 31/08 (propuesta: responsable + operario,
@@ -81,6 +91,12 @@ comportamiento real, luego decisiones, luego construcción.
 - Ceria sobre DeepSeek: aprobación explícita de sacar datos de
   producción a ese proveedor antes de construirlo.
 - `[DECISIÓN PENDIENTE]` umbral de "minutos atípicos" (hoy 600).
+
+- Decidir modelo principal de OCR (GPT `gpt-4o-mini` vs Claude Haiku) —
+  hoy GPT es el extractor principal con fallback automático a Haiku si
+  falla, en prueba de coste/calidad desde 20/08/2026
+  (`_shared/openai.ts`, `_shared/anthropic.ts`). Sin fecha límite para
+  decidir cuál queda en firme.
 
 ## Por construir (orden sugerido)
 
@@ -107,3 +123,14 @@ comportamiento real, luego decisiones, luego construcción.
     `normalizacion`/`formato`/informe.
 12. Temas de color (claro/oscuro/gaming/IA), PWA, retención de 18 meses
     en Cloudinary.
+
+17. `extraido_con` (gpt/claude) que devuelve `ocr-parte` no se guarda
+    en ningún sitio — se pierde al terminar la petición. Si se quiere
+    poder comparar coste/calidad de forma sistemática (no solo
+    mirando la factura de Anthropic), hace falta una columna en
+    `parte` (una por foto: hoja/caja/pantalla) y que el frontend la
+    guarde al llamar a resolver-catalogo/completar el parte.
+18. Warning "Docker is not running" en cada `supabase functions
+    deploy` — no se ha confirmado si afecta al empaquetado real de las
+    funciones o es inofensivo. Instalar/abrir Docker Desktop de forma
+    permanente antes de futuros deploys, para descartarlo de raíz.

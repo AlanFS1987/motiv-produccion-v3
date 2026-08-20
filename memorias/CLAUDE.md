@@ -89,6 +89,11 @@ lunes.
   BD↔Edge Functions en tabla `app_secrets` (sin acceso para
   anon/authenticated) y en los secrets de Edge Functions; deben
   coincidir byte a byte.
+  - **Historial de git**: reiniciado el 20/08/2026 (un secreto de
+  Telegram, ya rotado, había quedado en un commit antiguo de un repo
+  que salió de la máquina local). Si necesitas algo de antes de esa
+  fecha, no está — se documentó lo relevante en estos `.md` antes de
+  reiniciar.
 - **Fotos**: recorte a proporción fija en cliente (`captura-imagen.ts`)
   → WebP → Cloudinary (unsigned) → se pasa la URL a `ocr-parte`.
   Nombre `{prefijo_}{identificador}_{timestamp}`. El operario nunca
