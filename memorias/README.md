@@ -15,6 +15,11 @@ una entrada "sesión de tal día".
 | `05-automatismos.md` | Telegram, cron, triggers, Edge Functions, Cloudinary |
 | `06-esquema-bd.md` | Tablas, columnas, políticas RLS, funciones, vistas |
 | `07-pendientes.md` | Solo lo abierto: bugs conocidos, decisiones por tomar, trabajo por hacer |
+| `08-dashboard-jefe.md` | Dashboard del jefe: Vista Rápida, Vista Detallada, Incidencias, fórmulas de m²/rendimiento/calidad |
+| `09-administrador.md` | Panel de administrador: qué está construido (rotación) y qué falta |
+| `10-pantalla.md` | Pantalla de fábrica: carrusel, rol `pantalla`, las 5 diapositivas |
+| `11-ceria.md` | Ceria: herramientas, decisiones de proveedor, reglas de separación producción/calidad |
+| `12-temas.md` | Sistema de temas: los 5 temas, qué pantallas están migradas y cuáles no |
 
 Marcas usadas en los archivos:
 - `[VERIFICAR]` — descrito a partir de migraciones/código, no contrastado con la BD real.

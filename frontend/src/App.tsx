@@ -7,6 +7,10 @@ import { GestionLotes } from "./components/GestionLotes";
 import { useAuth } from "./context/AuthContext";
 import { cerrarSesion } from "./lib/auth";
 import { OperarioApp } from "./components/operario/OperarioApp";
+import { JefeApp } from "./components/jefe/JefeApp";
+import { AdminApp } from "./components/admin/AdminApp";
+import { PantallaCarrusel } from "./components/pantalla/PantallaCarrusel";
+import { ThemeSwitcher } from "./components/ThemeSwitcher";
 
 type Pestana = "turno" | "resumen" | "lotes";
 
@@ -47,26 +51,40 @@ function AppAutenticada({ username }: { username: string }) {
     return <OperarioApp />;
   }
 
+  if (usuario?.rol === "pantalla") {
+    return <PantallaCarrusel username={username} />;
+  }
+
+  if (usuario?.rol === "administrador") {
+    return <AdminApp username={username} />;
+  }
+  
+  if (usuario?.rol === "jefe") {
+    return <JefeApp username={username} />;
+  }
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-[var(--fondo)]">
       {/* Cabecero de ancho completo */}
-      <header className="border-b border-slate-200 bg-white">
+      <header className="border-b border-[var(--borde)] bg-[var(--superficie)]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <span className="text-sm text-slate-500">
-            Conectado como <strong className="text-slate-900">{username}</strong>
+          <span className="text-sm text-[var(--texto-secundario)]">
+            Conectado como <strong className="text-[var(--texto)]">{username}</strong>
           </span>
-          <button
-            onClick={() => cerrarSesion()}
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-200"
-          >
-            <LogOut size={16} aria-hidden />
-            Salir
-          </button>
+          <div className="flex items-center gap-3">
+            <ThemeSwitcher />
+            <button
+              onClick={() => cerrarSesion()}
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-[var(--texto-secundario)] hover:bg-[var(--superficie-alt)]"
+            >
+              <LogOut size={16} aria-hidden />
+              Salir
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Pestañas */}
-      <div className="border-b border-slate-200 bg-white">
+      <div className="border-b border-[var(--borde)] bg-[var(--superficie)]">
         <div className="mx-auto flex max-w-6xl gap-1 px-4">
           <BotonPestana activa={pestana === "turno"} onClick={() => setPestana("turno")}>
             Turno
@@ -110,8 +128,8 @@ function BotonPestana({
       onClick={onClick}
       className={`border-b-2 px-3 py-2 text-sm font-medium transition ${
         activa
-          ? "border-slate-900 text-slate-900"
-          : "border-transparent text-slate-500 hover:text-slate-700"
+          ? "border-[var(--acento)] text-[var(--texto)]"
+          : "border-transparent text-[var(--texto-tenue)] hover:text-[var(--texto-secundario)]"
       }`}
     >
       {children}

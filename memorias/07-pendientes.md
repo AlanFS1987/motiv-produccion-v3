@@ -50,7 +50,14 @@ comportamiento real, luego decisiones, luego construcción.
   Confirmado contra `pg_proc` en BD real: `proconfig =
   ["search_path=public"]` en las dos.
 
-
+- **[CERRADO 21/08/2026]** Ceria (fase 1) podía devolver `tool_calls`
+  vacío pese a `tool_choice: "required"` con preguntas más complejas
+  de clasificar. Causa: gpt-5-mini es un modelo de razonamiento, gasta
+  tokens internos antes de responder, contados contra
+  `max_completion_tokens` — con 500 podía agotar el presupuesto
+  pensando. Corregido: 1200 tokens + `reasoning_effort: "low"` en fase
+  1 (elegir herramienta es tarea simple, no necesita razonar de más),
+  3000 + `"low"` en fase 3.
 
 9. Enum `rol_usuario` con `pantalla`/`jefe_rectificado` en BD y no en
    migraciones (confirmado): migración `alter type ... add value if not
@@ -99,8 +106,6 @@ comportamiento real, luego decisiones, luego construcción.
   (`select * from puntos_rendimiento_responsable order by pct_min` —
   no venía en el volcado).
 - Dónde guardar el saldo inicial de puntos de v2.
-- Ceria sobre DeepSeek: aprobación explícita de sacar datos de
-  producción a ese proveedor antes de construirlo.
 - `[DECISIÓN PENDIENTE]` umbral de "minutos atípicos" (hoy 600).
 
 - Decidir modelo principal de OCR (GPT `gpt-4o-mini` vs Claude Haiku) —
@@ -113,35 +118,26 @@ comportamiento real, luego decisiones, luego construcción.
 
 1. `cerrar-ciclo` + escritura de `historial_ciclos` + total de puntos
    completo (piezas + rendimiento + limpieza) — **antes del 28/09**.
-2. Alta/edición de usuarios y letra desde la app (hoy SQL a mano).
+2. Alta/edición de usuarios y letra desde la app — DESCARTADO (ver
+   `09-administrador.md`); la letra ya se ajusta desde el panel de
+   admin, el alta de cuentas se queda en SQL a mano.
 3. Incidencia de producción desde dentro del parte.
 4. Responsable: Historial de partes, barra de gamificación (Ranking,
    Personaje, Logros, Equipo).
 5. Operario: Inicio con puntos/nivel, Ranking, Stats, Logros, personaje
    RPG (elegir proveedor de imagen).
-6. Dashboard del jefe (Vista Rápida, Detallada, Calidad, Rendimiento,
-   incidencias) y recortes para producción/calidad.
-7. Administrador: fusión de modelos/marcas/productos/lotes, corrección
-   de partes sin límite, cierre de fábrica, checklist, "Recalcular ciclo
-   anterior".
-8. Pantalla (carrusel, con login) y políticas RLS para pantalla y
-   jefe_rectificado; diseñar jefe_rectificado.
-9. Ceria y base de conocimiento de averías.
-10. Refactor de `TurnoScreen.tsx` (hook `useTurnoActual`, componentes
-    `EstadoTurnoBloqueado`, `TarjetaLinea`, máquina de estados pura).
-11. Tests unitarios (rotación, validaciones, normalización, tramos) y
-    paquete de dominio compartido frontend/Deno para dejar de duplicar
-    `normalizacion`/`formato`/informe.
-12. Temas de color (claro/oscuro/gaming/IA), PWA, retención de 18 meses
-    en Cloudinary.
-
-17. `extraido_con` (gpt/claude) que devuelve `ocr-parte` no se guarda
-    en ningún sitio — se pierde al terminar la petición. Si se quiere
-    poder comparar coste/calidad de forma sistemática (no solo
-    mirando la factura de Anthropic), hace falta una columna en
-    `parte` (una por foto: hoja/caja/pantalla) y que el frontend la
-    guarde al llamar a resolver-catalogo/completar el parte.
-18. Warning "Docker is not running" en cada `supabase functions
-    deploy` — no se ha confirmado si afecta al empaquetado real de las
-    funciones o es inofensivo. Instalar/abrir Docker Desktop de forma
-    permanente antes de futuros deploys, para descartarlo de raíz.
+6. Administrador: fusión de modelos/marcas/productos/lotes, corrección
+   de partes sin límite, cierre de fábrica, checklist. "Recalcular
+   ciclo anterior" bloqueado hasta que exista `cerrar-ciclo` (punto 1).
+7. Refactor de `TurnoScreen.tsx` (hook `useTurnoActual`, componentes
+   `EstadoTurnoBloqueado`, `TarjetaLinea`, máquina de estados pura).
+8. Tests unitarios (rotación, validaciones, normalización, tramos) y
+   paquete de dominio compartido frontend/Deno para dejar de duplicar
+   `normalizacion`/`formato`/informe.
+9. Migrar el contenido interior de las pantallas ya construidas
+   (Vista Rápida/Detallada/Incidencias, Ceria, Rotación, y todo lo
+   anterior a hoy) al sistema de temas — ver `12-temas.md` para la
+   lista exacta de qué falta.
+10. PWA, retención de 18 meses en Cloudinary.
+11. Reyes del formato (pantalla de fábrica) — sin diseño, sin
+    capturas de referencia.

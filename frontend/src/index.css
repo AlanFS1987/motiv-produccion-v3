@@ -1,1 +1,61 @@
 @import "tailwindcss";
+
+/* =============================================================
+   Variables de tema — 5 temas (Oscuro/Claro/Naturaleza/Cielo/Sistema,
+   "Sistema" resuelve a oscuro o claro según el SO, ver ThemeContext).
+   Aplicadas vía [data-tema] en <html>. Los componentes las usan con
+   sintaxis de valor arbitrario de Tailwind v4:
+     bg-[var(--fondo)]  text-[var(--texto)]  border-[var(--borde)]
+   Para migrar un componente ya escrito con colores fijos (bg-white,
+   text-slate-900, border-slate-200), cambiar esas 3 clases por las
+   de arriba basta en la mayoría de los casos.
+   ============================================================= */
+
+:root,
+[data-tema="claro"] {
+  --fondo: #f1f5f9;          /* bg-slate-100 */
+  --superficie: #ffffff;     /* bg-white */
+  --superficie-alt: #f8fafc; /* bg-slate-50 */
+  --texto: #0f172a;          /* text-slate-900 */
+  --texto-secundario: #64748b; /* text-slate-500 */
+  --texto-tenue: #94a3b8;    /* text-slate-400 */
+  --borde: #e2e8f0;          /* border-slate-200 */
+  --acento: #0f172a;         /* bg-slate-900 (botones primarios) */
+  --acento-texto: #ffffff;
+}
+
+[data-tema="oscuro"] {
+  --fondo: #0f172a;
+  --superficie: #1e293b;
+  --superficie-alt: #172033;
+  --texto: #f1f5f9;
+  --texto-secundario: #94a3b8;
+  --texto-tenue: #64748b;
+  --borde: #334155;
+  --acento: #38bdf8;
+  --acento-texto: #0f172a;
+}
+
+[data-tema="naturaleza"] {
+  --fondo: #f0fdf4;
+  --superficie: #ffffff;
+  --superficie-alt: #ecfdf5;
+  --texto: #14532d;
+  --texto-secundario: #4d7c0f;
+  --texto-tenue: #86a06a;
+  --borde: #bbf7d0;
+  --acento: #16a34a;
+  --acento-texto: #ffffff;
+}
+
+[data-tema="cielo"] {
+  --fondo: #f0f9ff;
+  --superficie: #ffffff;
+  --superficie-alt: #e0f2fe;
+  --texto: #0c4a6e;
+  --texto-secundario: #0369a1;
+  --texto-tenue: #7dd3fc;
+  --borde: #bae6fd;
+  --acento: #0284c7;
+  --acento-texto: #ffffff;
+}
