@@ -382,7 +382,10 @@ export async function obtenerPartesPendientesPorLinea(turnoId: string): Promise<
 /** Detalle completo de un parte ya cerrado, para la vista de revisión/corrección. */
 export interface ParteDetalle {
   id: string;
+  turnoId: string;
+  lineaId: string;
   loteId: string;
+  responsableId: string;
   tono: string;
   calibre: string | null;
   numeroOrden: string;
@@ -416,7 +419,7 @@ export interface ParteDetalle {
   dentroDeVentanaCorreccion: boolean;
 }
 
-const SELECT_PARTE_DETALLE = `id, linea_id, lote_id, tono, calibre, verificacion_caja_estado, completado_at,
+const SELECT_PARTE_DETALLE = `id, turno_id, linea_id, lote_id, responsable_id, tono, calibre, verificacion_caja_estado, completado_at,
   piezas_1a, piezas_comercial, piezas_eco, piezas_descuadre_com, piezas_planar_com, piezas_contenedor, piezas_entradas,
   cal_1, cal_2, cal_3, cal_4, cal_5, cal_6, cal_7, cal_8,
   minutos_total, minutos_plena, minutos_no_alimentada, minutos_saturacion, minutos_banco, minutos_maquina,
@@ -441,7 +444,10 @@ function mapearFilaAParteDetalle(fila: any): ParteDetalle {
 
   return {
     id: fila.id,
+    turnoId: fila.turno_id,
+    lineaId: fila.linea_id,
     loteId: fila.lote_id,
+    responsableId: fila.responsable_id,
     tono: fila.tono,
     calibre: fila.calibre,
     numeroOrden: lote?.numero_orden ?? "",

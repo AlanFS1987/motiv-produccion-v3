@@ -13,6 +13,7 @@ import { subirACloudinary, construirPublicId } from "../../lib/cloudinary";
 import { ocrParte } from "../../lib/supabase-functions";
 import { completarParte, corregirParte, type DatosOcrPantalla, type ParteDetalle } from "../../lib/parte";
 import { validarParte, calcularCalibrePct } from "../../lib/validaciones-parte";
+import { esTonoCalibreValido, limpiarEntradaTonoCalibre } from "../../lib/normalizacion";
 
 type Fase = "capturando" | "procesando" | "revisando" | "guardando" | "error";
 
@@ -120,6 +121,8 @@ export function FotoPantallaMaquina(props: FotoPantallaMaquinaProps) {
     return fecha ? aValorDatetimeLocal(fecha) : "";
   });
   const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
+  const [tonoEditado, setTonoEditado] = useState(esCorreccion ? props.valoresIniciales.tono : "");
+  const [calibreEditado, setCalibreEditado] = useState(esCorreccion ? (props.valoresIniciales.calibre ?? "") : "");
 
   const camaraActiva = fase === "capturando";
   const camara = useCamaraLive("pantalla", camaraActiva);
@@ -221,8 +224,8 @@ export function FotoPantallaMaquina(props: FotoPantallaMaquinaProps) {
         });
       } else {
         await corregirParte(props.parteOriginalId, props.contexto, {
-          tono: props.valoresIniciales.tono,
-          calibre: props.valoresIniciales.calibre,
+          tono: tonoEditado,
+          calibre: calibreEditado || null,
           verificacionCajaEstado: props.valoresIniciales.verificacionCajaEstado,
           piezas1a: datos.piezas_1a,
           piezasComercial: datos.piezas_comercial,
@@ -343,6 +346,33 @@ export function FotoPantallaMaquina(props: FotoPantallaMaquinaProps) {
         {esCorreccion ? "Repetir foto (sustituye estos datos)" : "Repetir foto"}
       </button>
 
+      {esCorreccion && (
+        <SeccionCampos titulo="Tono y calibre">
+          <div className="mb-3">
+            <label className="mb-1 block text-sm font-medium text-slate-600">Tono</label>
+            <input
+              value={tonoEditado}
+              onChange={(e) => setTonoEditado(limpiarEntradaTonoCalibre(e.target.value))}
+              className={`w-full rounded-lg border p-2 text-sm ${
+                esTonoCalibreValido(tonoEditado) ? "border-slate-300" : "border-red-400"
+              }`}
+            />
+            {!esTonoCalibreValido(tonoEditado) && (
+              <p className="mt-1 text-xs text-red-600">Requerido — solo mayúsculas y números, sin espacios.</p>
+            )}
+          </div>
+          <div className="mb-3">
+            <label className="mb-1 block text-sm font-medium text-slate-600">Calibre</label>
+            <input
+              value={calibreEditado}
+              onChange={(e) => setCalibreEditado(limpiarEntradaTonoCalibre(e.target.value))}
+              className="w-full rounded-lg border border-slate-300 p-2 text-sm"
+              placeholder="opcional"
+            />
+          </div>
+        </SeccionCampos>
+      )}
+
       <SeccionCampos titulo="Piezas por calidad">
         {CAMPOS_PIEZAS.map(([campo, etiqueta]) => (
           <CampoEntero key={campo} etiqueta={etiqueta} valor={datos[campo]} onChange={(v) => actualizarNumero(campo, v)} />
@@ -387,7 +417,7 @@ export function FotoPantallaMaquina(props: FotoPantallaMaquinaProps) {
 
       <button
         type="button"
-        disabled={!validacion.puedeGuardar || fase === "guardando"}
+        disabled={!validacion.puedeGuardar || fase === "guardando" || (esCorreccion && !esTonoCalibreValido(tonoEditado))}
         onClick={guardar}
         className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-4 text-base font-medium text-white disabled:opacity-40"
       >

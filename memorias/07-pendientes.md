@@ -55,7 +55,15 @@ comportamiento real, luego decisiones, luego construcción.
 esquema real y migraciones alineados, incluido el enum `rol_usuario`
 completo (`pantalla`/`jefe_rectificado` sí están cubiertos por
 migración, la nota anterior sobre esto era incorrecta/desactualizada).
-
+- **[CERRADO 21/08/2026]** `FotoPantallaMaquina.tsx` modo `"corregir"`
+  — el tono/calibre nunca fueron editables al corregir un parte: el
+  guardado enviaba siempre `props.valoresIniciales.tono/calibre` a
+  pelo, sin ningún `<input>` que los expusiera. No era un fallo nuevo
+  de la pantalla de admin (`CorreccionPartesScreen.tsx`) — ya existía
+  para el responsable corrigiendo su propio parte, solo que rara vez
+  necesita tocar el tono al corregir. Se añadieron campos editables
+  con la misma validación de siempre (`esTonoCalibreValido`,
+  `limpiarEntradaTonoCalibre`).
 
 
 - **[CERRADO 21/08/2026]** Ceria (fase 1) podía devolver `tool_calls`
@@ -179,6 +187,17 @@ migración, la nota anterior sobre esto era incorrecta/desactualizada).
   (`_shared/openai.ts`, `_shared/anthropic.ts`). Sin fecha límite para
   decidir cuál queda en firme.
 
+  - Cámara nativa (`<input capture>`) sigue recargando la app en Redmi
+  Note 12 Pro+ (confirmado 21/08/2026, pantalla de prueba
+  `admin/PruebaCamaraScreen.tsx`) — igual que en los Xiaomi de la
+  sesión 18/08/2026 que motivó pasar a cámara en vivo. v2 usaba el
+  mismo `<input capture>` sin este problema; hipótesis en estudio:
+  peso en memoria de la app actual frente a v2, no falta de RAM
+  (MIUI descarta procesos de fondo aunque sobre memoria). Pendiente
+  de confirmar con `chrome://discards` si de verdad es un descarte de
+  pestaña. Se mantiene la pantalla de prueba para seguir investigando
+  y para repetir la comprobación si la app pasa a PWA.
+
 ## Por construir (orden sugerido)
 
 1. `cerrar-ciclo` + escritura de `historial_ciclos` + total de puntos
@@ -191,9 +210,10 @@ migración, la nota anterior sobre esto era incorrecta/desactualizada).
    Personaje, Logros, Equipo).
 5. Operario: Inicio con puntos/nivel, Ranking, Stats, Logros, personaje
    RPG (elegir proveedor de imagen).
-6. Administrador: fusión de modelos/marcas/productos/lotes, corrección
-   de partes sin límite, cierre de fábrica, checklist. "Recalcular
-   ciclo anterior" bloqueado hasta que exista `cerrar-ciclo` (punto 1).
+6. Administrador: fusión de modelos/marcas/productos/lotes, cierre de
+   fábrica, checklist. "Recalcular ciclo anterior" bloqueado hasta que
+   exista `cerrar-ciclo` (punto 1). Corrección de partes sin límite —
+   **[CERRADO 21/08/2026]**, ver `09-administrador.md`.
 7. Refactor de `TurnoScreen.tsx` (hook `useTurnoActual`, componentes
    `EstadoTurnoBloqueado`, `TarjetaLinea`, máquina de estados pura).
 8. Tests unitarios (rotación, validaciones, normalización, tramos) y

@@ -13,8 +13,10 @@ import { VistaRapidaScreen } from "../jefe/VistaRapidaScreen";
 import { VistaDetalladaScreen } from "../jefe/VistaDetalladaScreen";
 import { IncidenciasScreen } from "../jefe/IncidenciasScreen";
 import { AjustarLetrasScreen } from "./AjustarLetrasScreen";
+import { CorreccionPartesScreen } from "./CorreccionPartesScreen";
+import { PruebaCamaraScreen } from "./PruebaCamaraScreen";
 
-type PestanaAdmin = "vista-rapida" | "vista-detallada" | "incidencias" | "ceria" | "rotacion";
+type PestanaAdmin = "vista-rapida" | "vista-detallada" | "incidencias" | "ceria" | "rotacion" | "partes" | "prueba-camara";
 
 function BotonPestana({
   activa,
@@ -75,6 +77,12 @@ export function AdminApp({ username }: { username: string }) {
           <BotonPestana activa={pestana === "rotacion"} onClick={() => setPestana("rotacion")}>
             Rotación
           </BotonPestana>
+          <BotonPestana activa={pestana === "partes"} onClick={() => setPestana("partes")}>
+            Partes
+          </BotonPestana>
+          <BotonPestana activa={pestana === "prueba-camara"} onClick={() => setPestana("prueba-camara")}>
+            Cámara
+          </BotonPestana>
         </div>
       </div>
 
@@ -84,6 +92,8 @@ export function AdminApp({ username }: { username: string }) {
         {pestana === "incidencias" && <IncidenciasScreen />}
         {pestana === "ceria" && <CeriaScreen />}
         {pestana === "rotacion" && <AjustarLetrasScreen />}
+        {pestana === "partes" && <CorreccionPartesScreen />}
+        {pestana === "prueba-camara" && <PruebaCamaraScreen />}
       </div>
     </div>
   );
