@@ -109,8 +109,11 @@ se aplican las validaciones de `01-dominio.md`; al confirmar →
 ### Incidencia de calidad
 Botón dentro del parte mientras está pendiente (no después): texto +
 fotos opcionales → `incidencia_calidad(parte_id)` → Telegram al
-instante. No hay punto de entrada para incidencia de producción dentro
-del parte (pendiente).
+instante. La incidencia de producción no tiene botón aquí a propósito:
+cuelga de turno + línea (o solo turno si es general), no de un parte
+concreto — un paro de máquina o falta de material no está ligado a un
+lote/tono específico. Su punto de entrada real está en `TurnoScreen`
+(ver más abajo), no dentro de la captura de parte.
 
 ### Aviso final
 Recuerda la ventana de corrección de 1 h. Se puede ocultar.
@@ -140,5 +143,4 @@ parte nuevo lo hace).
 
 ## Lo que el responsable no tiene todavía
 Historial de partes propio, ranking/stats/personaje/logros/equipo
-(diseñado: barra inferior de gamificación), incidencia de producción
-desde dentro del parte.
+(diseñado: barra inferior de gamificación).

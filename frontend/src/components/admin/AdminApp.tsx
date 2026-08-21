@@ -15,9 +15,10 @@ import { IncidenciasScreen } from "../jefe/IncidenciasScreen";
 import { AjustarLetrasScreen } from "./AjustarLetrasScreen";
 import { CorreccionPartesScreen } from "./CorreccionPartesScreen";
 import { PruebaCamaraScreen } from "./PruebaCamaraScreen";
+import { CierreFabricaScreen } from "./CierreFabricaScreen";
+import { ChecklistScreen } from "./ChecklistScreen";
 
-type PestanaAdmin = "vista-rapida" | "vista-detallada" | "incidencias" | "ceria" | "rotacion" | "partes" | "prueba-camara";
-
+type PestanaAdmin = "vista-rapida" | "vista-detallada" | "incidencias" | "ceria" | "rotacion" | "partes" | "prueba-camara" | "cierre-fabrica" | "checklist";
 function BotonPestana({
   activa,
   onClick,
@@ -83,6 +84,12 @@ export function AdminApp({ username }: { username: string }) {
           <BotonPestana activa={pestana === "prueba-camara"} onClick={() => setPestana("prueba-camara")}>
             Cámara
           </BotonPestana>
+          <BotonPestana activa={pestana === "cierre-fabrica"} onClick={() => setPestana("cierre-fabrica")}>
+            Cierre fábrica
+          </BotonPestana>
+          <BotonPestana activa={pestana === "checklist"} onClick={() => setPestana("checklist")}>
+            Checklist
+          </BotonPestana>
         </div>
       </div>
 
@@ -94,6 +101,8 @@ export function AdminApp({ username }: { username: string }) {
         {pestana === "rotacion" && <AjustarLetrasScreen />}
         {pestana === "partes" && <CorreccionPartesScreen />}
         {pestana === "prueba-camara" && <PruebaCamaraScreen />}
+        {pestana === "cierre-fabrica" && <CierreFabricaScreen />}
+        {pestana === "checklist" && <ChecklistScreen />}
       </div>
     </div>
   );

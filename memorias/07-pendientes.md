@@ -205,15 +205,16 @@ migración, la nota anterior sobre esto era incorrecta/desactualizada).
 2. Alta/edición de usuarios y letra desde la app — DESCARTADO (ver
    `09-administrador.md`); la letra ya se ajusta desde el panel de
    admin, el alta de cuentas se queda en SQL a mano.
-3. Incidencia de producción desde dentro del parte.
-4. Responsable: Historial de partes, barra de gamificación (Ranking,
+3. Responsable: Historial de partes, barra de gamificación (Ranking,
    Personaje, Logros, Equipo).
 5. Operario: Inicio con puntos/nivel, Ranking, Stats, Logros, personaje
    RPG (elegir proveedor de imagen).
-6. Administrador: fusión de modelos/marcas/productos/lotes, cierre de
-   fábrica, checklist. "Recalcular ciclo anterior" bloqueado hasta que
-   exista `cerrar-ciclo` (punto 1). Corrección de partes sin límite —
-   **[CERRADO 21/08/2026]**, ver `09-administrador.md`.
+6. Administrador: **[CERRADO 22/08/2026]** cambio de rol, cierre de
+   fábrica y checklist ya construidos (ver `09-administrador.md`).
+   Solo queda fusión de modelos/marcas/productos/lotes (necesita
+   Edge Function con `service_role`) y "Recalcular ciclo anterior"
+   (bloqueado hasta que exista `cerrar-ciclo`, punto 1). Corrección
+   de partes sin límite — **[CERRADO 21/08/2026]**.
 7. Refactor de `TurnoScreen.tsx` (hook `useTurnoActual`, componentes
    `EstadoTurnoBloqueado`, `TarjetaLinea`, máquina de estados pura).
 8. Tests unitarios (rotación, validaciones, normalización, tramos) y

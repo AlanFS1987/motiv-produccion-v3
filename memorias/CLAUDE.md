@@ -61,7 +61,7 @@ Usuarios: 27 reales cargados (6 responsables, 17 operarios, jefe, admin, suplent
 | Gamificación: tablas de tramos, vistas de puntos de rendimiento del ciclo actual, con reparto igualitario entre operarios de una línea+turno | Construido y probado en real (20/08/2026) — falta corregir `crearParteInicial` que no rellenaba `operario_id` (ya corregido), **sin pantalla** y sin piezas/limpieza en el total |
 | Cierre de ciclo (`historial_ciclos`), ranking, niveles, personaje RPG, logros | Diseñado, **no construido** |
 | Dashboard del jefe (Vista Rápida, Detallada, Incidencias) | **Construido** (ver `08-dashboard-jefe.md`) |
-| Panel de administrador (Rotación) | **Construido** (ver `09-administrador.md`); fusión catálogo/corrección sin límite/cierre fábrica/checklist siguen sin construir |
+| Panel de administrador (Rotación + rol, corrección sin límite, cierre fábrica, checklist) | **Construido** (ver `09-administrador.md`); solo falta fusión de catálogo, pendiente de Edge Function con `service_role` |
 | Pantalla de fábrica (carrusel, rol `pantalla`) | **Construido** (ver `10-pantalla.md`); 2 de 5 diapositivas en placeholder |
 | Ceria | **Construido** sobre GPT-5-mini (ver `11-ceria.md`) |
 | Sistema de temas (5 temas) | **Construido** (arquitectura + marco de todos los shells); contenido interior de la mayoría de pantallas sin migrar (ver `12-temas.md`) |

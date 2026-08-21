@@ -50,17 +50,43 @@ propias pestañas de gestión.
   a que Chrome/MIUI descarta la pestaña en 2º plano, no a falta de
   RAM — a confirmar con `chrome://discards`).
 
+- **Cambio de rol** (`admin/AjustarLetrasScreen.tsx`, mismo lib
+  `admin-usuarios.ts`) — en la misma pantalla de Rotación, además de
+  la letra, se puede cambiar el rol de cualquier usuario entre
+  responsable/suplente/operario/jefe/producción/calidad. Al pasar a
+  un rol sin letra se limpia `letra` en el mismo UPDATE. `suplente`
+  sigue siendo fila única (índice parcial existente) — el error de
+  Postgres se muestra tal cual si se intenta duplicar. Ascender a
+  `administrador` está bloqueado con doble barrera: la UI no lo
+  ofrece como opción, y además un trigger en BD
+  (`fn_bloquear_ascenso_admin`, migración
+  `20260821230000_bloquear_ascenso_admin.sql`) rechaza cualquier
+  UPDATE que ponga `rol = 'administrador'` viniendo de un rol
+  distinto — probado en real forzando el valor desde el inspector del
+  navegador. El alta de la primera cuenta admin sigue siendo por SQL
+  a mano (INSERT), eso no lo toca el trigger.
+- **Cierre de fábrica** (`admin/CierreFabricaScreen.tsx`,
+  `lib/admin-cierre-fabrica.ts`) — alta/baja de periodos de
+  vacaciones sobre `cierre_fabrica` (listado + formulario
+  desde/hasta + eliminar). La tabla y el trigger de bloqueo
+  (`fn_bloquear_turno_en_cierre`) ya existían; esto era solo la
+  pantalla. Permisos ya cubiertos por la política
+  `cierre_fabrica_admin_todo`, sin migración nueva.
+- **Checklist de limpieza** (`admin/ChecklistScreen.tsx`,
+  `lib/admin-checklist.ts`) — activar/desactivar los 6 ítems de
+  `checklist_items` y ajustar sus puntos. Un ítem desactivado
+  desaparece de la pantalla de Limpieza del operario
+  (`obtenerLineasParaLimpieza` ya filtra `activo = true`); el
+  histórico de `operario_checklist` no se toca. Permisos ya cubiertos
+  por `checklist_items_admin_todo`, sin migración nueva.
+
 ## Por construir
 
 - **Fusión de modelos/marcas/productos/lotes duplicados** — el OCR
   puede crear un registro nuevo por un typo o variación de nombre
   cuando en realidad ya existía uno. Sin pantalla; hoy se corrige a
-  mano por SQL.
-- **Cierre de fábrica** (`cierre_fabrica`) — tabla y trigger de
-  bloqueo (`fn_bloquear_turno_en_cierre`) ya existen; falta el
-  formulario para dar de alta un periodo de vacaciones.
-- **Checklist de limpieza** (`checklist_items`) — activar/desactivar
-  ítems y sus puntos; tabla ya existe, sin pantalla.
+  mano por SQL. Pendiente de Edge Function con `service_role` (no
+  encaja en el patrón de RLS por rol de usuario final).
 - **Recalcular ciclo anterior** — bloqueado: depende de que
   `cerrar-ciclo` exista primero (ver `04-gamificacion.md`, pieza con
   fecha límite 28/09/2026). No tiene sentido construir el
