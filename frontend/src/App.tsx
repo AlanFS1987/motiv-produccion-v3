@@ -11,6 +11,7 @@ import { JefeApp } from "./components/jefe/JefeApp";
 import { AdminApp } from "./components/admin/AdminApp";
 import { PantallaCarrusel } from "./components/pantalla/PantallaCarrusel";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
+import { RolSinInterfaz } from "./components/RolSinInterfaz";
 
 type Pestana = "turno" | "resumen" | "lotes";
 
@@ -62,8 +63,11 @@ function AppAutenticada({ username }: { username: string }) {
   if (usuario?.rol === "jefe") {
     return <JefeApp username={username} />;
   }
+  if (usuario?.rol !== "responsable" && usuario?.rol !== "suplente") {
+    return <RolSinInterfaz rol={usuario?.rol ?? "desconocido"} />;
+  }
   return (
-    <div className="min-h-screen bg-[var(--fondo)]">
+  <div className="min-h-screen bg-[var(--fondo)]">
       {/* Cabecero de ancho completo */}
       <header className="border-b border-[var(--borde)] bg-[var(--superficie)]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">

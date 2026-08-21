@@ -49,6 +49,14 @@ comportamiento real, luego decisiones, luego construcción.
   public` a ambas (`20260820160000_fix_search_path_funciones.sql`).
   Confirmado contra `pg_proc` en BD real: `proconfig =
   ["search_path=public"]` en las dos.
+  
+  
+  Confirmado 21/08/2026: `supabase db diff --linked` sin diferencias —
+esquema real y migraciones alineados, incluido el enum `rol_usuario`
+completo (`pantalla`/`jefe_rectificado` sí están cubiertos por
+migración, la nota anterior sobre esto era incorrecta/desactualizada).
+
+
 
 - **[CERRADO 21/08/2026]** Ceria (fase 1) podía devolver `tool_calls`
   vacío pese a `tool_choice: "required"` con preguntas más complejas
@@ -58,10 +66,58 @@ comportamiento real, luego decisiones, luego construcción.
   pensando. Corregido: 1200 tokens + `reasoning_effort: "low"` en fase
   1 (elegir herramienta es tarea simple, no necesita razonar de más),
   3000 + `"low"` en fase 3.
+  - **[CERRADO 21/08/2026]** `AuthContext.tsx` — el guard de
+  `TOKEN_REFRESHED` comprobaba `usuario` directamente dentro del
+  callback de `onAuthStateChange`, pero ese callback vive en un
+  `useEffect` con deps `[]` (se crea una sola vez, al montar) — así
+  que `usuario` quedaba congelado en `null` para siempre por el
+  closure, y el guard nunca se cumplía. Resultado real: cada
+  TOKEN_REFRESHED (se dispara al recuperar el foco, incluida la
+  cámara nativa) seguía disparando `setCargando(true)` y desmontando
+  la app — el bug de "se pierde la foto en curso al volver de la
+  cámara" que un comentario anterior en el propio archivo daba por
+  corregido, en realidad seguía activo. Corregido con un `useRef`
+  sincronizado (`usuarioRef`) que sí refleja el valor actual dentro
+  del callback.
 
-9. Enum `rol_usuario` con `pantalla`/`jefe_rectificado` en BD y no en
-   migraciones (confirmado): migración `alter type ... add value if not
-   exists` y `supabase db diff` para cazar más deriva.
+- **[CERRADO 21/08/2026]** `fn_es_responsable_de_turno` — función sin
+  ningún uso real (confirmado contra `pg_policies`), con un bug de
+  diseño (el `or fn_rol_actual() in (...)` final anulaba la
+  comprobación real de `exists(...)` contra `p_turno_id`). Eliminada
+  con `20260821223000_drop_fn_es_responsable_de_turno.sql`.
+
+- **[CERRADO 21/08/2026]** `lib/supabase-functions.ts` tenía
+  `llamarEdgeFunction`/`generarResumenTurnoRemoto` sin ningún uso real
+  y con un comentario que decía justo lo contrario que la Edge
+  Function que llamaba (`generar-resumen-turno`, que "NUNCA la llama
+  el frontend"). Además mandaba la anon key como Bearer contra una
+  función desplegada `--no-verify-jwt` que solo acepta
+  `x-webhook-secret` — habría fallado con 401 si alguien la
+  reactivaba. Eliminada la función y sus tipos asociados.
+
+- **[CERRADO 21/08/2026]** `App.tsx` — cualquier rol no reconocido
+  explícitamente (`produccion`, `calidad`, o cualquier valor futuro)
+  caía por defecto al shell de responsable y fallaba en silencio
+  contra RLS. Añadido componente `RolSinInterfaz` y una comprobación
+  explícita: solo `responsable`/`suplente` van al shell de
+  responsable, cualquier otro rol ve un aviso claro.
+
+- **[CERRADO 21/08/2026]** `notificar-telegram-resumen-calidad` — el
+  marcado de `resumen_calidad_enviado_at` ocurría solo al final de
+  todos los envíos; si un mensaje fallaba a mitad (de varios, por el
+  límite de 3500 caracteres), ningún lote quedaba marcado, incluidos
+  los ya enviados con éxito en mensajes anteriores — duplicados
+  garantizados en el siguiente pase del cron. Corregido: se marca
+  cada lote justo tras confirmarse el envío de SU mensaje concreto.
+
+- **[CERRADO 21/08/2026]** `SelectorFotosMultiple.tsx` — al quitar una
+  foto no se liberaba la URL de objeto local (`URL.revokeObjectURL`),
+  quedando en memoria hasta recargar la página. Corregido. (El borrado
+  del archivo remoto en Cloudinary queda fuera: los presets son
+  unsigned y no permiten borrado sin exponer credenciales — se acepta
+  la huérfana hasta la purga de retención de 18 meses, o hasta que el
+  volumen justifique una Edge Function de borrado con service_role.)
+
 
 12. Cierre automático de turno: confirmar con un caso real (o forzar
     `select fn_encolar_resumenes_turno_pendientes();`).
@@ -69,6 +125,15 @@ comportamiento real, luego decisiones, luego construcción.
     probar de punta a punta.
 14. Identificador de modelo de OCR fijo en código; moverlo a
     configuración/secret para no redesplegar cuando se retire.
+15. Migraciones duplicadas de mismo propósito
+    (`20260816230000`/`20260816230001` para resumen automático de
+    turno; `20260820220000`/`20260821220000` para seeds de prompts de
+    Ceria) — el resultado final en BD es correcto (confirmado con
+    `supabase db diff --linked`, sin diferencias), pero son confusas
+    de leer. Aplazado a propósito: se resolverá con un squash general
+    de migraciones antes de arrancar producción (31/08/2026) — la app
+    no tiene datos reales más allá de usuarios de prueba creados a
+    mano, así que es un buen momento para hacerlo sin riesgo.
 - **[CERRADO 20/08/2026]** Sin plan B si la API de Anthropic no
   respondía: se descartó el formulario manual/guardado local (mucha
   complejidad para un evento que no había ocurrido en 5 meses de uso

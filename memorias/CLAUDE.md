@@ -184,8 +184,6 @@ pantalla para ello.
 - Las políticas de UPDATE en `parte` para responsables exigen
   `responsable_id = auth.uid()`: un suplente no puede completar un
   parte abierto por el titular (ni al revés). Ver `07-pendientes.md`.
-- El enum `rol_usuario` tiene `pantalla` y `jefe_rectificado` en la BD
-  real (confirmado) sin migración que los cree: falta la migración.
 - Las 2 filas de `usuario` sin letra son `suplente` (sin letra por
   diseño, exenta del candado de rotación) y `test` (cuenta de
   pruebas) — no hay ningún responsable real bloqueado. Queda

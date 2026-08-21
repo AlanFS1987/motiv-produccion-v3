@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase-client";
 
@@ -34,7 +34,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<PerfilUsuario | null>(null);
   const [cargando, setCargando] = useState(true);
   const [errorPerfil, setErrorPerfil] = useState<string | null>(null);
-
+  const usuarioRef = useRef<PerfilUsuario | null>(null);
+  useEffect(() => {
+    usuarioRef.current = usuario;
+  }, [usuario]);
   useEffect(() => {
     let activo = true;
 

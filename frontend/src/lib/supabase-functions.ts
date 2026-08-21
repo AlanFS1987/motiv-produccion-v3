@@ -3,31 +3,8 @@
 // solo necesitamos invocar funciones — cuando añadamos login/consultas
 // a tablas sí incorporaremos el cliente completo (con manejo de sesión).
 import { supabase } from "./supabase-client";
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-async function llamarEdgeFunction<T>(nombre: string, body: unknown): Promise<T> {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error(
-      "Faltan VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY — revisa tu archivo .env.local",
-    );
-  }
 
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/${nombre}`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  const data = await res.json();
-  if (!res.ok || data.ok === false) {
-    throw new Error(data.error ?? `Error llamando a ${nombre} (HTTP ${res.status})`);
-  }
-  return data as T;
-}
 
 export type FotoTipoOcr = "hoja_partida" | "caja" | "pantalla";
 
@@ -110,21 +87,3 @@ export async function resolverCatalogo(
   return data as RespuestaResolverCatalogo;
 }
 
-export interface RespuestaGenerarResumenTurno {
-  ok: true;
-  texto: string;
-  mensajes_enviados: number;
-}
-
-/**
- * Dispara la Edge Function que compila el informe de cierre de turno
- * (01-rol-responsable.md 3.9b) y lo manda al grupo de Telegram
- * "Resumen de turno". Se llama justo después de cerrar el turno
- * (`cerrarTurnoManualmente`) — quien llama debe capturar el error y
- * NO bloquear el cierre si esto falla (Telegram caído, etc.): el
- * turno ya quedó cerrado, y el informe se puede seguir viendo/
- * copiando desde la pestaña Resumen en cualquier momento.
- */
-export function generarResumenTurnoRemoto(turnoId: string): Promise<RespuestaGenerarResumenTurno> {
-  return llamarEdgeFunction<RespuestaGenerarResumenTurno>("generar-resumen-turno", { turno_id: turnoId });
-}

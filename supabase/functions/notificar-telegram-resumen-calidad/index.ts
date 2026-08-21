@@ -121,6 +121,14 @@ async function calcularDesgloseLote(loteId: string, formatoNombre: string): Prom
   };
 }
 
+// Un bloque de texto (un lote) más los ids de lote que contiene —
+// normalmente 1, pero se deja como array por si en el futuro un
+// bloque agrupa más de un lote.
+interface BloqueConLotes {
+  texto: string;
+  loteIds: string[];
+}
+
 Deno.serve(async (req) => {
   const secretRecibido = req.headers.get("x-webhook-secret");
   if (secretRecibido !== WEBHOOK_SECRET) {
@@ -145,11 +153,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    const bloques: string[] = [
-      `📊 <b>RESUMEN DE CALIDAD — ${lotes.length} lote${lotes.length === 1 ? "" : "s"} finalizado${lotes.length === 1 ? "" : "s"}</b>`,
-    ];
+    // El encabezado no lleva lotes propios (loteIds: []) — solo
+    // acompaña al primer mensaje, nunca hace falta marcar nada por él.
+    const cabecera: BloqueConLotes = {
+      texto: `📊 <b>RESUMEN DE CALIDAD — ${lotes.length} lote${lotes.length === 1 ? "" : "s"} finalizado${lotes.length === 1 ? "" : "s"}</b>`,
+      loteIds: [],
+    };
 
-    const loteIdsEnviados: string[] = [];
+    const bloques: BloqueConLotes[] = [cabecera];
 
     for (const lote of lotes) {
       const desglose = await calcularDesgloseLote(lote.id, lote.formatoNombre);
@@ -157,8 +168,8 @@ Deno.serve(async (req) => {
       const totalCompleta = desglose.m2_1a + desglose.m2Comercial + desglose.m2Contenedor;
       const tonosTexto = desglose.tonos.length > 0 ? desglose.tonos.join(", ") : "—";
 
-      bloques.push(
-        [
+      bloques.push({
+        texto: [
           `Orden ${lote.numeroOrden}`,
           `${lote.marcaNombre} ${lote.formatoNombre}`,
           `<b>${lote.modeloNombre}</b> Tono ${tonosTexto}`,
@@ -172,46 +183,69 @@ Deno.serve(async (req) => {
           `Comercial: ${formatearPct(desglose.m2Comercial, totalCompleta)} · ${formatearM2(desglose.m2Comercial)}`,
           `Descarte: ${formatearPct(desglose.m2Contenedor, totalCompleta)} · ${formatearM2(desglose.m2Contenedor)}`,
         ].join("\n"),
-      );
-      loteIdsEnviados.push(lote.id);
+        loteIds: [lote.id],
+      });
     }
 
-    // Partir en varios mensajes si hace falta, siempre en un límite de
-    // bloque completo — mismo patrón que generar-resumen-turno.
-    const mensajes: string[] = [];
-    let actual = "";
+    // Partir en varios mensajes si hace falta (mismo patrón que
+    // generar-resumen-turno), pero ahora cada mensaje lleva también
+    // la lista de loteIds que contiene, para poder marcar exactamente
+    // esos lotes en cuanto ESE mensaje concreto se envíe con éxito.
+    const mensajes: { texto: string; loteIds: string[] }[] = [];
+    let textoActual = "";
+    let loteIdsActual: string[] = [];
     for (const bloque of bloques) {
-      const candidato = actual ? `${actual}\n\n${bloque}` : bloque;
-      if (candidato.length > LIMITE_TELEGRAM && actual) {
-        mensajes.push(actual);
-        actual = bloque;
+      const candidato = textoActual ? `${textoActual}\n\n${bloque.texto}` : bloque.texto;
+      if (candidato.length > LIMITE_TELEGRAM && textoActual) {
+        mensajes.push({ texto: textoActual, loteIds: loteIdsActual });
+        textoActual = bloque.texto;
+        loteIdsActual = [...bloque.loteIds];
       } else {
-        actual = candidato;
+        textoActual = candidato;
+        loteIdsActual = [...loteIdsActual, ...bloque.loteIds];
       }
     }
-    if (actual) mensajes.push(actual);
+    if (textoActual) mensajes.push({ texto: textoActual, loteIds: loteIdsActual });
 
-    for (const texto of mensajes) {
+    const loteIdsEnviados: string[] = [];
+
+    // Se envía mensaje a mensaje, y se marca CADA mensaje en cuanto
+    // se confirma su envío — así, si algo falla a mitad (ej. el
+    // segundo de tres), los lotes de los mensajes ya enviados con
+    // éxito quedan marcados y no se repiten en el próximo digest;
+    // solo se reintentan los que de verdad no llegaron.
+    for (const mensaje of mensajes) {
       const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: TELEGRAM_CHAT_RESUMEN_CALIDAD, text: texto, parse_mode: "HTML" }),
+        body: JSON.stringify({ chat_id: TELEGRAM_CHAT_RESUMEN_CALIDAD, text: mensaje.texto, parse_mode: "HTML" }),
       });
       if (!res.ok) {
         const errText = await res.text();
         throw new Error(`Error enviando a Telegram (${res.status}): ${errText}`);
       }
-    }
 
-    // Marcar SOLO tras un envío con éxito — evita que un lote se
-    // repita en un futuro digest, y si algo falla a mitad, ningún
-    // lote queda marcado como enviado sin haberlo estado de verdad.
-    const { error: marcarErr } = await supabase
-      .from("lote")
-      .update({ resumen_calidad_enviado_at: new Date().toISOString() })
-      .in("id", loteIdsEnviados);
-    if (marcarErr) {
-      console.error("Digest enviado, pero no se pudo marcar resumen_calidad_enviado_at:", marcarErr);
+      if (mensaje.loteIds.length > 0) {
+        const { error: marcarErr } = await supabase
+          .from("lote")
+          .update({ resumen_calidad_enviado_at: new Date().toISOString() })
+          .in("id", mensaje.loteIds);
+        if (marcarErr) {
+          // Este mensaje concreto ya salió a Telegram: no relanzamos
+          // el error (eso reintentaría reenviarlo), solo lo dejamos
+          // registrado — el próximo pase del cron volverá a intentar
+          // marcar estos mismos lotes (siguen con enviado_at null) y,
+          // si Telegram ya los tiene, se duplicarán una vez más hasta
+          // que el marcado funcione. Es el mismo riesgo residual que
+          // ya asume generar-resumen-turno con resumen_enviado_at.
+          console.error(
+            `Mensaje enviado a Telegram, pero no se pudo marcar resumen_calidad_enviado_at para lotes ${mensaje.loteIds.join(", ")}:`,
+            marcarErr,
+          );
+        } else {
+          loteIdsEnviados.push(...mensaje.loteIds);
+        }
+      }
     }
 
     return new Response(

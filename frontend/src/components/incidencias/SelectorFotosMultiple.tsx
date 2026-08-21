@@ -45,6 +45,14 @@ export function SelectorFotosMultiple({ fotos, onCambiar, publicIdPrefijo, categ
   }
 
   function quitarFoto(index: number) {
+    const foto = fotos[index];
+    if (foto) {
+      // Libera la URL de objeto local de la previsualización — el
+      // archivo real en Cloudinary no se borra (preset unsigned, no
+      // permite borrado desde el navegador sin exponer credenciales;
+      // queda para la purga periódica de retención).
+      URL.revokeObjectURL(foto.previsualizacion);
+    }
     onCambiar(fotos.filter((_, i) => i !== index));
   }
 
