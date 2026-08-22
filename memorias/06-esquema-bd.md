@@ -90,9 +90,11 @@ completado bool default false, completado_at, created_at.
 (formato, min, max, puntos — 35 filas), **puntos_metros** (m2_min,
 m2_max, puntos — 10 filas).
 
-**niveles** (9 filas: nombre, umbral_min/max, color, estrellas,
-efecto_aura, descripcion, prompt_base, prompt_imagen),
-**niveles_responsable** (nivel_id, umbral_min, umbral_max).
+**niveles** (9 filas: nombre, umbral_min/max, descripcion, color,
+estrellas, efecto_aura, prompt_base, prompt_imagen, orden, +
+`umbral_min_responsable`/`umbral_max_responsable` generadas ×1,5).
+Sin tabla `niveles_responsable` — descartada (22/08/2026), ver
+`04-gamificacion.md`.
 
 **logros_definicion**, **operario_logro** (usuario, logro, nivel_actual,
 primera_vez_at, ultima_vez_at; unique), **personaje_rpg** (usuario,
