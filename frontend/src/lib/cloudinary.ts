@@ -3,12 +3,19 @@
 // preset/carpeta compartido por todo, a un preset por categoría —
 // cada uno con su "Asset folder" fijo en el propio preset (seguridad:
 // el cliente no puede escribir en otra carpeta aunque quiera).
+//
+// "personajes" añadida 22/08/2026: reutiliza el MISMO preset unsigned
+// que ya usa la Edge Function generar-personaje del lado servidor
+// (CLOUDINARY_PRESET_PERSONAJES en los secrets de Supabase) — un
+// preset unsigned no distingue quién sube, solo hace falta que el
+// frontend también conozca su nombre (variable VITE_*, pública).
 
 export type CategoriaCloudinary =
   | "partes"
   | "incidencias-calidad"
   | "incidencias-produccion"
-  | "limpieza";
+  | "limpieza"
+  | "personajes";
 
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined;
 
@@ -20,6 +27,7 @@ const PRESETS: Record<CategoriaCloudinary, string | undefined> = {
   "incidencias-calidad": import.meta.env.VITE_CLOUDINARY_PRESET_INCIDENCIAS_CALIDAD as string | undefined,
   "incidencias-produccion": import.meta.env.VITE_CLOUDINARY_PRESET_INCIDENCIAS_PRODUCCION as string | undefined,
   "limpieza": import.meta.env.VITE_CLOUDINARY_PRESET_LIMPIEZA as string | undefined,
+  "personajes": import.meta.env.VITE_CLOUDINARY_PRESET_PERSONAJES as string | undefined,
 };
 
 export interface ResultadoSubidaCloudinary {
