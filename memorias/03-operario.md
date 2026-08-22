@@ -2,8 +2,12 @@
 
 Shell propio (`operario/OperarioApp.tsx`), se muestra cuando
 `usuario.rol = 'operario'`. Cuatro pestañas: **Inicio**, **Mi línea**,
-**Historial**, **Limpieza**. La barra de gamificación
-(Ranking/Stats/Logros) está diseñada y no construida.
+**Historial**, **Limpieza**. La barra de gamificación como pestañas
+propias (Ranking/Stats/Logros) está diseñada y no construida — pero
+ojo, eso no significa que Inicio siga vacía de gamificación: desde
+22/08/2026 Inicio ya incluye la tarjeta completa de nivel/puntos/
+personaje (ver más abajo), es solo Ranking/Stats/Logros como
+**pestañas separadas** lo que sigue sin construir.
 
 ## Turno y pertenencia
 
@@ -20,8 +24,25 @@ Limpieza muestran "pide al responsable que te añada como refuerzo" en
 vez de datos de un turno ajeno.
 
 ## Inicio
-Mensaje de estado del turno personal. El diseño prevé puntos totales,
-barra de nivel y desglose — no construido.
+
+**Construida y probada en real (22/08/2026)** —
+`InicioOperarioScreen.tsx`. Dos bloques:
+
+- Mensaje de estado del turno personal (sin cambios desde antes).
+- **Tarjeta de gamificación** (`<GamificacionCard />`, mismo archivo):
+  nivel actual con color de marco/estrellas, puntos totales, barra de
+  progreso al siguiente nivel, personaje RPG (imagen + historia) si
+  ya generó uno, selector de imagen de referencia + texto libre +
+  botón "Generar mi personaje" (o "de nuevo"), contador de
+  generaciones disponibles. Usa `frontend/src/lib/gamificacion.ts`
+  (nuevo, genérico para operario y responsable) y llama a la Edge
+  Function `generar-personaje` para la generación en sí — ver
+  `04-gamificacion.md` para el detalle del proveedor (GPT Image 2) y
+  el flujo completo.
+
+Estilo: se mantuvo igual que el resto de `operario/` (colores
+`slate-*` fijos, sin variables de tema) para no mezclar la migración
+al sistema de temas con este cambio — ver `12-temas.md`.
 
 ## Mi línea
 
@@ -81,5 +102,7 @@ Marcar un ítem: foto de **antes** (cámara, obligatoria) → foto de
 restricción UNIQUE (línea, turno, ítem) resuelve la concurrencia: si
 otro lo marcó antes, el INSERT falla y la app avisa "ya lo hizo un
 compañero". Fotos a Cloudinary carpeta `limpieza`, prefijos `antes_` /
-`despues_`. Cada ítem vale 1 punto (`checklist_items.puntos`), pero
-hoy ningún cálculo de puntos los suma (ver `04-gamificacion.md`).
+`despues_`. Cada ítem vale 1 punto (`checklist_items.puntos`), **ya
+sumado desde el 22/08/2026** por `v_puntos_limpieza_operario_por_turno`
+y agregado al total del operario (`v_puntos_operario_total_vida`) —
+ver `04-gamificacion.md`.

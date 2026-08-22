@@ -13,7 +13,8 @@ por **OCR de fotos** (hoja de partida, caja impresa, pantalla de la
 máquina) en vez de a mano. Sobre esos partes: verificación de que la
 caja impresa corresponde al lote, incidencias de calidad/producción,
 informe automático de cierre de turno por Telegram, y una capa de
-gamificación (puntos, niveles, ranking) para operarios y responsables.
+gamificación (puntos, niveles, ranking, personaje RPG) para operarios
+y responsables.
 
 No tiene acceso a PLCs ni a ningún sistema en tiempo real: todo dato
 nace de una foto o de un formulario. No hay modo offline (decisión
@@ -33,9 +34,14 @@ Usuarios: 27 reales cargados (6 responsables, 17 operarios, jefe, admin, suplent
   `supabase/functions/_shared/openai.ts` y `_shared/anthropic.ts`
   respectivamente. Ambas llamadas (y la validación de sesión) tienen
   timeout para evitar cuelgues.
-- **Imágenes**: Cloudinary, cloud `dugiquak1`, 4 presets unsigned con
+- **Generación de imagen (personaje RPG)**: GPT Image 2 (`gpt-image-2`),
+  vía `images/edits` con imagen de referencia — proveedor distinto del
+  usado para el OCR. Constante `MODEL` en
+  `supabase/functions/_shared/openai_images.ts`. Ver `04-gamificacion.md`.
+- **Imágenes**: Cloudinary, cloud `dugiquak1`, 5 presets unsigned con
   carpeta fija cada uno (partes / incidencias-calidad /
-  incidencias-produccion / limpieza).
+  incidencias-produccion / limpieza / **personajes**, este último
+  usado tanto desde el navegador como desde una Edge Function).
 - **Notificaciones**: un bot de Telegram, 5 grupos.
 - **Frontend**: React 19 + TypeScript + Vite + Tailwind v4 +
   lucide-react + @zxing (códigos de barras). Sin framework de tests.
@@ -57,12 +63,11 @@ Usuarios: 27 reales cargados (6 responsables, 17 operarios, jefe, admin, suplent
 | Cierre automático de turno (cron) + envío del informe a Telegram | Construido; el camino automático **no** se ha visto ocurrir en real todavía |
 | Gestión de lotes (lista, Finalizar/Reabrir) | Construido |
 | Telegram: incidencias calidad, incidencias producción, nuevos lotes, resumen de turno, resumen calidad | Construido |
-| Operario: Inicio, Mi línea (verificación propia), Historial, Limpieza | Construido |
-| Gamificación: tablas de tramos, vistas de puntos de rendimiento del ciclo actual, con reparto igualitario entre operarios de una línea+turno | Construido y probado en real (20/08/2026) — falta corregir `crearParteInicial` que no rellenaba `operario_id` (ya corregido), **sin pantalla** y sin piezas/limpieza en el total |
-| Cierre de ciclo (`historial_ciclos`), ranking, niveles, personaje RPG, logros | Diseñado, **no construido** |
+| Operario: Inicio (con gamificación completa), Mi línea (verificación propia), Historial, Limpieza | Construido |
+| Gamificación: puntos completos (rendimiento+piezas+limpieza, operario y responsable), niveles, cierre de ciclo, fuerza/resistencia/velocidad, logros (100% por consulta, sin datos sembrados todavía), personaje RPG (GPT Image 2) | **Construido y probado en real (22/08/2026)** — falta pantalla de Inicio del responsable, Ranking/Stats/Logros como pestañas, y logros del responsable (fase 2). Ver `04-gamificacion.md`. |
 | Dashboard del jefe (Vista Rápida, Detallada, Incidencias) | **Construido** (ver `08-dashboard-jefe.md`) |
-| Panel de administrador (Rotación + rol, corrección sin límite, cierre fábrica, checklist) | **Construido** (ver `09-administrador.md`); solo falta fusión de catálogo, pendiente de Edge Function con `service_role` |
-| Pantalla de fábrica (carrusel, rol `pantalla`) | **Construido** (ver `10-pantalla.md`); 2 de 5 diapositivas en placeholder |
+| Panel de administrador (Rotación + rol, corrección sin límite, cierre fábrica, checklist, recalcular ciclo) | **Construido** (ver `09-administrador.md`); solo falta fusión de catálogo, pendiente de Edge Function con `service_role` |
+| Pantalla de fábrica (carrusel, rol `pantalla`) | **Construido** (ver `10-pantalla.md`); 2 de 5 diapositivas en placeholder (ya no bloqueadas por falta de mecánica de gamificación, solo falta la diapositiva en sí) |
 | Ceria | **Construido** sobre GPT-5-mini (ver `11-ceria.md`) |
 | Sistema de temas (5 temas) | **Construido** (arquitectura + marco de todos los shells); contenido interior de la mayoría de pantallas sin migrar (ver `12-temas.md`) |
 | Base de conocimiento de averías | No construido |
@@ -70,7 +75,7 @@ Usuarios: 27 reales cargados (6 responsables, 17 operarios, jefe, admin, suplent
 Fecha de arranque de rotación y ciclos: **31/08/2026** (lunes,
 `configuracion.fecha_inicio_rotacion`). Si el arranque se mueve, hay
 que cambiar ese valor antes del primer turno y sigue teniendo que ser
-lunes.
+lunes. Primer cierre de ciclo real: **28/09/2026**.
 
 ## Convenciones que hay que respetar
 
@@ -83,7 +88,7 @@ lunes.
   (`notificar-telegram`, `generar-resumen-turno`,
   `notificar-telegram-resumen-calidad`) se despliegan con
   `--no-verify-jwt`; las que llama el navegador (`ocr-parte`,
-  `resolver-catalogo`) no.
+  `resolver-catalogo`, `generar-personaje`) no.
 - **RLS**: helper `fn_rol_actual()`. Las políticas son permisivas y se
   suman con OR: para dar un permiso nuevo se crea una política nueva,
   nunca se amplía una existente. PostgREST **no da error** cuando un
@@ -99,12 +104,19 @@ lunes.
   fecha, no está — se documentó lo relevante en estos `.md` antes de
   reiniciar.
 - **Fotos**: recorte a proporción fija en cliente (`captura-imagen.ts`)
-  → WebP → Cloudinary (unsigned) → se pasa la URL a `ocr-parte`.
+  → WebP → Cloudinary (unsigned) → se pasa la URL a `ocr-parte` (o a
+  `generar-personaje`, en el caso de la imagen de referencia del
+  personaje — sin recorte forzado ahí, solo `procesarFotoLibre`).
   Nombre `{prefijo_}{identificador}_{timestamp}`. El operario nunca
-  tiene selector de galería; el responsable sí (cámara o galería).
+  tiene selector de galería en la captura de parte; el responsable sí
+  (cámara o galería). La imagen de referencia del personaje es la
+  única excepción: ahí el operario SÍ elige de su galería a propósito
+  (ver `04-gamificacion.md`).
 - **Horas**: las franjas de turno son hora de Madrid. El cliente usa
   el reloj del dispositivo; los crons disparan en UTC cada hora en
-  punto y deciden dentro con `at time zone 'Europe/Madrid'`.
+  punto y deciden dentro con `at time zone 'Europe/Madrid'`. El cron
+  de cierre de ciclo además restringe el propio cron a los lunes
+  (`0 * * * 1`), no solo la condición interna — ver `05-automatismos.md`.
 - **Texto duplicado a propósito**: `normalizacion`, `formato` y el
   informe de turno existen en frontend y en `_shared/` de Deno porque
   Deno no importa del frontend. Si se cambia uno, cambiar el otro.
@@ -123,6 +135,7 @@ frontend/src/
     parte.ts                   crear/completar/corregir partes, sugerencias, lotes del turno anterior
     lote.ts                    gestión de lotes
     operario.ts                Mi línea, limpieza, verificación del operario
+    gamificacion.ts            puntos/nivel/personaje — genérico operario+responsable (nuevo 22/08/2026)
     incidencias.ts
     resumen-turno.ts           informe de cierre (versión cliente)
     validaciones-parte.ts      reglas de coherencia piezas/tiempos
@@ -135,13 +148,14 @@ frontend/src/
     ResumenScreen.tsx, GestionLotes.tsx, OperariosRefuerzoCard.tsx
     captura-parte/             wizard: hoja, tono, continuar, caja, codbar, pantalla, aviso
     incidencias/
-    operario/                  OperarioApp, Inicio, MiLinea, Historial, Limpieza, Verificacion*
+    operario/                  OperarioApp, Inicio (con gamificación), MiLinea, Historial, Limpieza, Verificacion*
 supabase/
-  migrations/                  ~30 archivos, 20260101000001 … 20260819140000
+  migrations/                  ~35 archivos, 20260101000001 … 20260822190000
   functions/
-    _shared/                   anthropic.ts, cors.ts, normalizacion.ts, formato.ts
+    _shared/                   anthropic.ts, openai.ts, openai_images.ts, cors.ts, cloudinary.ts, normalizacion.ts, formato.ts
     ocr-parte/                 fotos → JSON (prompts.ts)
     resolver-catalogo/         modelo/marca/producto/lote (service_role)
+    generar-personaje/         imagen de referencia + prompt → personaje RPG (GPT Image 2, service_role)
     notificar-telegram/        incidencias + nuevo lote
     generar-resumen-turno/     informe de cierre → Telegram
     notificar-telegram-resumen-calidad/
@@ -181,6 +195,10 @@ pantalla para ello.
   línea+turno. Se encontró y corrigió un bug aparte:
   `crearParteInicial` (lib/parte.ts) no copiaba el operario a
   `parte.operario_id`, quedaba siempre null.
+  **[AMPLIADO 22/08/2026]**: este reparto igualitario es solo para
+  PUNTOS. Las cantidades en bruto que alimentan los logros de tramo
+  (m², piezas, tiempos) se atribuyen SIN repartir, directamente por
+  `parte.operario_id` — ver `04-gamificacion.md`, sección "Principios".
 - Las políticas de UPDATE en `parte` para responsables exigen
   `responsable_id = auth.uid()`: un suplente no puede completar un
   parte abierto por el titular (ni al revés). Ver `07-pendientes.md`.
@@ -190,4 +208,8 @@ pantalla para ello.
   pendiente decidir el rol de `test` para que no aparezca mezclada en
   listados que filtren por `rol = 'responsable'`; se borra a mano
   desde Supabase cuando ya no haga falta.
+- **`operario_logro` fue eliminada (22/08/2026)** — si ves referencias
+  a ella en migraciones antiguas o documentación de sesiones
+  anteriores, están desactualizadas. Ver `04-gamificacion.md` y
+  `06-esquema-bd.md`.
 - Pendientes ordenados en `07-pendientes.md`.

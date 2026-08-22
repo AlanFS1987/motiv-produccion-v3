@@ -79,6 +79,14 @@ propias pestañas de gestión.
   (`obtenerLineasParaLimpieza` ya filtra `activo = true`); el
   histórico de `operario_checklist` no se toca. Permisos ya cubiertos
   por `checklist_items_admin_todo`, sin migración nueva.
+- **Recalcular ciclo anterior** *(desbloqueado 22/08/2026)* — ya no
+  depende de nada por construir: `fn_cerrar_ciclos_pendientes` (ver
+  `04-gamificacion.md`) es idempotente (`on conflict do update`), así
+  que llamarla a mano desde el SQL Editor
+  (`select fn_cerrar_ciclos_pendientes();`) recalcula cualquier ciclo
+  ya cerrado sin duplicar nada. Falta solo el botón en la UI del
+  admin que dispare esta misma llamada — hoy se hace directamente por
+  SQL.
 
 ## Por construir
 
@@ -87,10 +95,9 @@ propias pestañas de gestión.
   cuando en realidad ya existía uno. Sin pantalla; hoy se corrige a
   mano por SQL. Pendiente de Edge Function con `service_role` (no
   encaja en el patrón de RLS por rol de usuario final).
-- **Recalcular ciclo anterior** — bloqueado: depende de que
-  `cerrar-ciclo` exista primero (ver `04-gamificacion.md`, pieza con
-  fecha límite 28/09/2026). No tiene sentido construir el
-  "recalcular" antes que el propio cierre.
+- **Botón de "Recalcular ciclo anterior" en la UI** — la función ya
+  existe y es segura de llamar (ver arriba); solo falta la pantalla
+  que la invoque en vez de hacerlo por SQL Editor.
 
 ## Descartado (decisión de sesión)
 

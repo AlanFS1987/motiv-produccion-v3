@@ -42,9 +42,15 @@ equivalente.
    - **fuera_producción** no se captura como dato — se infiere:
      `minutos_total − (plena+no_alimentada+saturación+banco+máquina)`,
      igual que el hueco "sin reportar" que ya existía en Vista Rápida.
-4. **Ranking de operarios** — PLACEHOLDER ("zona en obras"). Bloqueado
-   por gamificación: depende de `cerrar-ciclo`, `historial_ciclos`,
-   `personaje_rpg`, nada de eso construido aún.
+4. **Ranking de operarios** — PLACEHOLDER ("zona en obras"). La
+   mecánica de la que dependía (`cerrar-ciclo`, `historial_ciclos`,
+   `personaje_rpg`) **ya está construida** (22/08/2026, ver
+   `04-gamificacion.md`) — lo que falta ahora es solo esta
+   diapositiva en sí, no ningún bloqueo de fondo. `historial_ciclos`
+   sigue vacía hasta el primer cierre real de ciclo (28/09/2026), así
+   que aunque se construya la diapositiva antes de esa fecha, no
+   tendrá datos históricos que mostrar (sí podría mostrar el ciclo
+   actual en vivo vía `v_puntos_operario_ciclo`).
 5. **Reyes del formato** — PLACEHOLDER ("zona en obras"). Existía en
    v2 (gamificación), sin capturas de referencia para replicarlo —
    pendiente de diseño.

@@ -1,10 +1,12 @@
 # 06 — Esquema de base de datos
 
 Contrastado con la BD real el 19/08/2026 (enums, políticas RLS,
-triggers, funciones, vistas, cron). Las columnas de `parte`, `turno`,
-`usuario`, `producto`, `refuerzo_operario_turno`, `operario_*`,
-`personaje_rpg` y `puntos_*` vienen de las migraciones (el volcado de
-columnas se cortó en 100 filas). Para regenerar: `information_schema.columns`,
+triggers, funciones, vistas, cron). Actualizado 22/08/2026 con lo
+construido en la sesión de gamificación (cierre de ciclo, stats,
+personaje RPG). Las columnas de `parte`, `turno`, `usuario`,
+`producto`, `refuerzo_operario_linea`, `operario_*`, `personaje_rpg` y
+`puntos_*` vienen de las migraciones (el volcado de columnas se cortó
+en 100 filas). Para regenerar: `information_schema.columns`,
 `pg_policies`, `pg_proc`, `cron.job`.
 
 Extensiones: `pg_trgm`, `pgcrypto`, `pg_cron`, `pg_net`.
@@ -96,22 +98,73 @@ estrellas, efecto_aura, prompt_base, prompt_imagen, orden, +
 Sin tabla `niveles_responsable` — descartada (22/08/2026), ver
 `04-gamificacion.md`.
 
-**logros_definicion**, **operario_logro** (usuario, logro, nivel_actual,
-primera_vez_at, ultima_vez_at; unique), **personaje_rpg** (usuario,
-nivel_en_generacion, imagen_url, historia, seleccionada),
+**logros_definicion** — **3 columnas nuevas 22/08/2026**: `rol` (text
+not null default 'operario'), `formato_nombre` (text, solo para los
+logros de piezas por formato), `condicion_valor` pasó a **nullable**
+(Rey de Reyes no tiene umbral numérico). Los 19 datos reales del CSV
+de v2 siguen sin sembrar.
+
+**~~operario_logro~~ — eliminada entera (22/08/2026)**. Con los 19
+logros pasando a calcularse 100% por consulta (ver `04-gamificacion.md`),
+esta tabla de progreso guardado (usuario, logro, nivel_actual,
+primera_vez_at, ultima_vez_at) se quedó sin ninguna función — nadie la
+escribía ni la leía. Dropeada en
+`20260822140000_logros_sin_motor.sql`. **Si ves referencias a ella en
+documentación más antigua, están desactualizadas.**
+
+**personaje_rpg** (usuario, nivel_en_generacion, imagen_url, historia,
+seleccionada — sin cambios de esquema hoy, pero ya en uso real:
+`generar-personaje` la escribe vía `fn_guardar_personaje_generado`).
+
 **historial_ciclos** (usuario, rol, cycle_id, fecha_cierre,
 puntos_ciclo, fuerza, resistencia, velocidad, m2_total, piezas_total,
-tiempo_*, piezas_por_formato jsonb; unique (usuario, cycle_id)).
-Todas vacías salvo catálogos.
+tiempo_*, piezas_por_formato jsonb, **+ `m2_contenedor`, `m2_com`,
+`m2_std` numeric default 0, añadidas 22/08/2026** para los 3 logros de
+m² por categoría; unique (usuario, cycle_id)). Sigue vacía hasta el
+primer cierre real de ciclo (28/09/2026) — el mecanismo que la rellena
+(`fn_cerrar_ciclos_pendientes`) ya está construido y probado
+manualmente.
 
 ## Vistas (confirmadas; sin `security_invoker`: se evalúan como el dueño, no aplican RLS)
 
+Ya existían antes de hoy:
 - `operario_ledger`: partes vigentes y completados, operario vía
   `parte.operario_id` directamente (sin JOIN a `asignacion_operario_linea`,
   desde 19-20/08/2026).
 - `v_rendimiento_operario_por_turno`, `v_puntos_rendimiento_operario_ciclo`,
-  `v_rendimiento_responsable_por_turno`, `v_puntos_rendimiento_responsable_ciclo`,
-  `v_puntos_operario_total_vida` (histórico + rendimiento del ciclo actual).
+  `v_rendimiento_responsable_por_turno`, `v_puntos_rendimiento_responsable_ciclo`.
+
+**Nuevas 22/08/2026 (sección 7 del diseño — piezas/metros/limpieza):**
+- `v_piezas_formato_linea_turno` → `v_puntos_piezas_linea_turno` →
+  `v_puntos_piezas_operario_por_linea_turno` (cadena de 3 pasos: piezas
+  por formato → tramo → reparto igualitario entre operarios).
+- `v_puntos_limpieza_operario_por_turno`.
+- `v_metros_responsable_por_turno` → `v_puntos_metros_responsable_por_turno`.
+
+**Nuevas 22/08/2026 (vistas en vivo del ciclo actual, para logros):**
+- `v_piezas_operario_formato_ciclo` → `v_produccion_operario_ciclo`
+  (equivalente a `historial_ciclos` pero para CUALQUIER ciclo, incluido
+  el que aún no cerró — atribución directa por `operario_id`, sin
+  reparto igualitario).
+- `v_puntos_piezas_operario_ciclo`, `v_puntos_limpieza_operario_ciclo`
+  → `v_puntos_operario_ciclo` (puntos totales por operario+ciclo, para
+  cualquier ciclo).
+
+**Nuevas 22/08/2026 (soporte del responsable para cierre de ciclo y stats):**
+- `v_metros_responsable_ciclo`, `v_puntos_metros_responsable_ciclo` →
+  `v_puntos_responsable_ciclo`.
+- `v_tiempo_responsable_ciclo` (tiempo_plena + minutos_rendimiento por
+  ciclo, para fuerza/resistencia/velocidad del responsable).
+- `v_puntos_responsable_total_vida` (análoga a la del operario, no
+  existía hasta hoy).
+
+**Nuevas 22/08/2026 (stats):**
+- `v_stats_vida` — fuerza/resistencia/velocidad de toda la vida
+  (histórico + ciclo en vivo), para cualquier usuario y rol.
+
+**Ampliada 22/08/2026:**
+- `v_puntos_operario_total_vida` — ahora suma piezas y limpieza además
+  de rendimiento (antes solo rendimiento).
 
 ## Funciones
 
@@ -119,7 +172,6 @@ Todas vacías salvo catálogos.
 |---|---|
 | `fn_rol_actual()` | security definer, stable, `set search_path = public` (confirmado 20/08/2026) |
 | `fn_parte_restringir_columnas_update()` | trigger before update en `parte`, no security definer; ver `05-automatismos.md` |
-| `fn_es_responsable_de_turno(uuid)` | security definer; en la práctica devuelve true para cualquier responsable/suplente; no la usa ninguna política |
 | `fn_normalizar_texto(text)` | immutable |
 | `fn_turno_de_letra(date, letra)`, `fn_ciclo_id(date)`, `fn_ciclo_rango(int)`, `fn_letra_de_turno` | todas stable (corregido 20/08/2026) |
 | `fn_fabrica_cerrada(date)`, `fn_bloquear_turno_en_cierre()` | cierre anual |
@@ -128,10 +180,16 @@ Todas vacías salvo catálogos.
 | `fn_parte_reabre_lote()` | trigger de parte, no security definer |
 | `fn_buscar_modelo_similar`, `fn_buscar_marca_similar` | pg_trgm, top 5 |
 | `fn_calcular_calibre_com_pct()` | trigger before insert/update en parte |
-| `fn_ciclo_rango(int)` | inicio/fin de un ciclo; immutable leyendo configuracion |
-| `fn_otorgar_generaciones_por_nivel(uuid, int)`, `fn_consumir_generacion(uuid)` | existen, nada las llama todavía |
+| `fn_otorgar_generaciones_por_nivel(uuid, int)`, `fn_consumir_generacion(uuid)` | ya existían; **ahora en uso real** por `generar-personaje` |
 | `fn_notificar_telegram()`, `fn_disparar_resumen_turno(uuid)`, `fn_disparar_resumen_calidad()` | security definer, leen app_secrets, `net.http_post` |
 | `fn_encolar_resumenes_turno_pendientes()` | cierre automático + reintento |
+| **`fn_cerrar_ciclos_pendientes()`** | **nueva 22/08/2026**, security definer. Recorre todo `cycle_id` anterior al actual sin fila en `historial_ciclos` y las cierra (operario+responsable, con fuerza/resistencia/velocidad). Idempotente (`on conflict do update`) — también sirve para "recalcular ciclo anterior". Disparada por el cron `cerrar-ciclos-pendientes` (ver `05-automatismos.md`). |
+| **`fn_nivel_actual(uuid)`** | **nueva 22/08/2026**, security definer, stable. Nivel actual (id de `niveles`) de un operario o responsable, según puntos totales y el umbral de su rol. |
+| **`fn_guardar_personaje_generado(uuid, uuid, text, text)`** | **nueva 22/08/2026**, security definer. Guardado atómico del personaje generado: desmarca el `seleccionada` anterior, inserta el nuevo ya seleccionado. Usada por la Edge Function `generar-personaje`. |
+
+`fn_es_responsable_de_turno(uuid)` — **eliminada 21/08/2026** (sin uso
+real, bug de diseño). Si ves referencias a ella en documentación más
+antigua, están desactualizadas.
 
 ## Políticas RLS (confirmadas contra `pg_policies`; permisivas, se combinan con OR)
 
@@ -147,10 +205,12 @@ Todas vacías salvo catálogos.
 | incidencia_produccion | responsable, suplente, jefe, produccion, admin | responsable, suplente, admin | — | — |
 | operario_checklist | propio; jefe; admin | propio; admin | — | — |
 | personaje_rpg | propio; jefe; admin | propio; admin | propio | — |
-| historial_ciclos, operario_logro | propio; jefe; admin | — | — | — |
-| modelo, marca, formato, producto, linea, checklist_items, logros_definicion, puntos_*, niveles*, cierre_fabrica | autenticados | admin | admin | admin |
+| historial_ciclos | propio; jefe; admin | — | — | — |
+| modelo, marca, formato, producto, linea, checklist_items, logros_definicion, puntos_*, niveles, cierre_fabrica | autenticados | admin | admin | admin |
 | app_secrets | ninguno (revoke) | | | |
 
 No hay políticas para `pantalla` ni `jefe_rectificado`; `parte_select`
 los excluye (lista explícita de roles). El administrador **no** tiene
 UPDATE en `parte`.
+
+`operario_logro` eliminada de esta lista (tabla dropeada, ver arriba).

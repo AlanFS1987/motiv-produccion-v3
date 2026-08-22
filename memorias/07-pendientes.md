@@ -13,12 +13,6 @@ comportamiento real, luego decisiones, luego construcción.
   reparto igualitario entre 2 operarios confirmado con datos reales
   (16 puntos cada uno).
 
-- **[CERRADO 20/08/2026]** robada en real —
-  reparto igualitario confirmado entre 2 operarios en la misma
-  línea+turno. Se encontró y corrigió un bug aparte:
-  `crearParteInicial` (lib/parte.ts) no copiaba el operario a
-  `parte.operario_id`, quedaba siempre null.
-
 - **[CERRADO 20/08/2026]** `puntos_rendimiento` (operario) tenía
   copiada por error la escala del responsable (10 tramos, máx 45).
   Reemplazada por la escala real de v2 (6 tramos, máx 15), sin huecos.
@@ -126,6 +120,10 @@ migración, la nota anterior sobre esto era incorrecta/desactualizada).
   la huérfana hasta la purga de retención de 18 meses, o hasta que el
   volumen justifique una Edge Function de borrado con service_role.)
 
+- **[CERRADO 22/08/2026]** `operario_logro` eliminada — con los 19
+  logros pasando a calcularse 100% por consulta, esta tabla de
+  progreso guardado se quedó sin ninguna función. Ver
+  `04-gamificacion.md`.
 
 12. Cierre automático de turno: confirmar con un caso real (o forzar
     `select fn_encolar_resumenes_turno_pendientes();`).
@@ -142,6 +140,12 @@ migración, la nota anterior sobre esto era incorrecta/desactualizada).
     de migraciones antes de arrancar producción (31/08/2026) — la app
     no tiene datos reales más allá de usuarios de prueba creados a
     mano, así que es un buen momento para hacerlo sin riesgo.
+16. **[NUEVO 22/08/2026]** `fn_cerrar_ciclos_pendientes` está
+    construida y probada manualmente, pero el primer cierre real no
+    ocurrirá hasta el 28/09/2026 (fin del ciclo 0) — pendiente de
+    confirmar con un caso real que el cron dispara correctamente ese
+    lunes (mismo tipo de validación pendiente que el cierre automático
+    de turno, punto 12).
 - **[CERRADO 20/08/2026]** Sin plan B si la API de Anthropic no
   respondía: se descartó el formulario manual/guardado local (mucha
   complejidad para un evento que no había ocurrido en 5 meses de uso
@@ -169,15 +173,14 @@ migración, la nota anterior sobre esto era incorrecta/desactualizada).
 - **[VALIDADO 20/08/2026]** Cálculo de puntos de rendimiento del
   operario confirmado correcto contra datos reales
   (`v_puntos_operario_total_vida`) tras probar el flujo completo
-  responsable→operario con la fábrica parada por vacaciones. Sigue sin
-  pantalla que lo muestre (ver `04-gamificacion.md`).
+  responsable→operario con la fábrica parada por vacaciones.
+  **[CERRADO 22/08/2026]**: ya tiene pantalla (`InicioOperarioScreen.tsx`,
+  ver `04-gamificacion.md`).
+
 ## Decisiones por tomar
 
 - Alcance del lanzamiento del 31/08 (propuesta: responsable + operario,
   jefe por Telegram; el resto en septiembre–octubre).
-- Tabla de rendimiento del responsable: confirmar escala
-  (`select * from puntos_rendimiento_responsable order by pct_min` —
-  no venía en el volcado).
 - Dónde guardar el saldo inicial de puntos de v2.
 - `[DECISIÓN PENDIENTE]` umbral de "minutos atípicos" (hoy 600).
 
@@ -185,7 +188,9 @@ migración, la nota anterior sobre esto era incorrecta/desactualizada).
   hoy GPT es el extractor principal con fallback automático a Haiku si
   falla, en prueba de coste/calidad desde 20/08/2026
   (`_shared/openai.ts`, `_shared/anthropic.ts`). Sin fecha límite para
-  decidir cuál queda en firme.
+  decidir cuál queda en firme. (Nota: el proveedor de imagen del
+  personaje RPG, GPT Image 2, es una decisión distinta y ya está
+  cerrada — ver `04-gamificacion.md`.)
 
   - Cámara nativa (`<input capture>`) sigue recargando la app en Redmi
   Note 12 Pro+ (confirmado 21/08/2026, pantalla de prueba
@@ -200,30 +205,43 @@ migración, la nota anterior sobre esto era incorrecta/desactualizada).
 
 ## Por construir (orden sugerido)
 
-1. `cerrar-ciclo` + escritura de `historial_ciclos` + total de puntos
-   completo (piezas + rendimiento + limpieza) — **antes del 28/09**.
+1. **[CERRADO 22/08/2026]** `cerrar-ciclo` + escritura de
+   `historial_ciclos` + total de puntos completo (piezas + rendimiento
+   + limpieza) — construido, probado manualmente. Ver
+   `04-gamificacion.md`. Queda pendiente confirmar el primer cierre
+   real el 28/09/2026 (punto 16 de arriba).
 2. Alta/edición de usuarios y letra desde la app — DESCARTADO (ver
    `09-administrador.md`); la letra ya se ajusta desde el panel de
    admin, el alta de cuentas se queda en SQL a mano.
 3. Responsable: Historial de partes, barra de gamificación (Ranking,
-   Personaje, Logros, Equipo).
-5. Operario: Inicio con puntos/nivel, Ranking, Stats, Logros, personaje
-   RPG (elegir proveedor de imagen).
-6. Administrador: **[CERRADO 22/08/2026]** cambio de rol, cierre de
+   Personaje, Logros, Equipo). Personaje ya tiene la Edge Function y
+   la fórmula lista (`generar-personaje`, ver `04-gamificacion.md`) —
+   solo falta la pantalla del responsable, que puede reutilizar
+   `frontend/src/lib/gamificacion.ts` tal cual.
+4. **[CERRADO 22/08/2026]** Operario: Inicio con puntos/nivel y
+   personaje RPG (proveedor decidido: GPT Image 2). Construido y
+   probado en real. Quedan Ranking, Stats, Logros como pestañas
+   propias, sin construir todavía.
+5. Administrador: **[CERRADO 22/08/2026]** cambio de rol, cierre de
    fábrica y checklist ya construidos (ver `09-administrador.md`).
-   Solo queda fusión de modelos/marcas/productos/lotes (necesita
-   Edge Function con `service_role`) y "Recalcular ciclo anterior"
-   (bloqueado hasta que exista `cerrar-ciclo`, punto 1). Corrección
-   de partes sin límite — **[CERRADO 21/08/2026]**.
-7. Refactor de `TurnoScreen.tsx` (hook `useTurnoActual`, componentes
+   "Recalcular ciclo anterior" **[CERRADO 22/08/2026]**: ya no está
+   bloqueado — `fn_cerrar_ciclos_pendientes` es idempotente y sirve
+   para esto directamente, llamándola a mano. Solo queda fusión de
+   modelos/marcas/productos/lotes (necesita Edge Function con
+   `service_role`). Corrección de partes sin límite —
+   **[CERRADO 21/08/2026]**.
+6. Refactor de `TurnoScreen.tsx` (hook `useTurnoActual`, componentes
    `EstadoTurnoBloqueado`, `TarjetaLinea`, máquina de estados pura).
-8. Tests unitarios (rotación, validaciones, normalización, tramos) y
+7. Tests unitarios (rotación, validaciones, normalización, tramos) y
    paquete de dominio compartido frontend/Deno para dejar de duplicar
    `normalizacion`/`formato`/informe.
-9. Migrar el contenido interior de las pantallas ya construidas
+8. Migrar el contenido interior de las pantallas ya construidas
    (Vista Rápida/Detallada/Incidencias, Ceria, Rotación, y todo lo
    anterior a hoy) al sistema de temas — ver `12-temas.md` para la
-   lista exacta de qué falta.
-10. PWA, retención de 18 meses en Cloudinary.
-11. Reyes del formato (pantalla de fábrica) — sin diseño, sin
+   lista exacta de qué falta. `InicioOperarioScreen.tsx` (reescrita
+   22/08/2026) tampoco usa las variables de tema todavía — se dejó
+   igual que el resto de pantallas de `operario/` a propósito, para no
+   mezclar dos cambios en el mismo archivo.
+9. PWA, retención de 18 meses en Cloudinary.
+10. Reyes del formato (pantalla de fábrica) — sin diseño, sin
     capturas de referencia.
