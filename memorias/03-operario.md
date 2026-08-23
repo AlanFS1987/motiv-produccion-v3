@@ -2,12 +2,13 @@
 
 Shell propio (`operario/OperarioApp.tsx`), se muestra cuando
 `usuario.rol = 'operario'`. Cuatro pestañas: **Inicio**, **Mi línea**,
-**Historial**, **Limpieza**. La barra de gamificación como pestañas
-propias (Ranking/Stats/Logros) está diseñada y no construida — pero
-ojo, eso no significa que Inicio siga vacía de gamificación: desde
-22/08/2026 Inicio ya incluye la tarjeta completa de nivel/puntos/
-personaje (ver más abajo), es solo Ranking/Stats/Logros como
-**pestañas separadas** lo que sigue sin construir.
+**Historial**, **Limpieza** — sin cambios en `OperarioApp.tsx` desde
+19/08/2026, la gamificación no añadió pestañas propias aquí.
+
+**Construido 23/08/2026**: dentro de Inicio, una SEGUNDA barra (solo
+visible ahí, no en Mi línea/Historial/Limpieza) con 4 sub-vistas:
+Inicio (turno + tarjeta resumen), Ranking, Stats, Logros. Ver
+`04-gamificacion.md` para el detalle de cada una.
 
 ## Turno y pertenencia
 
@@ -29,16 +30,13 @@ vez de datos de un turno ajeno.
 `InicioOperarioScreen.tsx`. Dos bloques:
 
 - Mensaje de estado del turno personal (sin cambios desde antes).
-- **Tarjeta de gamificación** (`<GamificacionCard />`, mismo archivo):
-  nivel actual con color de marco/estrellas, puntos totales, barra de
-  progreso al siguiente nivel, personaje RPG (imagen + historia) si
-  ya generó uno, selector de imagen de referencia + texto libre +
-  botón "Generar mi personaje" (o "de nuevo"), contador de
-  generaciones disponibles. Usa `frontend/src/lib/gamificacion.ts`
-  (nuevo, genérico para operario y responsable) y llama a la Edge
-  Function `generar-personaje` para la generación en sí — ver
-  `04-gamificacion.md` para el detalle del proveedor (GPT Image 2) y
-  el flujo completo.
+- **Tarjeta resumen de gamificación, SOLO LECTURA** (`ResumenGamificacionMini`,
+  en `InicioOperarioScreen.tsx`, reescrita 23/08/2026): avatar mini,
+  nivel, nombre+grupo(letra), puntos totales, barra de progreso,
+  puntos ciclo/piezas/rendimiento/limpieza (los 3 últimos de por
+  vida), metros totales, tiempo plena total. Usa
+  `frontend/src/lib/inicio-gamificacion.ts` (nuevo). La generación de
+  personaje SALIÓ de aquí — ver "Stats+Avatar" en `04-gamificacion.md`.
 
 Estilo: se mantuvo igual que el resto de `operario/` (colores
 `slate-*` fijos, sin variables de tema) para no mezclar la migración

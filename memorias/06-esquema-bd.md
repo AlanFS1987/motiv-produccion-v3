@@ -222,3 +222,87 @@ los excluye (lista explícita de roles). El administrador **no** tiene
 UPDATE en `parte`.
 
 `operario_logro` eliminada de esta lista (tabla dropeada, ver arriba).
+
+**historial_ciclos** — **3 columnas nuevas 23/08/2026**: `puntos_piezas`,
+`puntos_rendimiento`, `puntos_limpieza` (int default 0, aportación de
+ESE ciclo) — antes solo se guardaba `puntos_ciclo` ya sumado, sin
+desglose por categoría, así que no se podía calcular "puntos piezas
+totales de por vida" para ciclos ya cerrados. `fn_cerrar_ciclos_
+pendientes` las rellena ahora (solo para operarios — los responsables
+no tienen aún este desglose, fase 2).
+
+**personaje_stats_nivel** — **1 columna nueva 23/08/2026**:
+`generaciones_usadas` (int not null default 0, check 0-3). Sustituye
+al modelo de `usuario.generaciones_disponibles` (contador plano) —
+ahora cada nivel alcanzado lleva sus propias 3 generaciones.
+
+**usuario.generaciones_disponibles** — **SIN USO desde 23/08/2026**.
+Columna no borrada (inofensiva ahí parada) pero ningún código la lee
+ni la escribe ya — ver `personaje_stats_nivel.generaciones_usadas`.
+
+**parte** — **1 columna nueva 23/08/2026**: `formato_id` (uuid
+references formato, nullable), denormalizado desde
+`producto.formato_id` vía `lote` en el momento de crear el parte
+(trigger `trg_parte_set_formato_id`, solo BEFORE INSERT — el formato
+de un parte no cambia después). Existe solo para poder indexar
+directamente sobre `parte` sin pasar por `lote`/`producto` en cada
+consulta — ver `idx_parte_formato_record` más abajo. Backfill
+aplicado a los partes ya existentes al migrar.
+
+- `v_puntos_piezas_operario_total_vida`, `v_puntos_rendimiento_operario_total_vida`,
+  `v_puntos_limpieza_operario_total_vida` — desglose de puntos de por
+  vida por categoría (histórico cerrado + ciclo en vivo), análogas a
+  `v_puntos_operario_total_vida` pero de una sola categoría cada una.
+  Alimentan la tarjeta resumen de Inicio.
+- `v_stats_vida` — **ampliada**: gana `m2_total_vida` y
+  `horas_plena_vida` en crudo (ya se calculaban internamente para
+  derivar fuerza/velocidad, solo faltaba exponerlos) — para "metros
+  totales"/"tiempo plena total" de la tarjeta de Inicio.
+- `v_rey_formato_historico` — récord absoluto de piezas de un formato
+  en un solo `parte` (un operario, un turno, una línea), con TODOS
+  los empates si los hay. Apoyada en `idx_parte_formato_record`
+  (`parte(formato_id, vigente, completado, piezas_entradas desc)`) —
+  resuelve el MAX por formato sin escanear `parte` entera.
+- `v_rey_formato_actual` — más piezas de un formato acumuladas en el
+  ciclo EN CURSO por operario (sobre `v_piezas_operario_formato_ciclo`,
+  que ya suma todas las líneas/turnos). Mismo criterio de empates.
+- `v_mi_mejor_parte_por_formato` — mejor parte histórico de CADA
+  operario en cada formato, para que Ranking muestre "tu mejor parte"
+  aunque no seas ninguno de los dos reyes.
+- `v_ganador_por_ciclo` — ranking de CADA ciclo (cerrados +
+  el actual en vivo), `posicion=1` el ganador. Base del logro "Rey de
+  Reyes".
+- `v_veces_rey_de_reyes` — cuántos ciclos ha ganado cada operario
+  (`posicion=1` en `v_ganador_por_ciclo`), agregada.
+- `v_niveles_disponibles_generar` — niveles alcanzados por usuario con
+  generaciones restantes (de 3) y si ya hay carta generada para ese
+  nivel — apoyo directo del selector de la pantalla Avatar.
+
+| `fn_parte_set_formato_id()` | trigger before insert en `parte`, no security definer — copia `producto.formato_id` vía `lote` |
+| `fn_seleccionar_personaje(p_personaje_id uuid)` | security definer. Elegir avatar entre los ya generados. Usa `auth.uid()` internamente — NUNCA recibe `usuario_id` como parámetro (sería explotable al saltarse RLS) |
+| `fn_consumir_generacion_nivel(p_usuario_id uuid, p_nivel_id uuid)` | security definer, **ejecución restringida a service_role** (revocada a authenticated/anon) — corregido 23/08/2026, ver `04-gamificacion.md`. Llamada solo desde `generar-personaje` (ya validó el JWT por su cuenta) |
+| `fn_devolver_generacion_nivel(p_usuario_id uuid, p_nivel_id uuid)` | igual criterio que la anterior — solo service_role |
+
+**Patrón de seguridad para RPCs `security definer` llamadas directamente
+por el cliente** (no vía Edge Function): NUNCA reciben `usuario_id`
+como parámetro — siempre resuelven `auth.uid()` internamente. Al ser
+`security definer` se saltan RLS, así que confiar en un `usuario_id`
+que manda el cliente sería explotable (cualquiera podría pasar el id
+de otra persona). Ejemplo: `fn_seleccionar_personaje` (la llama el cliente directamente
+con su propia sesión).
+
+**Patrón contrario, igual de válido**: RPCs llamadas desde DENTRO de
+una Edge Function con `service_role` (nunca directamente por el
+cliente) — ahí `auth.uid()` NO funciona (siempre da `null` con
+`service_role`, no lleva el JWT del usuario). En ese caso SÍ hay que
+recibir `p_usuario_id` como parámetro, pero restringiendo el permiso
+de ejecución a `service_role` (`revoke execute ... from public,
+authenticated, anon; grant execute ... to service_role;`) para que
+ningún cliente pueda llamarla directamente con un id ajeno. Ejemplos:
+`fn_consumir_generacion_nivel`, `fn_devolver_generacion_nivel` — error
+real: se diseñaron primero con `auth.uid()` como si el cliente las
+llamara, se desplegaron, y fallaron en real ("No hay sesión activa")
+porque en verdad las llama `generar-personaje` con `service_role`.
+Corregido en sesión 23/08/2026 tras el fallo — la lección: el patrón
+de seguridad correcto depende de QUIÉN llama a la función (cliente
+directo vs. Edge Function con service_role), no es el mismo siempre.

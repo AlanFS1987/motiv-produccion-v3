@@ -458,5 +458,175 @@ responsable — decide sola qué vista de puntos y qué columna de umbral
 usar según `usuario.rol`, listo para reutilizar en la pantalla de
 Inicio del responsable sin duplicar lógica.
 
-Pendiente: Inicio del responsable, Ranking, Stats, Logros (las 4
-pestañas de gamificación que faltan, ver `07-pendientes.md`).
+**Construido 23/08/2026 — Ranking, Stats+Avatar, Logros** (las 3
+sub-vistas que faltaban dentro de Inicio, ver `03-operario.md`):
+
+- **Ranking** (`RankingOperarioScreen.tsx`, `lib/ranking.ts`): toggle
+  ciclo actual/anterior, podio 1º-2º-3º + 4º-5º listados + "tú" si
+  quedas fuera del top 5 (sin revelar posiciones intermedias). Debajo,
+  **Reyes del formato**: histórico (récord absoluto de un solo parte,
+  con TODOS los empates si los hay) y actual (más piezas acumuladas
+  en el ciclo, sumando líneas/turnos), más "tu marca" en cada uno de
+  los 7 formatos. El histórico se resuelve barato gracias a
+  `parte.formato_id` denormalizado (trigger `trg_parte_set_formato_id`)
+  + índice `idx_parte_formato_record` — sin eso habría que escanear
+  `parte` entera por cada consulta.
+- **Stats+Avatar fusionados en una sola pestaña** (decisión de
+  sesión — iban a ser 2 separadas): 4 barras SIEMPRE EN VIVO
+  (fuerza/resistencia/velocidad/vida, `v_stats_vida` + puntos
+  totales), con 6 tramos logarítmicos (10/100/1.000/10.000/100.000/
+  1.000.000) para fuerza/resistencia/vida y rango simple 6-11 para
+  velocidad — colores fijos por stat (roja/naranja/azul/verde), no
+  por tramo. Debajo, la tarjeta del avatar activo + su historia +
+  gestión (elegir entre generados / generar nuevo).
+- **Logros** (`LogrosOperarioScreen.tsx`, `lib/logros.ts`): motor
+  100% GENÉRICO que lee `logros_definicion` y resuelve cada fila según
+  `condicion_tipo` — nada hardcodeado por nombre de logro. **`logros_
+  definicion` sigue vacía** (los 19 datos del CSV de v2 nunca se
+  sembraron) — la pantalla funciona pero no muestra nada hasta que se
+  siembren, usando exactamente los `condicion_tipo` documentados al
+  principio de `lib/logros.ts`. Bloqueado = icono apagado + "???".
+  Desbloqueado (tramo) = contador ×N + barra hacia el siguiente tramo.
+  Desbloqueado (ciclo: bestia/legendario/rey de reyes) = solo contador
+  ×N, sin barra (no hay "siguiente tramo" progresivo).
+
+**Desglose de puntos de por vida** (`20260823110000_desglose_puntos_
+historial_ciclos.sql`): `historial_ciclos` ganó 3 columnas
+(`puntos_piezas`, `puntos_rendimiento`, `puntos_limpieza`, aportación
+de ESE ciclo) — antes solo se guardaba `puntos_ciclo` ya sumado, así
+que no se podía calcular "puntos piezas totales de por vida" para
+ciclos ya cerrados. `fn_cerrar_ciclos_pendientes` las rellena ahora.
+Vistas nuevas: `v_puntos_piezas_operario_total_vida`,
+`v_puntos_rendimiento_operario_total_vida`,
+`v_puntos_limpieza_operario_total_vida`. `v_stats_vida` ganó
+`m2_total_vida`/`horas_plena_vida` en crudo (ya se calculaban
+internamente, solo faltaba exponerlos).
+
+**Generaciones ligadas a CADA NIVEL, no un contador plano**
+(`20260823150000_generaciones_por_nivel.sql`, reemplaza el diseño
+anterior de `usuario.generaciones_disponibles`): cada fila de
+`personaje_stats_nivel` lleva su propio `generaciones_usadas` (0-3).
+El operario elige PARA QUÉ NIVEL de los que ya alcanzó quiere generar
+— la Edge Function usa las stats CONGELADAS de `personaje_stats_nivel`
+de ese nivel (nunca `fn_nivel_actual`/`v_stats_vida` en vivo) tanto
+para la imagen como para la historia. RPCs RPCs `fn_consumir_generacion_nivel`/`fn_devolver_generacion_nivel`
+(`p_usuario_id, p_nivel_id`) — **[CORREGIDO 23/08/2026, fix real tras
+desplegar]**: el primer diseño usaba `auth.uid()` como
+`fn_seleccionar_personaje`, pero se llaman desde DENTRO de
+`generar-personaje` con el cliente `supabaseAdmin` (`service_role`) —
+con `service_role`, `auth.uid()` siempre es `null` (no lleva el JWT
+del usuario), así que lanzaban "No hay sesión activa" en producción
+pese a que el usuario sí tenía sesión válida. Corrección: vuelven a
+recibir `p_usuario_id` como parámetro (como la `fn_consumir_
+generacion` original), pero con el permiso de ejecución RESTRINGIDO a
+`service_role` (`revoke ... from public, authenticated, anon`) — así
+ningún cliente puede llamarlas directamente con el `usuario_id` de
+otra persona. Mismo nivel de seguridad que `auth.uid()`, solo que la
+barrera la impone Postgres (quién puede ejecutar la función) en vez
+de la función misma. Vista `v_niveles_disponibles_generar` para el
+selector del frontend. `usuario.generaciones_disponibles` queda SIN
+USO (columna sin borrar, inofensiva).
+
+`fn_seleccionar_personaje` es DISTINTA y sigue con `auth.uid()` sin
+cambios — esa sí la llama el cliente directamente con su propia
+sesión (no pasa por una Edge Function con `service_role`), ahí
+`auth.uid()` es el patrón correcto.
+
+**Historia con DeepSeek** (`_shared/deepseek_historia.ts`, integrada
+en `generar-personaje`): existía en v2 pero no estaba documentado
+aquí. Antes, `historia` se rellenaba con `niveles.prompt_base` tal
+cual (genérico, igual para todos en ese nivel). Ahora: prompt de
+sistema con reglas de estilo heredadas de v2 (máximo 3 frases
+completas y CORTAS — no un párrafo narrativo comprimido, cada frase
+una pincelada suelta, máximo 1 máquina/problema por frase; humor de
+fábrica; nada de poesía barata; contexto real de máquinas y
+problemas de la fábrica) + `prompt_base` + `prompt_imagen` + los 4
+stats (congelados del nivel que se está generando) + texto libre del
+operario. Si DeepSeek falla, la función NUNCA lanza — devuelve `null`,
+`generar-personaje` guarda igual (imagen + stats correctos, historia
+`null`), y responde `historia_pendiente: true` para que el frontend
+avise "tu historia se está preparando" — el administrador la rellena
+a mano en la BD, sin mecanismo de reintento automático todavía.
+Secret nuevo: `DEEPSEEK_API_KEY`.
+
+**Migración de datos reales de v2** (script de un solo uso, no
+migración de esquema — `scripts/migrar_v2_historial.sql` o donde lo
+guardaras): 19 operarios reales (de 20 en el CSV; `operario1` era
+cuenta de pruebas, se quedó fuera aposta) migrados desde datos en
+bruto de v2 (parte a parte), RECALCULANDO puntos con las fórmulas
+reales de v3 (no copiando los puntos ya calculados en v2) — cruce por
+`username`, nunca por id (los ids de v2 y v3 no coinciden). Insertados
+en `historial_ciclos` con `cycle_id` negativo (anterior a
+`fecha_inicio_rotacion`, nunca choca con ciclos reales). `personaje_
+stats_nivel` reconstruido simulando cronológicamente cuándo cruzó cada
+operario cada umbral — nadie pasa de nivel 3, coherente con lo
+esperado. Nivel 1 (Aprendiz) explícitamente EXCLUIDO de estas filas
+(no es una "subida", todos empiezan ahí) tras corregir un error real
+del primer intento del script (si ves código o docs que lo contradigan,
+están desactualizados). Cada nivel migrado quedó con 3/3 generaciones
+sin gastar (`generaciones_usadas` default 0), listas para usar con el
+selector nuevo.
+### Renumeración de ciclos (sesión 23/08/2026, el mismo día de la migración)
+
+Al migrar, `fn_ciclo_id` calculó cycle_id NEGATIVOS para los datos de
+v2 (sus fechas son anteriores al 31/08/2026, la fecha ancla de
+entonces) — funcionaban bien para sumar "puntos totales", pero
+quedaban invisibles para el toggle de Ranking (que solo mira el ciclo
+de hoy y el inmediatamente anterior) y, más grave: **hoy mismo, antes
+de que arrancara el ciclo real, `fn_ciclo_id(hoy)` también daba
+negativo** (-1) — el mismo cajón que la migración más reciente.
+
+Se corrigió con dos UPDATE, sin tocar ninguna fórmula ni vista:
+
+```sql
+update historial_ciclos set cycle_id = cycle_id + 7 where cycle_id < 0;
+update configuracion set valor = '2026-02-16' where clave = 'fecha_inicio_rotacion';
+```
+
+Resultado: los ciclos migrados pasaron de -6..-1 a 0..6 (bien, ya no
+son negativos, y sin descuadres — este SEGUNDO update). El "+7" no es
+arbitrario: son exactamente 7 ciclos de 28 días, así que el ciclo 7
+sigue arrancando el 31/08/2026 (la fecha ancla original) — el plan de
+lanzamiento no cambió, solo se renumeró lo anterior para que quede en
+la misma línea temporal creciente. Hoy (23/08/2026) es el **ciclo 6**
+en vivo — cerrado en `historial_ciclos` (por la migración), sin datos
+en vivo todavía porque no ha habido ningún `parte` real de v3 (solo
+pruebas de gamificación/personaje) — normal, no es un bug.
+
+**Aviso sobre el cierre del ciclo 6**: como el ciclo 6 ya tiene fila
+en `historial_ciclos` (por la migración), `fn_cerrar_ciclos_
+pendientes` lo saltará sin más cuando llegue el ciclo 7 (el `not
+exists` del loop es a nivel de cycle_id, no por operario) — si
+hubiera producción real de v3 durante el ciclo 6 (23-30/08/2026), se
+perdería de "puntos totales" al cerrar, porque nunca se escribiría en
+`historial_ciclos`. Confirmado en sesión: la fábrica está parada
+hasta el turno de mañana del lunes (ya en ciclo 7), así que no aplica
+— pero si alguna vez se necesita producción real ANTES de que empiece
+un ciclo nuevo tras una migración/renumeración así, hay que cerrar
+ese ciclo a mano (fuera del loop automático) antes de que el cron lo
+dé por bueno solo por tener fila.
+
+**IMPORTANTE para cualquier sesión futura**: `fecha_inicio_rotacion`
+NO es solo el ancla de los ciclos de puntos — es la MISMA fecha que
+decide el patrón de rotación real de turnos (M/T/N/descanso por
+letra). Cualquier cambio futuro de esta fecha exige repetir el ajuste
+manual de letras del admin para que la rotación calculada vuelva a
+coincidir con la realidad — es un paso manual, no automático, y hay
+que avisar de que hace falta cada vez.
+
+**Alcance exacto de la migración de v2** (por si se pregunta en otra
+sesión): SOLO dos tablas, `historial_ciclos` (104 filas, puntos/stats
+por operario+ciclo) y `personaje_stats_nivel` (niveles cruzados con
+stats congeladas, sin Aprendiz). Ninguna otra tabla se tocó — ni
+`parte`, ni `lote`/`producto`, ni ningún catálogo. La tabla de
+staging `stg_migracion_v2` fue temporal y ya se borró.
+**Pendiente**: Inicio/gamificación del **responsable** — no
+construido (solo el operario tiene las 4 sub-vistas). Reutilizaría
+`frontend/src/lib/gamificacion.ts` y buena parte del patrón de
+`inicio-gamificacion.ts`/`ranking.ts`/`stats-avatar.ts`, pero el
+responsable no tiene aún desglose puntos_piezas/rendimiento/limpieza
+por categoría (solo metros+rendimiento, sin piezas/limpieza — fase 2),
+ni logros propios (`logros_definicion.rol` está listo para
+`'responsable'` pero sin datos), ni Reyes del formato (concepto
+pensado solo para operario). Requiere diseño propio, no es un simple
+"copiar y cambiar el rol".

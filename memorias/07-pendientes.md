@@ -235,10 +235,14 @@ migración, la nota anterior sobre esto era incorrecta/desactualizada).
    la fórmula lista (`generar-personaje`, ver `04-gamificacion.md`) —
    solo falta la pantalla del responsable, que puede reutilizar
    `frontend/src/lib/gamificacion.ts` tal cual.
-4. **[CERRADO 22/08/2026]** Operario: Inicio con puntos/nivel y
-   personaje RPG (proveedor decidido: GPT Image 2). Construido y
-   probado en real. Quedan Ranking, Stats, Logros como pestañas
-   propias, sin construir todavía.
+4. **[CERRADO 23/08/2026]** Operario: Ranking, Stats+Avatar (fusionadas
+   en una pestaña), Logros — las 3 sub-vistas de gamificación que
+   faltaban dentro de Inicio. Construido y probado en real, incluida
+   la migración de datos reales de v2. Ver `04-gamificacion.md`.
+   Sigue pendiente: sembrar los 19 logros en `logros_definicion` (el
+   motor ya funciona, la tabla está vacía), y toda la gamificación
+   del responsable (nueva entrada, ver `04-gamificacion.md` sección
+   "Pendiente").
 5. Administrador: **[CERRADO 22/08/2026]** cambio de rol, cierre de
    fábrica y checklist ya construidos (ver `09-administrador.md`).
    "Recalcular ciclo anterior" **[CERRADO 22/08/2026]**: ya no está

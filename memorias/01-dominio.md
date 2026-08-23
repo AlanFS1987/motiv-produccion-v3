@@ -55,8 +55,21 @@ formato ┘
 - **Rotación calculada**, no tabla: patrón fijo de 28 días por letra
   (7 N, 2 descanso, 7 T, 2 descanso, 7 M, 3 descanso), letras A/B/C/D
   desfasadas 0/7/14/21 días, desde el lunes
-  `configuracion.fecha_inicio_rotacion` (= 31/08/2026). Cada día hay
-  exactamente una letra en cada tipo y una descansando. Función SQL
+  `configuracion.fecha_inicio_rotacion`. Cada día hay exactamente una
+  letra en cada tipo y una descansando.
+
+  **Valor real: 16/02/2026** (movido desde el 31/08/2026 original en
+  sesión 23/08/2026 — ver "Renumeración de ciclos" en
+  `04-gamificacion.md`, mismo motivo: alinear la numeración de ciclos
+  de gamificación con la de v2, sin dejar huecos negativos). El
+  31/08/2026 sigue siendo una fecha real dentro del patrón — es
+  justo donde empieza el ciclo 7 — así que no se perdió el plan de
+  lanzamiento original, solo se renumeró lo anterior. Tras este
+  cambio hizo falta repetir el ajuste manual de letras del admin
+  (`AjustarLetrasScreen`) para que la rotación calculada volviera a
+  coincidir con la realidad de la fábrica — ese ajuste es
+  independiente de esta fecha (ver `09-administrador.md`), así que es
+  seguro repetirlo cada vez que la fecha ancla cambie.Función SQL
   `fn_turno_de_letra(fecha, letra)` y su inversa `fn_letra_de_turno`.
   La rotación **nunca se pausa**, ni en el cierre anual de fábrica.
 - **Estado del turno** (calculado en cliente, `lib/rotacion.ts`):
