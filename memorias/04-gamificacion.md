@@ -323,6 +323,76 @@ corrigiendo dos problemas que tenía:
 (histórico + ciclo en vivo), para cualquier usuario y rol. Sin
 pantalla que lo muestre todavía (pendiente, ver `07-pendientes.md`).
 
+## Stats — el cuarto (vida) y el snapshot por nivel
+
+Los stats pasan de 3 a **4**: fuerza, resistencia, velocidad y
+**vida**. Vida no es un cálculo nuevo — es un alias directo de los
+puntos totales de vida (los mismos que deciden el nivel), expuesto
+con el nombre que le toca dentro del grupo de 4 para que la pantalla
+de Stats trate a los 4 de forma uniforme.
+
+### Problema de diseño: cartas ligadas al pasado, no al presente
+
+Decisión de sesión 23/08/2026: cuando se genera una carta de
+personaje para un nivel ya alcanzado, sus stats mostrados deben ser
+los que tenía el usuario **cuando alcanzó ese nivel**, no los stats en
+vivo del momento de generar — así una carta de nivel 1 generada
+semanas tarde (la generación es siempre manual, puede retrasarse
+cualquier cantidad de tiempo) sigue mostrando el pasado del operario,
+no un presente inflado por producción posterior.
+
+Esto exige un snapshot de stats por nivel, separado de la generación
+de la carta (que puede no ocurrir nunca para un nivel dado).
+
+### Por qué NO es un trigger reactivo a los puntos
+
+Se descartó un trigger que se disparase "al cruzar X puntos" porque
+recrearía el mismo patrón de contador mutable que la lección de v2 ya
+enseñó a evitar (ver "Fuerza / resistencia / velocidad" arriba): los
+puntos no tienen un único punto de mutación (vienen de `parte`,
+`operario_checklist` y el cierre de ciclo), así que un contador
+persistido de puntos necesitaría triggers en 3 sitios distintos, y
+cualquier corrección de parte que no re-disparase el trigger
+correspondiente desincronizaría el contador para siempre sin que
+nadie lo note — exactamente el bug de v2, aplicado ahora a niveles.
+
+### Solución: el administrador es el disparador manual
+
+En vez de detección automática, el administrador otorga el bonus a
+mano desde la vista de usuarios (ampliada con puntos totales, puntos
+para el siguiente nivel, y un botón "otorgar generaciones"). Sin
+ventana de tiempo que se cierre: el botón queda disponible
+indefinidamente hasta que se pulsa, así que un despiste del admin
+retrasa el bonus pero nunca lo pierde — y es poco probable que el
+admin no entre a la app al menos una vez al día.
+
+Construido en `20260823100000_personaje_stats_nivel_bonus.sql`:
+
+- **`personaje_stats_nivel`** — snapshot de los 4 stats por
+  `(usuario_id, nivel_id)`, con `unique (usuario_id, nivel_id)`. La
+  **existencia de la fila ES el estado "ya otorgado"** — sin columna
+  de control aparte, nada que sincronizar en dos sitios. El UNIQUE de
+  paso previene doble clic sin lógica extra.
+- **`fn_otorgar_bonus_nivel(usuario_id)`** — llamada por el botón del
+  admin. Orden deliberado: primero persiste el snapshot de stats,
+  DESPUÉS otorga las 3 generaciones (`fn_otorgar_generaciones_por_nivel`,
+  que ya existía pero hasta ahora no la llamaba nada con este
+  propósito — solo se usaba para devolver 1 generación si fallaba la
+  API externa). Si el nivel actual ya tenía fila, no hace nada y
+  devuelve `otorgado=false` — idempotente.
+- **`v_admin_usuarios_gamificacion`** — una fila por operario/
+  responsable con puntos totales, nivel actual, puntos que faltan
+  para el siguiente nivel, y `bonus_nivel_actual_otorgado` (booleano
+  listo para el `disabled` del botón en el frontend).
+
+| **`fn_otorgar_bonus_nivel(uuid)`** | **nueva 23/08/2026**, security definer. Botón del admin: guarda el snapshot de stats del nivel actual y, solo la primera vez para ese nivel, otorga +3 generaciones. Idempotente. |
+
+**Pendiente** (no incluido en esta migración, a propósito — no
+mezclar cambios): la Edge Function `generar-personaje` sigue leyendo
+`v_stats_vida` en vivo. Falta cambiarla para que lea de
+`personaje_stats_nivel` (el snapshot del nivel de la carta) y guarde
+esos 4 valores en `personaje_rpg` en el momento de generar.
+
 ## Personaje RPG
 
 **Proveedor: GPT Image 2** (`gpt-image-2`, salió el 21/04/2026 —

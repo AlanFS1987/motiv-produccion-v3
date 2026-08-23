@@ -125,6 +125,8 @@ migración, la nota anterior sobre esto era incorrecta/desactualizada).
   progreso guardado se quedó sin ninguna función. Ver
   `04-gamificacion.md`.
 
+
+
 12. Cierre automático de turno: confirmar con un caso real (o forzar
     `select fn_encolar_resumenes_turno_pendientes();`).
 13. Camino "Continuar mismo lote+tono" con cambio de turno real: sin
@@ -146,6 +148,21 @@ migración, la nota anterior sobre esto era incorrecta/desactualizada).
     confirmar con un caso real que el cron dispara correctamente ese
     lunes (mismo tipo de validación pendiente que el cierre automático
     de turno, punto 12).
+
+17. **[NUEVO 23/08/2026]** `generar-personaje` (Edge Function) debe
+   dejar de leer `v_stats_vida` en vivo y leer en su lugar el
+   snapshot de `personaje_stats_nivel` para el nivel de la carta que
+   se está generando, guardando esos 4 valores en `personaje_rpg`.
+   Sin esto, el snapshot por nivel existe en BD pero ninguna carta lo
+   usa todavía.
+18. **[NUEVO 23/08/2026]** Vista de usuarios del admin: ampliar con
+   puntos totales, puntos para el siguiente nivel y botón "otorgar
+   generaciones" (consume `v_admin_usuarios_gamificacion` +
+   `fn_otorgar_bonus_nivel`, ya construidos en
+   `20260823100000_personaje_stats_nivel_bonus.sql`). Sin pantalla
+   todavía.
+
+   
 - **[CERRADO 20/08/2026]** Sin plan B si la API de Anthropic no
   respondía: se descartó el formulario manual/guardado local (mucha
   complejidad para un evento que no había ocurrido en 5 meses de uso

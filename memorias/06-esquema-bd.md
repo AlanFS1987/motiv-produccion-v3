@@ -162,6 +162,14 @@ Ya existían antes de hoy:
 - `v_stats_vida` — fuerza/resistencia/velocidad de toda la vida
   (histórico + ciclo en vivo), para cualquier usuario y rol.
 
+**Nuevas 23/08/2026:**
+- `personaje_stats_nivel` — snapshot de fuerza/resistencia/velocidad/
+  vida por (usuario_id, nivel_id), la existencia de la fila es el
+  estado "bonus ya otorgado".
+- `v_admin_usuarios_gamificacion` — apoyo para la vista de usuarios
+  del admin (puntos, siguiente nivel, si el bonus del nivel actual ya
+  se otorgó).
+
 **Ampliada 22/08/2026:**
 - `v_puntos_operario_total_vida` — ahora suma piezas y limpieza además
   de rendimiento (antes solo rendimiento).
