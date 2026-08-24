@@ -21,8 +21,10 @@ No tiene acceso a PLCs ni a ningún sistema en tiempo real: todo dato
 nace de una foto o de un formulario. No hay modo offline (decisión
 cerrada: el OCR necesita red igualmente y la fábrica tiene wifi).
 
-Usuarios: 27 reales cargados (6 responsables, 17 operarios, jefe,
-admin, suplente, pantalla), máximo 30. Roles del enum: `responsable`,
+Usuarios: **24 reales cargados** (4 responsables A/B/C/D, 17 operarios
+4/5/4/4, jefe, administrador, pantalla), máximo 30. ⚠️ **No existe la
+cuenta `suplente`** — hay que crearla antes del 31/08 (`07`). Roles del
+enum: `responsable`,
 `suplente`, `operario`, `jefe`, `produccion`, `calidad`,
 `administrador`, `pantalla`, `jefe_rectificado`. Solo responsables y
 operarios llevan letra de rotación; el resto no. `jefe_rectificado`

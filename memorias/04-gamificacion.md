@@ -222,9 +222,21 @@ guarda el snapshot del nivel actual (idempotente; si ya tenía fila,
 `otorgado=false`). Vista de apoyo `v_admin_usuarios_gamificacion`
 (puntos, siguiente nivel, `bonus_nivel_actual_otorgado`). La pantalla
 del admin que llama a esto **no está construida** (`07`).
-`[VERIFICAR]` si `fn_otorgar_bonus_nivel` sigue llamando a
-`fn_otorgar_generaciones_por_nivel` (modelo antiguo de contador plano):
-con el modelo por nivel, crear la fila ya da las 3 generaciones.
+
+Tres cosas comprobadas en el código real de la función (24/08/2026):
+- Las stats que congela son las **en vivo del momento en que el admin
+  pulsa** (`v_stats_vida` + puntos totales), no las del instante en que
+  el usuario cruzó el umbral. Nadie las pierde por un despiste, pero un
+  retraso del admin **infla** el snapshot con producción posterior, que
+  es justo lo que el diseño quería evitar. Mitigación práctica: otorgar
+  a diario.
+- Tras insertar la fila llama a `fn_otorgar_generaciones_por_nivel`,
+  que escribe en `usuario.generaciones_disponibles`, el contador plano
+  que ya no lee nadie. Llamada muerta: las 3 generaciones reales salen
+  de `personaje_stats_nivel.generaciones_usadas` (default 0) al crearse
+  la fila. Inofensiva pero engañosa (`07`).
+- `velocidad` se inserta sin `coalesce`, a diferencia de los otros 3
+  stats: un usuario con `tiempo_plena = 0` congelaría un null.
 
 ## Personaje RPG
 
@@ -288,19 +300,21 @@ Script de un solo uso (`scripts/migrar_v2_historial.sql`). Solo dos
 tablas tocadas: `historial_ciclos` y `personaje_stats_nivel`.
 - **Operarios** (23/08): 19 reales (`operario1` era de pruebas),
   recalculados parte a parte con fórmulas de v3, cruzados por
-  `username`. 104 filas en `historial_ciclos`. `personaje_stats_nivel`
+  `username`. 100 filas en `historial_ciclos`. `personaje_stats_nivel`
   reconstruido simulando cuándo cruzó cada uno cada umbral (nadie pasa
   de nivel 3; Aprendiz excluido, no es una "subida"; 3/3 generaciones).
 - **Responsables** (24/08): `hectorn`, `radu`, `valentina`, `joaquina`
   (la cuenta genérica `responsable` de v2 se dejó fuera), desde
   `turnos` de v2 recalculando `puntos_metros` + rendimiento por turno.
-  Ciclo 6 incompleto (el export llega al 09/08). `personaje_stats_nivel`
-  NO reconstruido para ellos (`07`).
+  Ciclo 6 incompleto (el export llega al 09/08) y el ciclo 1 solo tiene
+  3 de los 4. `personaje_stats_nivel` NO reconstruido para ellos (`07`).
 - **Renumeración**: con el ancla en 31/08 los ciclos de v2 salían
   negativos (y `fn_ciclo_id(hoy)` también). Se hizo
   `update historial_ciclos set cycle_id = cycle_id + 7 where cycle_id < 0`
-  y se movió el ancla a 2026‑02‑16 (7 ciclos antes). Ciclos migrados:
-  0..6. Consecuencias sobre la rotación en `01`.
+  y se movió el ancla a 2026‑02‑16 (7 ciclos antes). Ciclos migrados
+  resultantes: **1..6** (no hay ciclo 0), 100 filas de operario y 23 de
+  responsable — comprobado en BD 24/08/2026. Consecuencias sobre la
+  rotación en `01`.
 
 ## Pendiente (detalle en `07`)
 

@@ -28,14 +28,15 @@ Fila `telegram_webhook_secret`.
 `generaciones_disponibles` (sin significado desde 23/08/2026 — el
 contador real es `personaje_stats_nivel.generaciones_usadas`; la
 columna sigue leyéndose en código, ver `07`), created_at. Índice
-único parcial: una sola fila con rol = suplente. 27 usuarios reales
-(`CLAUDE.md`).
+único parcial: una sola fila con rol = suplente. 24 usuarios reales
+(4 responsables A/B/C/D, 17 operarios, jefe, admin, pantalla —
+comprobado 24/08/2026). La fila `suplente` **está sin crear** (`07`).
 
 **modelo / marca** — id, nombre, nombre_normalizado (trigger),
 created_at. Índice GIN trgm.
 
 **formato** — id, nombre unique (7 filas), `area_m2` derivado del
-nombre (`[VERIFICAR]`, ver `01`).
+nombre; valores confirmados en BD 24/08/2026 (ver `01`).
 
 **producto** — id, modelo_id, marca_id, formato_id, created_at; unique
 (modelo, marca, formato).
@@ -117,7 +118,8 @@ puntos_ciclo, puntos_piezas, puntos_rendimiento, puntos_limpieza
 (desglose solo para operarios), fuerza, resistencia, velocidad,
 m2_total, m2_std, m2_com, m2_contenedor, piezas_total, tiempo_*,
 piezas_por_formato jsonb; unique (usuario, cycle_id). Contiene los
-datos migrados de v2 (ciclos 0..6, operarios y responsables — `04`);
+datos migrados de v2 (ciclos 1..6; 100 filas de operario + 23 de
+responsable, comprobado 24/08/2026 — `04`);
 el primer cierre automático real será el del ciclo 7 (28/09/2026).
 
 **ceria_prompts**, **ceria_conversaciones**, **ceria_mensajes** — `11`.
@@ -213,7 +215,7 @@ llama):
 | personaje_stats_nivel | propio; admin | — (solo funciones definer) | — | — |
 | historial_ciclos | propio; jefe; admin; operario/responsable/pantalla (ranking, 24/08) | — | — | — |
 | usuario | cualquier rol conocido (24/08) | — | admin | — |
-| configuracion | admin (24/08; antes sin RLS) `[VERIFICAR]` si otros roles necesitan SELECT — `rotacion.ts` y la pantalla leen `fecha_inicio_rotacion`/`objetivo_m2_dia` | admin | admin | admin |
+| configuracion | `configuracion_select_autenticados`: cualquier autenticado (lo necesitan `rotacion.ts` y la pantalla) | admin | admin | admin |
 | modelo, marca, formato, producto, linea, checklist_items, logros_definicion, puntos_*, niveles, cierre_fabrica | autenticados | admin | admin | admin |
 | app_secrets | ninguno (revoke) | | | |
 

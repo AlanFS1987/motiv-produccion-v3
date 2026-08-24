@@ -7,13 +7,20 @@ verificaciones, decisiones y construcción.
 
 ## Bugs y huecos conocidos
 
-1. Migración `20260824120000_rls_configuracion_usuario_ranking.sql`
-   (RLS de `configuracion`, `usuario`, `historial_ciclos`) — confirmar
-   que está aplicada (`db push`) y **repetir las pruebas de Ranking y
-   Vista Detallada con una cuenta de operario y una de jefe reales**:
-   hasta la auditoría del 24/08 solo se habían probado con admin, que
-   ve todo por RLS.
-2. Código muerto con contrato roto: `generarPersonaje()` en
+1. ⚠️ **La cuenta `suplente` no existe en `usuario`** (comprobado
+   24/08/2026: hay 24 usuarios — 4 responsables A/B/C/D, 17 operarios,
+   jefe, admin, pantalla). Todo el mecanismo de cobertura de turnos
+   (`01`) depende de ella: sin esa fila, si un titular falta, nadie
+   puede abrir su turno, porque la RLS solo deja al responsable de la
+   letra que toca. Crearla antes del 31/08 (Authentication → Add user
+   + INSERT en `usuario` con `rol = 'suplente'`, sin letra; el índice
+   único parcial garantiza que solo haya una).
+2. Migración `20260824120000_rls_configuracion_usuario_ranking.sql` —
+   confirmar que está aplicada (`db push`) y **repetir las pruebas de
+   Ranking y Vista Detallada con una cuenta de operario y una de jefe
+   reales**: hasta la auditoría del 24/08 solo se habían probado con
+   admin, que ve todo por RLS.
+3. Código muerto con contrato roto: `generarPersonaje()` en
    `lib/gamificacion.ts` no manda `nivel_id` (obligatorio en la Edge
    Function) — borrar; el flujo real es `generarPersonajeParaNivel`
    (`lib/stats-avatar.ts`), y el comentario de cabecera de ese archivo
@@ -21,35 +28,42 @@ verificaciones, decisiones y construcción.
    `obtenerDatosGamificacion` y `obtenerGeneracionesDisponibles`
    siguen leyendo `usuario.generaciones_disponibles` (sin significado
    desde 23/08) — limpiar cuando se toque esa zona.
-3. `ceria/index.ts`, fase 1: revisar `historialLimpio.slice(0, -1)`. Si
+4. `fn_otorgar_bonus_nivel` (confirmado leyendo la función, 24/08):
+   (a) llama a `fn_otorgar_generaciones_por_nivel`, que escribe en el
+   contador plano `usuario.generaciones_disponibles` que ya no lee
+   nadie — llamada muerta, quitar; (b) congela las stats **en vivo al
+   pulsar el botón**, así que un retraso del admin infla el snapshot
+   (mitigación: otorgar a diario, o pasar a congelar contra el ciclo
+   en que se cruzó el umbral); (c) inserta `velocidad` sin `coalesce`,
+   puede congelar null si `tiempo_plena = 0`. Ver `04`.
+5. `ceria/index.ts`, fase 1: revisar `historialLimpio.slice(0, -1)`. Si
    la pregunta del usuario aún no está guardada en BD en ese punto, el
    slice recorta el último mensaje del assistant, no un duplicado —
    degradaría el contexto sin error. Confirmar el orden real y quitar
    el slice si sobra.
-4. `[VERIFICAR]` `fn_otorgar_bonus_nivel`: si sigue llamando a
-   `fn_otorgar_generaciones_por_nivel` (contador plano antiguo) es
-   redundante con `personaje_stats_nivel.generaciones_usadas` (`04`).
-5. Historia del personaje: si DeepSeek falla queda `null` y el admin
+6. Historia del personaje: si DeepSeek falla queda `null` y el admin
    la rellena a mano — sin reintento automático.
 
 ## Verificaciones pendientes con casos reales
 
-6. Cierre automático de turno por cron + envío a Telegram: nunca visto
-   en real (se puede forzar con
-   `select fn_encolar_resumenes_turno_pendientes();`).
-7. Primer cierre real de ciclo: lunes 28/09/2026, 8:00 Madrid (cierre
-   del ciclo 7). Confirmar que el cron dispara.
-8. Camino "Continuar mismo lote+tono" con cambio de turno real: sin
+7. Cierre automático de turno por cron + envío a Telegram: el cron
+   `resumenes-turno-pendientes` corre cada hora y termina bien
+   (comprobado 24/08), pero el camino completo con un turno real sin
+   cerrar nunca se ha visto. Forzable con
+   `select fn_encolar_resumenes_turno_pendientes();`.
+8. Primer cierre real de ciclo: lunes 28/09/2026, 8:00 Madrid (ciclo
+   7). El cron `cerrar-ciclos-pendientes` ya corre los lunes sin error
+   (devuelve 0 filas porque los ciclos 1..6 ya tienen fila).
+9. Camino "Continuar mismo lote+tono" con cambio de turno real: sin
    probar de punta a punta.
-9. Tras el lanzamiento del 31/08, con partes reales: Ranking del ciclo
-   actual, Vista Detallada del jefe, Logros — hoy no hay datos de v3
-   para probarlos de extremo a extremo.
-10. `[VERIFICAR]` `formato.area_m2` aplicada en BD (`01`); nombres de
-    secrets con `supabase secrets list` y ajustes de seguridad del
-    preset `motiv_v3_personajes` (`05`); si `configuracion` necesita
-    SELECT para roles distintos de admin (`06`).
-11. Cámara nativa recarga la app en Xiaomi/Redmi — investigación
-    abierta, pantalla de prueba y estado en `09`.
+10. Tras el lanzamiento del 31/08, con partes reales: Ranking del ciclo
+    actual, Vista Detallada del jefe, Logros.
+11. `[VERIFICAR]` nombres de secrets con `supabase secrets list` (el
+    `telegram_webhook_secret` de `app_secrets` existe, 19 caracteres —
+    comparar byte a byte) y ajustes de seguridad del preset
+    `motiv_v3_personajes` en Cloudinary (`05`).
+12. Cámara nativa recarga la app en Xiaomi/Redmi — investigación
+    abierta, estado en `09`.
 
 ## Decisiones por tomar
 

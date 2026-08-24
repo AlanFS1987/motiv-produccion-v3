@@ -12,14 +12,15 @@
 | `generar-resumen-turno` | BD vía `pg_net` | `x-webhook-secret` | Compila el informe del turno (misma estructura que la pestaña Resumen), lo parte en mensajes < 3.500 caracteres, envía, marca `turno.resumen_enviado_at`. |
 | `notificar-telegram-resumen-calidad` | BD vía `pg_net` | `x-webhook-secret` | Digest de lotes `finalizado` con `resumen_calidad_enviado_at null`: m² 1ª / comercial / contenedor, calidad oficial y completa, tonos; marca cada lote justo tras confirmarse su mensaje. Si no hay lotes, no envía. |
 
-Secrets de Edge Functions (`[VERIFICAR]` nombres con `supabase secrets
-list`): `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (OCR y GPT Image 2),
+Secrets de Edge Functions (contrastados con `supabase secrets list` el
+24/08/2026): `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (OCR y GPT Image 2),
 `DEEPSEEK_API_KEY` (historia del personaje), `TELEGRAM_BOT_TOKEN`,
-`TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_CHAT_INCIDENCIAS_CALIDAD`,
-`TELEGRAM_CHAT_INCIDENCIAS_PRODUCCION`, `TELEGRAM_CHAT_NUEVOS_LOTES`,
+`TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_CHAT_CALIDAD`,
+`TELEGRAM_CHAT_PRODUCCION`, `TELEGRAM_CHAT_NUEVOS_LOTES`,
 `TELEGRAM_CHAT_RESUMEN_TURNO`, `TELEGRAM_CHAT_RESUMEN_CALIDAD`,
-`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_PRESET_PERSONAJES`. `SUPABASE_URL`
-y `SUPABASE_SERVICE_ROLE_KEY` los inyecta Supabase.
+`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_PRESET_PERSONAJES`. Los
+`SUPABASE_*` (URL, SERVICE_ROLE_KEY, ANON_KEY, JWKS, DB_URL y las
+claves publicables/secretas nuevas) los inyecta Supabase.
 
 Las tres funciones llamadas desde la BD se despliegan con
 `--no-verify-jwt`. La URL de cada una está escrita literalmente en las

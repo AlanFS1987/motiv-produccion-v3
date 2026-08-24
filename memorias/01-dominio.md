@@ -63,7 +63,7 @@ formato ┘
   cálculo de ciclos de gamificación (`fn_ciclo_id`, ver `04`). Estaba
   en 31/08/2026 (lanzamiento de v3) y se movió en la sesión 23/08/2026
   al migrar los datos de v2, para que sus ciclos quedaran numerados
-  0..6 sin `cycle_id` negativos. Como se movió exactamente 7×28 días,
+  1..6 sin `cycle_id` negativos. Como se movió exactamente 7×28 días,
   el 31/08/2026 sigue siendo el inicio del ciclo 7 y la rotación no se
   alteró. Reglas si alguna vez hay que moverla: debe seguir siendo
   lunes, moverse en múltiplos de 28 días, y repetir después el ajuste
@@ -89,7 +89,10 @@ formato ┘
 
 - **Suplente** (responsable): una única cuenta ficticia `rol=suplente`,
   sin letra, exenta del candado de rotación (política RLS de `turno`:
-  el suplente puede abrir cualquiera dentro de la franja). Se mantiene
+  el suplente puede abrir cualquiera dentro de la franja). ⚠️ **Esa
+  cuenta no existe hoy en `usuario`** (comprobado 24/08/2026): todo lo
+  que se describe aquí está soportado por RLS y por el enum, pero sin
+  la fila creada nadie puede usarlo — ver `07`. Se mantiene
   como cuenta compartida (decisión cerrada, sesión 19/08/2026): no se
   amplía a que cualquier responsable pueda abrir turno de otra letra.
   Dentro de un tramo cubierto por suplente no se distingue qué persona
@@ -167,8 +170,8 @@ del nombre del formato. Existe en dos sitios que deben dar lo mismo:
 - Cliente y Deno: `lib/formato.ts` y `_shared/formato.ts` (informe de
   turno, pestaña Resumen, captura).
 - SQL: columna `formato.area_m2` (derivada del nombre) — la usan las
-  vistas del dashboard (`08`) y de gamificación (`04`). `[VERIFICAR]`
-  que `area_m2` está aplicada en la BD real.
+  vistas del dashboard (`08`) y de gamificación (`04`). Confirmado en
+  BD (24/08/2026): los 7 formatos con el valor correcto.
 
 ## Dos modos de calidad (siempre se muestran juntos)
 

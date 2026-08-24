@@ -1,0 +1,14 @@
+[33m3463281[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m memorias actulizadas, todo correcto y congruente
+[33mf9f92cb[m docs: actualiza memorias con migración de puntos del responsable
+[33m139f91f[m migracuion de v2 a v3, mejora de la creacion de personajes, pantallas de gamificacion del operario creadas, logros añadidos, cambiada fecha inicio ciclos para que lo importado de la v2 sea coherente
+[33m3ec89c1[m actualizadas las memorias y migracion
+[33mdb904c7[m actualizadas las memorias
+[33mf232f53[m Logros operarios, migraciones para gamificacion, pantalla principal operarios, generacion de imagen con gpt-image-2
+[33mf5ec6c3[m Actualizadas memorias gamificacion
+[33m9826ddf[m memorias actualizadas
+[33m48d21e8[m administrador puede editar partes completos
+[33mb50a6d0[m fix: corrige pérdida de sesión al volver de la cámara y cierra 5 incongruencias menores
+[33m183c98f[m feat: Ceria (GPT-5-mini), dashboard del jefe, panel de admin, pantalla de fábrica y sistema de temas
+[33m014c6ad[m memorias actualizadas1
+[33m88a45cc[m memorias actualizadas
+[33m5b36e70[m Estado inicial — historial reiniciado

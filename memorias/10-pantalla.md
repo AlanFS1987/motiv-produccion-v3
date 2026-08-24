@@ -4,7 +4,7 @@ Shell propio (`pantalla/PantallaCarrusel.tsx`), se muestra cuando
 `usuario.rol = 'pantalla'`. **Con login** (usuario/contraseña, como
 cualquier otro rol) — decisión de sesión: no se puede abrir la URL
 desde cualquier sitio y ver datos de producción sin autenticarse. El
-rol ya existía en BD (1 usuario real, de los 27 cargados) antes de
+rol ya existía en BD (1 usuario real, de los 24 cargados) antes de
 construir esta pantalla; solo hacía falta el shell y la bifurcación
 en `App.tsx`.
 
@@ -44,7 +44,7 @@ equivalente.
      igual que el hueco "sin reportar" que ya existía en Vista Rápida.
 4. **Ranking de operarios** — PLACEHOLDER ("zona en obras"). Toda la
    mecánica existe (`v_puntos_operario_ciclo`, `historial_ciclos` con
-   ciclos 0..6 migrados de v2, `v_avatar_activo_operario`); falta solo
+   ciclos 1..6 migrados de v2, `v_avatar_activo_operario`); falta solo
    la diapositiva.
 5. **Reyes del formato** — PLACEHOLDER. El concepto ya está diseñado y
    construido en el Ranking del operario (`v_rey_formato_historico`,
