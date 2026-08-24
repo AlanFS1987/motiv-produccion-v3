@@ -72,10 +72,21 @@ Usuarios: 27 reales cargados (6 responsables, 17 operarios, jefe, admin, suplent
 | Sistema de temas (5 temas) | **Construido** (arquitectura + marco de todos los shells); contenido interior de la mayoría de pantallas sin migrar (ver `12-temas.md`) |
 | Base de conocimiento de averías | No construido |
 
-Fecha de arranque de rotación y ciclos: **31/08/2026** (lunes,
-`configuracion.fecha_inicio_rotacion`). Si el arranque se mueve, hay
-que cambiar ese valor antes del primer turno y sigue teniendo que ser
-lunes. Primer cierre de ciclo real: **28/09/2026**.
+Fecha ancla de rotación y ciclos: `configuracion.fecha_inicio_rotacion`
+= **2026-02-16** (lunes) desde la renumeración de ciclos del
+23/08/2026 — NO es la fecha de lanzamiento. El lanzamiento de v3 sigue
+siendo el **31/08/2026**, que es exactamente donde empieza el ciclo 7
+(16/02 + 7×28 días). Primer cierre de ciclo real: **28/09/2026**
+(cierre del ciclo 7).
+
+⚠️ NO "corregir" este valor a 31/08/2026 aunque parezca desactualizado:
+la renumeración fue deliberada (alinear la numeración con los ciclos
+migrados de v2 sin cycle_id negativos — ver `04-gamificacion.md`,
+"Renumeración de ciclos", y `01-dominio.md`). Esta fecha decide A LA
+VEZ el patrón de rotación de turnos y la numeración de ciclos: si
+alguna vez hay que moverla, tiene que seguir siendo lunes, moverse en
+múltiplos de 28 días para no romper la rotación, y repetirse después
+el ajuste manual de letras del admin (`AjustarLetrasScreen`).
 
 ## Convenciones que hay que respetar
 
@@ -122,6 +133,13 @@ lunes. Primer cierre de ciclo real: **28/09/2026**.
   Deno no importa del frontend. Si se cambia uno, cambiar el otro.
 - **Probar en real**: cada cambio en SQL/funciones/fechas se prueba
   con datos reales o Postgres local antes de darlo por bueno.
+
+- **Vistas y RLS**: todas las vistas del proyecto corren con permisos
+  del owner (comportamiento por defecto de Postgres) — es lo que
+  permite que Ranking, Reyes del formato y la pantalla de fábrica
+  lean datos agregados de tablas cuya RLS no cubre a esos roles.
+  NUNCA poner `security_invoker = on` a una vista existente "por
+  buenas prácticas": romperías pantalla, ranking y logros a la vez.
 
 ## Mapa de archivos
 

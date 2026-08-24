@@ -188,7 +188,10 @@ Ya existían antes de hoy:
 | `fn_parte_reabre_lote()` | trigger de parte, no security definer |
 | `fn_buscar_modelo_similar`, `fn_buscar_marca_similar` | pg_trgm, top 5 |
 | `fn_calcular_calibre_com_pct()` | trigger before insert/update en parte |
-| `fn_otorgar_generaciones_por_nivel(uuid, int)`, `fn_consumir_generacion(uuid)` | ya existían; **ahora en uso real** por `generar-personaje` |
+| `fn_consumir_generacion(uuid)` | **SIN USO desde 23/08/2026** — sustituida por `fn_consumir_generacion_nivel`. Sin borrar. |
+| **`fn_consumir_generacion_nivel(uuid, uuid)`** / **`fn_devolver_generacion_nivel(uuid, uuid)`** | **nuevas 23/08/2026**, security definer, ejecución RESTRINGIDA a `service_role` (revoke a public/authenticated/anon) — las llama `generar-personaje` con `p_usuario_id` ya validado por JWT. |
+| **`fn_seleccionar_personaje(uuid)`** | **nueva 23/08/2026**, security definer con `auth.uid()` (la llama el CLIENTE con su sesión — patrón correcto ahí, ver comentario de la migración 20260823160000). |
+| **`fn_otorgar_bonus_nivel(uuid)`** | **nueva 23/08/2026**, security definer. Botón del admin: snapshot de stats + 3 generaciones del nivel actual. Idempotente. |
 | `fn_notificar_telegram()`, `fn_disparar_resumen_turno(uuid)`, `fn_disparar_resumen_calidad()` | security definer, leen app_secrets, `net.http_post` |
 | `fn_encolar_resumenes_turno_pendientes()` | cierre automático + reintento |
 | **`fn_cerrar_ciclos_pendientes()`** | **nueva 22/08/2026**, security definer. Recorre todo `cycle_id` anterior al actual sin fila en `historial_ciclos` y las cierra (operario+responsable, con fuerza/resistencia/velocidad). Idempotente (`on conflict do update`) — también sirve para "recalcular ciclo anterior". Disparada por el cron `cerrar-ciclos-pendientes` (ver `05-automatismos.md`). |
@@ -216,9 +219,18 @@ antigua, están desactualizadas.
 | historial_ciclos | propio; jefe; admin | — | — | — |
 | modelo, marca, formato, producto, linea, checklist_items, logros_definicion, puntos_*, niveles, cierre_fabrica | autenticados | admin | admin | admin |
 | app_secrets | ninguno (revoke) | | | |
+| configuracion | autenticados (24/08/2026 — antes SIN RLS) | admin | admin | admin |
+| usuario | cualquier rol conocido (24/08/2026); [redundantes: propia; admin; responsable/suplente→operarios] | — | admin | — |
+| historial_ciclos | propio; jefe; admin; + operario/responsable/pantalla (24/08/2026, ranking) | — | — | — |
 
-No hay políticas para `pantalla` ni `jefe_rectificado`; `parte_select`
-los excluye (lista explícita de roles). El administrador **no** tiene
+`parte_select` sigue excluyendo a `pantalla` y `jefe_rectificado`
+(lista explícita de roles) — la pantalla de fábrica NO lee `parte`
+directamente: lee VISTAS (v_produccion_turno, v_calidad_turno,
+v_calidad_modelo), que corren con permisos del owner y saltan la RLS.
+Dependencia deliberada: ver la convención de vistas en `CLAUDE.md` —
+nunca poner `security_invoker = on` a estas vistas.
+Desde 24/08/2026 `pantalla` sí tiene SELECT en `usuario`,
+`historial_ciclos` y `configuracion` (migración 20260824120000).. El administrador **no** tiene
 UPDATE en `parte`.
 
 `operario_logro` eliminada de esta lista (tabla dropeada, ver arriba).
@@ -236,9 +248,14 @@ no tienen aún este desglose, fase 2).
 al modelo de `usuario.generaciones_disponibles` (contador plano) —
 ahora cada nivel alcanzado lleva sus propias 3 generaciones.
 
-**usuario.generaciones_disponibles** — **SIN USO desde 23/08/2026**.
-Columna no borrada (inofensiva ahí parada) pero ningún código la lee
-ni la escribe ya — ver `personaje_stats_nivel.generaciones_usadas`.
+**usuario.generaciones_disponibles** — **SIN SIGNIFICADO desde
+23/08/2026** (el contador real es
+`personaje_stats_nivel.generaciones_usadas`). OJO: no está "sin uso"
+en el código — `AuthContext.tsx` (PerfilUsuario),
+`obtenerDatosGamificacion` (lib/gamificacion.ts) y
+`obtenerGeneracionesDisponibles` (lib/stats-avatar.ts) todavía la
+LEEN, aunque su valor ya no decide nada. Pendiente de limpiar (ver
+`07-pendientes.md` 24/08/2026); la columna en sí es inofensiva.
 
 **parte** — **1 columna nueva 23/08/2026**: `formato_id` (uuid
 references formato, nullable), denormalizado desde
@@ -306,3 +323,7 @@ porque en verdad las llama `generar-personaje` con `service_role`.
 Corregido en sesión 23/08/2026 tras el fallo — la lección: el patrón
 de seguridad correcto depende de QUIÉN llama a la función (cliente
 directo vs. Edge Function con service_role), no es el mismo siempre.
+Nota: el comentario final de `20260101000010_rls.sql` ("Rol 'pantalla'
+— sin login, service_role desde el backend") describe un diseño
+DESCARTADO — el diseño real es CON login (ver `10-pantalla.md`). La
+migración no se edita (convención); la verdad es esta.

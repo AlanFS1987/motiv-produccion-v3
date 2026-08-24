@@ -79,14 +79,22 @@ export function RankingOperarioScreen() {
                     entrada ? (
                       <div key={entrada.operarioId} className="flex flex-col items-center">
                         <div
-                          className="mb-1 flex items-center justify-center rounded-full bg-slate-100"
+                          className="mb-1 flex items-center justify-center overflow-hidden rounded-xl bg-slate-100"
                           style={{
-                            width: entrada.posicion === 1 ? 48 : 40,
-                            height: entrada.posicion === 1 ? 48 : 40,
+                            width: entrada.posicion === 1 ? 56 : 46,
+                            height: entrada.posicion === 1 ? 84 : 69,
                             border: entrada.posicion === 1 ? `2px solid ${COLOR_MEDALLA[1]}` : undefined,
                           }}
                         >
-                          <User size={entrada.posicion === 1 ? 24 : 20} className="text-slate-400" aria-hidden />
+                          {entrada.avatarUrl ? (
+                            <img
+                              src={entrada.avatarUrl}
+                              alt={entrada.username}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <User size={entrada.posicion === 1 ? 24 : 20} className="text-slate-400" aria-hidden />
+                          )}
                         </div>
                         <p className="text-center text-xs font-medium text-slate-900">{entrada.username}</p>
                         <p className="mb-1 text-[11px] text-slate-500">{entrada.puntos.toLocaleString("es-ES")} pts</p>

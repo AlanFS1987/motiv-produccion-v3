@@ -70,7 +70,7 @@ export function FotoHojaPartida({ turnoId, lineaId, onResuelto, onCancelar }: Fo
       const subida = await subirACloudinary(procesada.blob, publicId, "partes");
       setUrlCloudinary(subida.url);
 
-      setMensaje("Leyendo con Claude...");
+      setMensaje("Leyendo con GPT...");
       const respuesta = await ocrParte("hoja_partida", [{ url: subida.url }]);
       const leido = respuesta.datos as unknown as DatosOcrHojaPartida;
       leido.modelo = extraerModeloVisible(leido.modelo);

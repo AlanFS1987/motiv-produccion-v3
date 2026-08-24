@@ -19,6 +19,7 @@ import { obtenerCicloActual, obtenerCicloAnterior } from "./ciclo";
 export interface EntradaPodio {
   operarioId: string;
   username: string;
+  avatarUrl: string | null;
   puntos: number;
   posicion: number; // 1-based
 }
@@ -31,11 +32,29 @@ export interface Podio {
   tuEntradaEnTop5: boolean;
 }
 
-function construirPodio(filas: { operario_id: string; username: string; puntos: number }[], usuarioId: string): Podio {
+/**
+ * Avatar activo de cada usuario (v_avatar_activo_operario, migración
+ * 24/08/2026) — se trae en paralelo a los puntos y se cruza en
+ * cliente por operarioId, mismo patrón de varias consultas en
+ * paralelo que ya usa obtenerReyesDelFormato más abajo en este
+ * archivo. Una sola consulta por carga de podio (~30 usuarios como
+ * mucho), no una por operario.
+ */
+async function obtenerAvataresActivos(): Promise<Map<string, string>> {
+  const { data, error } = await supabase.from("v_avatar_activo_operario").select("usuario_id, imagen_url");
+  if (error) throw new Error(error.message);
+  return new Map((data ?? []).map((f: any) => [f.usuario_id as string, f.imagen_url as string]));
+}
+
+function construirPodio(
+  filas: { operario_id: string; username: string; puntos: number; avatar_url: string | null }[],
+  usuarioId: string,
+): Podio {
   const ordenadas = [...filas].sort((a, b) => b.puntos - a.puntos);
   const conPosicion: EntradaPodio[] = ordenadas.map((f, i) => ({
     operarioId: f.operario_id,
     username: f.username,
+    avatarUrl: f.avatar_url,
     puntos: f.puntos,
     posicion: i + 1,
   }));
@@ -48,36 +67,55 @@ function construirPodio(filas: { operario_id: string; username: string; puntos: 
   };
 }
 
-/** Podio del ciclo EN CURSO — v_puntos_operario_ciclo, join a usuario para el nombre. */
+/**
+ * Podio del ciclo EN CURSO — v_puntos_operario_ciclo.
+ *
+ * `username` se pide como columna PLANA, no como relación
+ * (`usuario:operario_id(username)`) — v_puntos_operario_ciclo es una
+ * VISTA sin foreign key propia, así que PostgREST no puede resolver
+ * ese embed (error real visto 24/08/2026: "Could not find a
+ * relationship... in the schema cache"). La vista ya expone
+ * `username` directamente desde 24/08/2026 — ver migración
+ * 20260824130000_fix_v_puntos_operario_ciclo_username.sql.
+ */
+/** Podio del ciclo EN CURSO — v_puntos_operario_ciclo + avatar (v_avatar_activo_operario). */
 export async function obtenerPodioCicloActual(usuarioId: string): Promise<Podio> {
   const ciclo = await obtenerCicloActual();
-  const { data, error } = await supabase
-    .from("v_puntos_operario_ciclo")
-    .select("operario_id, puntos_ciclo, usuario:operario_id(username)")
-    .eq("cycle_id", ciclo.cycleId);
+  const [{ data, error }, avatares] = await Promise.all([
+    supabase
+      .from("v_puntos_operario_ciclo")
+      .select("operario_id, puntos_ciclo, username")
+      .eq("cycle_id", ciclo.cycleId),
+    obtenerAvataresActivos(),
+  ]);
   if (error) throw new Error(error.message);
 
   const filas = (data ?? []).map((f: any) => ({
     operario_id: f.operario_id,
-    username: (Array.isArray(f.usuario) ? f.usuario[0]?.username : f.usuario?.username) ?? "—",
+    username: f.username ?? "—",
+    avatar_url: avatares.get(f.operario_id as string) ?? null,
     puntos: f.puntos_ciclo ?? 0,
   }));
   return construirPodio(filas, usuarioId);
 }
 
-/** Podio del ciclo ANTERIOR (ya cerrado) — historial_ciclos. */
+/** Podio del ciclo ANTERIOR (ya cerrado) — historial_ciclos + avatar (v_avatar_activo_operario). */
 export async function obtenerPodioCicloAnterior(usuarioId: string): Promise<Podio> {
   const ciclo = await obtenerCicloAnterior();
-  const { data, error } = await supabase
-    .from("historial_ciclos")
-    .select("usuario_id, puntos_ciclo, usuario:usuario_id(username)")
-    .eq("cycle_id", ciclo.cycleId)
-    .eq("rol", "operario");
+  const [{ data, error }, avatares] = await Promise.all([
+    supabase
+      .from("historial_ciclos")
+      .select("usuario_id, puntos_ciclo, usuario:usuario_id(username)")
+      .eq("cycle_id", ciclo.cycleId)
+      .eq("rol", "operario"),
+    obtenerAvataresActivos(),
+  ]);
   if (error) throw new Error(error.message);
 
   const filas = (data ?? []).map((f: any) => ({
     operario_id: f.usuario_id,
     username: (Array.isArray(f.usuario) ? f.usuario[0]?.username : f.usuario?.username) ?? "—",
+    avatar_url: avatares.get(f.usuario_id as string) ?? null,
     puntos: f.puntos_ciclo ?? 0,
   }));
   return construirPodio(filas, usuarioId);

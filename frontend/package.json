@@ -25,6 +25,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "oxlint": "^1.75.0",
+    "rollup-plugin-visualizer": "^7.1.1",
     "typescript": "~6.0.2",
     "vite": "^8.2.0",
     "vite-plugin-mkcert": "^2.1.0"

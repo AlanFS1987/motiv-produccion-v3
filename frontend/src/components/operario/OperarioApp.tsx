@@ -13,8 +13,7 @@ import { ThemeSwitcher } from "../ThemeSwitcher";
 
 // Orden pedido en sesión (19/08/2026): Inicio, Mi línea, Historial,
 // Limpieza — distinto del orden de exploración inicial de
-// 03-rol-operario.md 5.0. Solo una barra por ahora: la de
-// gamificación (Ranking/Stats/Logros) queda pospuesta (08-pendientes.md).
+// 03-rol-operario.md 5.0.
 type Pestana = "inicio" | "mi_linea" | "historial" | "limpieza";
 
 const NOMBRE_TIPO: Record<"M" | "T" | "N", string> = { M: "Mañana", T: "Tarde", N: "Noche" };

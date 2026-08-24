@@ -7,7 +7,7 @@
 // más la gestión del avatar (listar los ya generados, elegir cuál es
 // el activo, generar uno nuevo).
 //
-// La generación en sí sigue siendo generarPersonaje() de
+// La generación en es generarPersonajeParaNivel() de
 // lib/gamificacion.ts (sin tocar) — este archivo solo añade lo que
 // faltaba: stats en vivo, listar avatares, y elegir uno ya generado.
 

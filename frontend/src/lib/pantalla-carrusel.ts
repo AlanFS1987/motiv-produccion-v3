@@ -48,7 +48,7 @@ export async function obtenerProduccionCicloActual(): Promise<ProduccionCiclo> {
     obtenerObjetivoDiario(),
   ]);
 
-  const inicioRotacion = new Date(`${configInicio?.valor ?? "2026-08-31"}T00:00:00`);
+  const inicioRotacion = new Date(`${configInicio?.valor ?? "2026-02-16"}T00:00:00`);
   const hoy = new Date();
   const diasDesdeInicio = Math.floor((hoy.getTime() - inicioRotacion.getTime()) / 86_400_000);
   const cicloActual = Math.floor(diasDesdeInicio / 28);

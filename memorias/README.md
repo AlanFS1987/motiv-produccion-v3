@@ -1,3 +1,13 @@
+> ⚠️ **DOCUMENTO HISTÓRICO — NO REFLEJA EL ESTADO ACTUAL.** Este
+> README describe la PRIMERA entrega del esquema (enero 2026) y
+> contiene información obsoleta: las Edge Functions SÍ existen (con
+> otros nombres — es `ceria`, no `ceria-chat`; el cierre de ciclo es
+> `fn_cerrar_ciclos_pendientes` en SQL + cron, no una Edge Function
+> `cerrar-ciclo`), la fecha ancla ya no es la que se menciona, y la
+> mayoría de "pendientes" están cerrados. **La verdad vive en
+> `memorias/`** (entrada: `memorias/CLAUDE.md`). Se conserva solo
+> como contexto de las migraciones 0001–0010.
+
 # Memorias — índice
 
 Documentación del estado actual de la app. Describe qué hace y por qué

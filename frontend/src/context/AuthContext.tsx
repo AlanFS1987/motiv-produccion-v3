@@ -10,7 +10,8 @@ export type RolUsuario =
   | "operario"
   | "administrador"
   | "suplente"
-  | "pantalla";
+  | "pantalla"
+  | "jefe_rectificado";
 
 export interface PerfilUsuario {
   id: string;

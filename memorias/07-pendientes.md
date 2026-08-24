@@ -120,10 +120,57 @@ migración, la nota anterior sobre esto era incorrecta/desactualizada).
   la huérfana hasta la purga de retención de 18 meses, o hasta que el
   volumen justifique una Edge Function de borrado con service_role.)
 
+- **[CERRADO 24/08/2026]** `obtenerPodioCicloActual` (lib/ranking.ts)
+  usaba un embed de PostgREST (`usuario:operario_id(username)`) contra
+  `v_puntos_operario_ciclo`, una VISTA sin foreign key propia —
+  PostgREST no puede resolver relaciones sobre vistas sin FK, error
+  400 "Could not find a relationship... in the schema cache". No era
+  un problema de RLS (el podio del ciclo ANTERIOR, que sí usa un
+  embed pero contra la tabla `historial_ciclos` con FK real, no tenía
+  este fallo). Corregido añadiendo `username` como columna directa a
+  `v_puntos_operario_ciclo` (mismo patrón que `v_rey_formato_
+  historico.operario_username`) y quitando el embed del cliente.
+  Bug pre-existente desde que se escribió el archivo (23/08/2026),
+  nunca se había probado contra datos reales de un ciclo con más de
+  un operario hasta la auditoría del 24/08.
+
 - **[CERRADO 22/08/2026]** `operario_logro` eliminada — con los 19
   logros pasando a calcularse 100% por consulta, esta tabla de
-  progreso guardado se quedó sin ninguna función. Ver
-  `04-gamificacion.md`.
+  progreso guardado se q
+  
+- **[NUEVO 24/08/2026 — auditoría]** Tres huecos de RLS detectados y
+  corregidos en `20260824120000_rls_configuracion_usuario_ranking.sql`
+  (pendiente de `supabase db push` + retest): (1) `configuracion` SIN
+  RLS — cualquier autenticado podía escribirla vía PostgREST; (2) los
+  embeds de username (Ranking del operario, Vista Detallada del jefe)
+  chocaban con la RLS de `usuario` — el podio salía sin nombres para
+  un operario y el dashboard sin nombres para el jefe; (3) el podio
+  del ciclo anterior lee `historial_ciclos` directo y la RLS solo
+  devolvía la fila propia. **Todo lo de Ranking/Dashboard se había
+  probado solo con cuenta admin** (que ve todo por RLS) — tras aplicar
+  la migración, repetir la prueba con una cuenta de operario y una de
+  jefe reales.
+- **[NUEVO 24/08/2026 — auditoría]** Código muerto con contrato roto:
+  `generarPersonaje()` en `lib/gamificacion.ts` no manda `nivel_id`,
+  que la Edge Function reescrita exige — si algo la llamara, fallaría.
+  El comentario de cabecera de `lib/stats-avatar.ts` ("la generación
+  sigue siendo generarPersonaje() de lib/gamificacion.ts") es falso:
+  el flujo real es `generarPersonajeParaNivel` del propio archivo.
+  Borrar la función vieja y el comentario. Relacionado:
+  `AuthContext.tsx`, `obtenerDatosGamificacion` y
+  `obtenerGeneracionesDisponibles` siguen leyendo
+  `usuario.generaciones_disponibles` (valor sin significado desde
+  23/08) — limpiar cuando se toque esa zona.
+- **[NUEVO 24/08/2026 — auditoría]** `frontend/.env.example` no
+  incluía `VITE_CLOUDINARY_PRESET_PERSONAJES` (obligatoria para la
+  generación de avatar desde 22/08). Corregido — ver parche.
+- **[NUEVO 24/08/2026 — auditoría]** Revisar en `ceria/index.ts` el
+  `historialLimpio.slice(0, -1)` de la fase 1: si la pregunta del
+  usuario aún no está guardada en BD en ese punto (el guardado ocurre
+  después), ese slice recorta el ÚLTIMO MENSAJE DEL ASSISTANT del
+  historial, no un duplicado de la pregunta — degradaría el contexto
+  sin dar error. Confirmar el orden real guardado/carga y quitar el
+  slice si sobra.
 
 
 
@@ -149,12 +196,10 @@ migración, la nota anterior sobre esto era incorrecta/desactualizada).
     lunes (mismo tipo de validación pendiente que el cierre automático
     de turno, punto 12).
 
-17. **[NUEVO 23/08/2026]** `generar-personaje` (Edge Function) debe
-   dejar de leer `v_stats_vida` en vivo y leer en su lugar el
-   snapshot de `personaje_stats_nivel` para el nivel de la carta que
-   se está generando, guardando esos 4 valores en `personaje_rpg`.
-   Sin esto, el snapshot por nivel existe en BD pero ninguna carta lo
-   usa todavía.
+17. **[CERRADO 23/08/2026]** `generar-personaje` reescrita ese mismo
+   día: lee el snapshot de `personaje_stats_nivel` del nivel elegido
+   (imagen E historia con las mismas stats congeladas). Ver
+   `04-gamificacion.md`.
 18. **[NUEVO 23/08/2026]** Vista de usuarios del admin: ampliar con
    puntos totales, puntos para el siguiente nivel y botón "otorgar
    generaciones" (consume `v_admin_usuarios_gamificacion` +
@@ -266,3 +311,23 @@ migración, la nota anterior sobre esto era incorrecta/desactualizada).
 9. PWA, retención de 18 meses en Cloudinary.
 10. Reyes del formato (pantalla de fábrica) — sin diseño, sin
     capturas de referencia.
+
+## Auditoría de congruencia 24/08/2026 — resumen
+
+- RLS: `configuracion` sin RLS (escribible por cualquiera), embeds de
+  `usuario` bloqueados por RLS para operario/jefe, `historial_ciclos`
+  solo visible para uno mismo (podio de una persona). Corregido en
+  20260824120000_rls_configuracion_usuario_ranking.sql.
+- Bug real (no RLS): `obtenerPodioCicloActual` usaba un embed de
+  PostgREST contra una vista con UNION ALL — PostgREST no puede
+  rastrear FK a través de UNIONs (confirmado contra la doc oficial).
+  Corregido horneando `username` en la vista
+  (20260824130000_fix_v_puntos_operario_ciclo_username.sql) +
+  lib/ranking.ts actualizado.
+- .md sincronizados con el estado real (CLAUDE.md, 04-gamificacion,
+  06-esquema-bd, README de migraciones) + 5 correcciones menores de
+  código (env.example, mensaje UI, fallback de fecha, comentarios
+  fósiles, tipo RolUsuario).
+- Pendiente de verificar con datos reales tras el lanzamiento del
+  31/08: Ranking ciclo actual, Vista Detallada del jefe, Logros — sin
+  partes reales todavía, no se pueden probar de extremo a extremo.

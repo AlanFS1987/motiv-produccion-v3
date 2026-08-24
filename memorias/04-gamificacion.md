@@ -387,11 +387,11 @@ Construido en `20260823100000_personaje_stats_nivel_bonus.sql`:
 
 | **`fn_otorgar_bonus_nivel(uuid)`** | **nueva 23/08/2026**, security definer. Botón del admin: guarda el snapshot de stats del nivel actual y, solo la primera vez para ese nivel, otorga +3 generaciones. Idempotente. |
 
-**Pendiente** (no incluido en esta migración, a propósito — no
-mezclar cambios): la Edge Function `generar-personaje` sigue leyendo
-`v_stats_vida` en vivo. Falta cambiarla para que lea de
-`personaje_stats_nivel` (el snapshot del nivel de la carta) y guarde
-esos 4 valores en `personaje_rpg` en el momento de generar.
+**[RESUELTO 23/08/2026]** La Edge Function `generar-personaje` fue
+reescrita ese mismo día: ya lee las stats CONGELADAS de
+`personaje_stats_nivel` del nivel elegido (nunca `v_stats_vida` ni
+`fn_nivel_actual` en vivo) — ver "Generaciones ligadas a CADA NIVEL"
+más abajo.
 
 ## Personaje RPG
 
@@ -415,7 +415,7 @@ OpenAI, con imagen de referencia:
    unsigned sirve para el lado cliente y para el servidor).
 3. La Edge Function `generar-personaje` compone el prompt final en 3
    partes, en este orden: `niveles.prompt_imagen` (BD, el "qué" —
-   marco, aura, entorno del nivel actual) + prompt fijo de estilo y
+   marco, aura, entorno del nivel ELEGIDO por el operario) (nivel_id del body — desde 23/08/2026 no es necesariamente el nivel actual en vivo) + prompt fijo de estilo y
    seguridad (código, `PROMPT_ESTILO_Y_SEGURIDAD`) + texto libre
    opcional del operario.
 4. Llama a `images/edits` con esa imagen + ese prompt, sube el
@@ -424,39 +424,46 @@ OpenAI, con imagen de referencia:
    seleccionado — el personaje recién generado pasa a ser
    automáticamente el que se ve).
 
-**Prompt de estilo y seguridad** — pide **fidelidad de rasgos** con
-quien sube la foto (es su alter ego dentro del juego, no un genérico)
-DENTRO del estilo ilustrado de cada nivel (nunca foto-realismo puro,
-que chocaría con "cyberpunk retrofuturista"), y excluye
-explícitamente a cualquier tercero, marca o logo que pueda aparecer de
-fondo en la foto (las fotos de playa/fiesta casi siempre tienen más
-gente al lado, sin que esa gente haya dado permiso).
+**Prompt de estilo y seguridad** (`PROMPT_ESTILO_Y_SEGURIDAD`, en
+código) — pide un **acabado fotorrealista** en retrato vertical: "el
+resultado debe parecer una fotografía fotorrealista de la persona
+transformada en un personaje de videojuego RPG", con **fidelidad de
+rasgos** con quien sube la foto (es su alter ego, no un genérico) y
+coherencia visual con la progresión de niveles. Excluye
+explícitamente logotipos, marcas y elementos de IP que aparezcan en
+la foto de referencia (sustituidos por diseños originales), y
+contenido sexual/violento. Nota histórica: una versión anterior de
+este documento decía "nunca foto-realismo puro, estilo ilustrado" —
+eso NO es lo que hace el prompt real; si el estilo debe cambiar, se
+cambia la constante en `generar-personaje/index.ts`.
 
 **Generación siempre manual** (decisión de sesión): el usuario pulsa
 un botón, nunca se dispara sola al subir de nivel. Si ya tiene un
 personaje del nivel anterior, se queda con él hasta que pida uno
 nuevo a mano.
 
-Infraestructura reutilizada sin cambios (ya existía desde antes de
-esta sesión): `usuario.generaciones_disponibles`, `fn_consumir_generacion`
-(atómico, falla si no quedan), `fn_otorgar_generaciones_por_nivel`
-(+3 al subir de nivel), el índice único `uq_personaje_rpg_seleccionada`.
-Si la generación falla DESPUÉS de consumir el crédito (fallo de la API
-externa), la Edge Function lo devuelve automáticamente — el usuario no
-pierde una generación por un fallo que no es suyo.
+**[SUSTITUIDO 23/08/2026]** El modelo de contador plano
+(`usuario.generaciones_disponibles` + `fn_consumir_generacion` +
+`fn_otorgar_generaciones_por_nivel`) quedó reemplazado por las
+generaciones POR NIVEL (`personaje_stats_nivel.generaciones_usadas`,
+`fn_consumir_generacion_nivel`/`fn_devolver_generacion_nivel`
+restringidas a service_role) — ver la sección "Generaciones ligadas a
+CADA NIVEL" más abajo, que es la vigente. Lo único que sobrevive sin
+cambios del modelo antiguo es el índice único
+`uq_personaje_rpg_seleccionada` y la garantía de que un fallo de API
+externa devuelve la generación consumida.
 
 ## Pantallas
 
 **Inicio del operario** — construida y probada en real
-(`InicioOperarioScreen.tsx`): nivel + estrellas + barra de progreso al
-siguiente nivel + puntos totales + personaje (imagen + historia) +
-selector de imagen de referencia + texto libre + botón generar +
-contador de generaciones disponibles.
-
-`frontend/src/lib/gamificacion.ts` (nuevo) es genérico para operario Y
-responsable — decide sola qué vista de puntos y qué columna de umbral
-usar según `usuario.rol`, listo para reutilizar en la pantalla de
-Inicio del responsable sin duplicar lógica.
+(`InicioOperarioScreen.tsx`, reescrita 23/08/2026): tarjeta de SOLO
+LECTURA (nivel + estrellas + progreso al siguiente nivel + puntos
+totales y desglose por categoría + avatar activo, vía
+`lib/inicio-gamificacion.ts`) + sub-barra interna con 4 vistas:
+Resumen, Ranking, Stats, Logros. La GENERACIÓN del personaje
+(selector de nivel + imagen de referencia + texto libre + botón) vive
+en la pestaña **Stats+Avatar** (`StatsAvatarOperarioScreen.tsx`), no
+aquí.
 
 **Construido 23/08/2026 — Ranking, Stats+Avatar, Logros** (las 3
 sub-vistas que faltaban dentro de Inicio, ver `03-operario.md`):
@@ -471,6 +478,13 @@ sub-vistas que faltaban dentro de Inicio, ver `03-operario.md`):
   `parte.formato_id` denormalizado (trigger `trg_parte_set_formato_id`)
   + índice `idx_parte_formato_record` — sin eso habría que escanear
   `parte` entera por cada consulta.
+  Avatar en el podio: el top 3 muestra la imagen del personaje RPG
+activo del operario (si tiene uno generado) en vez del icono
+genérico — vía `v_avatar_activo_operario`, una vista fina que expone
+solo `imagen_url` para poder saltar la RLS restrictiva de
+`personaje_rpg` sin abrir toda la tabla (mismo patrón que Reyes del
+formato con el username). 4º/5º puesto y "Tú" siguen siendo solo
+texto.
 - **Stats+Avatar fusionados en una sola pestaña** (decisión de
   sesión — iban a ser 2 separadas): 4 barras SIEMPRE EN VIVO
   (fuerza/resistencia/velocidad/vida, `v_stats_vida` + puntos
@@ -620,6 +634,26 @@ por operario+ciclo) y `personaje_stats_nivel` (niveles cruzados con
 stats congeladas, sin Aprendiz). Ninguna otra tabla se tocó — ni
 `parte`, ni `lote`/`producto`, ni ningún catálogo. La tabla de
 staging `stg_migracion_v2` fue temporal y ya se borró.
+
+**Migración de RESPONSABLES (sesión 24/08/2026, ampliación de la
+migración de operarios del 23/08/2026)**: 4 responsables reales
+(`hectorn`, `radu`, `valentina`, `joaquina` — la cuenta genérica
+`responsable` de v2, 3 turnos, se dejó fuera a propósito, sin
+equivalente directo en v3) migrados desde `turnos` de v2 (ya
+agregados a nivel de turno completo, sin necesidad de reconstruir
+desde `partes`, a diferencia del operario). Mismo criterio que
+operarios: RECALCULADO con las fórmulas de v3 (`puntos_metros` +
+`puntos_rendimiento_responsable`, resueltos por turno, nunca por
+ciclo agregado) desde datos en bruto, nunca copiando los puntos ya
+calculados en v2 (que además usaba una escala distinta — minutos
+absolutos en vez de %). A diferencia de la migración de operarios,
+esta se hizo YA con el ancla corregida (2026-02-16), así que
+`cycle_id` se calculó llamando directamente a `fn_ciclo_id()` — sin
+ningún "+7" de renumeración. Ciclo 6 queda incompleto (el export de
+v2 solo llega al 09/08/2026, 6 de los 28 días del ciclo).
+`personaje_stats_nivel` NO se reconstruyó para responsables —
+pendiente si se quiere el mismo efecto retroactivo de generaciones
+que tienen los operarios.
 **Pendiente**: Inicio/gamificación del **responsable** — no
 construido (solo el operario tiene las 4 sub-vistas). Reutilizaría
 `frontend/src/lib/gamificacion.ts` y buena parte del patrón de

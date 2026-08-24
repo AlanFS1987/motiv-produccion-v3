@@ -9,7 +9,6 @@
 //   2. Últimos modelos — REAL (v_calidad_modelo)
 //   3. Últimos turnos KPI1/KPI2 — REAL (v_produccion_turno, calculado aquí)
 //   4. Ranking de operarios — PLACEHOLDER (bloqueado por cerrar-ciclo,
-//      historial_ciclos, personaje_rpg — nada de eso existe aún)
 //   5. Reyes del formato — PLACEHOLDER (sin capturas de referencia)
 
 import { useEffect, useState } from "react";
