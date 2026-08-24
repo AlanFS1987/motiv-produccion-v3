@@ -4,22 +4,21 @@
 
 | Función | Quién la llama | Auth | Qué hace |
 |---|---|---|---|
-| `ocr-parte` | Frontend | JWT de sesión validado con `auth.getUser` (20/08/2026) | Recibe `foto_tipo` (`hoja_partida` / `caja` / `pantalla`) + 1-2 URLs de imagen, llama a Claude con el prompt de `prompts.ts`, devuelve el JSON. No escribe en BD. |
-| `resolver-catalogo` | Frontend, tras `ocr-parte` de hoja | JWT de sesión validado con `auth.getUser` (20/08/2026); `created_by` sale del token, no del body; usa service_role para escribir | Resuelve/crea modelo (pg_trgm ≥ 0,4, nombre cortado en el primer `(`), marca, producto, lote (número de orden exacto); reabre lote finalizado. Devuelve ids y flags `lote_creado`/`lote_reabierto`. |
+| `ocr-parte` | Frontend | JWT de sesión validado con `auth.getUser` | Recibe `foto_tipo` (`hoja_partida` / `caja` / `pantalla`) + 1-2 URLs de imagen, llama a GPT-4o-mini con el prompt de `prompts.ts` y cae a Claude Haiku si falla (timeout 25 s cada uno; `extraido_con: "gpt" | "claude"` en la respuesta), devuelve el JSON. No escribe en BD. |
+| `resolver-catalogo` | Frontend, tras `ocr-parte` de hoja | JWT validado; `created_by` sale del token; escribe con service_role | Resuelve/crea modelo (pg_trgm ≥ 0,4, nombre cortado en el primer `(`), marca, producto, lote (número de orden exacto); reabre lote finalizado. Devuelve ids y flags `lote_creado`/`lote_reabierto`. |
+| `generar-personaje` | Frontend (Stats+Avatar) | JWT validado; RPCs y escritura con service_role | Genera imagen (GPT Image 2) e historia (DeepSeek) del personaje para un `nivel_id` ya alcanzado. Flujo completo en `04`. |
+| `ceria` | Frontend (jefe/admin) | JWT validado | Asistente de producción sobre GPT-5-mini, 3 fases + 9 herramientas. Ver `11`. |
 | `notificar-telegram` | BD vía `pg_net` | header `x-webhook-secret` | `tipo` ∈ incidencia_calidad / incidencia_produccion / nuevo_lote. Enriquece con consulta y envía al grupo correspondiente, con fotos si hay. |
 | `generar-resumen-turno` | BD vía `pg_net` | `x-webhook-secret` | Compila el informe del turno (misma estructura que la pestaña Resumen), lo parte en mensajes < 3.500 caracteres, envía, marca `turno.resumen_enviado_at`. |
-| `notificar-telegram-resumen-calidad` | BD vía `pg_net` | `x-webhook-secret` | Digest de lotes `finalizado` con `resumen_calidad_enviado_at null`: m² 1ª / comercial / contenedor, calidad oficial y completa, tonos; marca los enviados. Si no hay lotes, no envía. |
-| **`generar-personaje`** *(reescrita 23/08/2026 — generaciones por nivel + DeepSeek)* | Frontend, selector de nivel en la pestaña Stats/Avatar | JWT de sesión validado con `auth.getUser`; usa service_role para el resto (RPC + escritura) | Recibe `nivel_id` (para qué nivel de los ya alcanzados quiere generar — YA NO adivina el nivel actual con `fn_nivel_actual`) + `imagen_referencia_url` + `prompt_operario` opcional. Consume 1 generación de ESE nivel (`fn_consumir_generacion_nivel`, atómico, `auth.uid()` interno). Lee `niveles` de ese `nivel_id` y las stats CONGELADAS de `personaje_stats_nivel` (usuario+nivel_id) — no `v_stats_vida` en vivo. Compone el prompt de imagen (`niveles.prompt_imagen` + `PROMPT_ESTILO_Y_SEGURIDAD` + texto del operario), llama a GPT Image 2, sube a Cloudinary. Genera la historia con DeepSeek (`_shared/deepseek_historia.ts`, `generarHistoriaOperario`) usando `prompt_base`+`prompt_imagen`+las 4 stats congeladas+texto del operario — nunca lanza, si falla devuelve `null` y la respuesta incluye `historia_pendiente: true`. Guarda con `fn_guardar_personaje_generado` (atómico, `p_nivel_id` = el elegido). Si algo falla en los pasos 3-7, devuelve la generación de ESE nivel (`fn_devolver_generacion_nivel`). |
+| `notificar-telegram-resumen-calidad` | BD vía `pg_net` | `x-webhook-secret` | Digest de lotes `finalizado` con `resumen_calidad_enviado_at null`: m² 1ª / comercial / contenedor, calidad oficial y completa, tonos; marca cada lote justo tras confirmarse su mensaje. Si no hay lotes, no envía. |
 
-Secrets de Edge Functions: `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`,
+Secrets de Edge Functions (`[VERIFICAR]` nombres con `supabase secrets
+list`): `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (OCR y GPT Image 2),
+`DEEPSEEK_API_KEY` (historia del personaje), `TELEGRAM_BOT_TOKEN`,
 `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_CHAT_INCIDENCIAS_CALIDAD`,
 `TELEGRAM_CHAT_INCIDENCIAS_PRODUCCION`, `TELEGRAM_CHAT_NUEVOS_LOTES`,
 `TELEGRAM_CHAT_RESUMEN_TURNO`, `TELEGRAM_CHAT_RESUMEN_CALIDAD`,
-`OPENAI_API_KEY` (usada tanto por el OCR como por `generar-personaje`),
-**`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_PRESET_PERSONAJES`** (nuevos
-22/08/2026, para que `generar-personaje` pueda subir el resultado sin
-pasar por el navegador) (nombres según el código de las funciones;
-`[VERIFICAR]` con `supabase secrets list`). `SUPABASE_URL`
+`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_PRESET_PERSONAJES`. `SUPABASE_URL`
 y `SUPABASE_SERVICE_ROLE_KEY` los inyecta Supabase.
 
 Las tres funciones llamadas desde la BD se despliegan con
@@ -47,7 +46,7 @@ devuelven 401 y no envían nada (falla cerrado).
 |---|---|---|
 | `resumenes-turno-pendientes` | `0 * * * *` | `fn_encolar_resumenes_turno_pendientes()`: (1) marca `cerrado_at/como_cerro='automatico'` en turnos cuya franja + 1 h ya pasó (hora Madrid) y nadie cerró; ese UPDATE dispara el trigger de envío. (1b) cierra "sin producción" cualquier parte que quedó `completado=false` en esos turnos (20/08/2026). (2) Reintenta `fn_disparar_resumen_turno` para turnos cerrados hace > 5 min sin `resumen_enviado_at`. |
 | `resumen-calidad-diario` | `0 * * * *` | Solo si la hora de Madrid es 7, 15 o 23 → `fn_disparar_resumen_calidad()`. |
-| **`cerrar-ciclos-pendientes`** *(nuevo 22/08/2026)* | `0 * * * 1` (**solo lunes**, cada hora en punto UTC) | Solo si la hora de Madrid es 8 → `fn_cerrar_ciclos_pendientes()`. Restringido a lunes en el propio cron (no en la condición SQL) porque el ciclo dura 28 días desde un lunes: matemáticamente, cada ciclo termina siempre en domingo y el siguiente arranca siempre en lunes — no hace falta comprobar ningún otro día. Las 8:00 dan margen de sobra sobre el cierre automático del turno N (07:00) y la ventana de corrección de 1h del responsable. Ver `04-gamificacion.md`. |
+| `cerrar-ciclos-pendientes` | `0 * * * 1` (solo lunes) | Solo si la hora de Madrid es 8 → `fn_cerrar_ciclos_pendientes()` (`04`). Lunes porque cada ciclo de 28 días desde un lunes acaba en domingo; las 8:00 dan margen sobre el cierre automático del turno N (07:00) y la ventana de corrección de 1 h. |
 
 Disparar cada hora es deliberado: España siempre está a un número
 entero de horas de UTC, así que no hay que tocar nada con el cambio de
@@ -63,7 +62,7 @@ consulta, no en el horario.
 | parte | after insert (`trg_parte_reabre_lote`) | `fn_reabrir_lote_si_finalizado(lote_id)` |
 | parte | before insert/update (`trg_parte_calibre_pct`) | recalcula `calibre_com_pct` = descuadre_com / entradas × 100 (null si entradas = 0) |
 | turno | before insert | bloquea si `fn_fabrica_cerrada(fecha)` |
-| parte | before update (`trg_parte_restringir_columnas`) | Restringe qué columnas puede tocar cada UPDATE según quién lo hace: operario (`operario_id = auth.uid()`) solo las 5 columnas `*_operario`; responsable en ventana de 1h no puede cambiar `completado`/`completado_at`/`vigente`; administrador sin restricción. Diff genérico OLD/NEW por jsonb, no lista columnas de piezas/tiempos a mano (07-pendientes.md #11, cerrado 20/08/2026). |
+| parte | before update (`trg_parte_restringir_columnas`) | Restringe qué columnas puede tocar cada UPDATE según quién lo hace: operario (`operario_id = auth.uid()`) solo las 5 columnas `*_operario`; responsable en ventana de 1h no puede cambiar `completado`/`completado_at`/`vigente`; administrador sin restricción. Diff genérico OLD/NEW por jsonb. |
 
 ## Cloudinary
 
@@ -71,13 +70,9 @@ Subida unsigned desde el navegador, preset por categoría, carpeta
 fija en el preset: `motiv_v3_partes` → `motiv-produccion/partes`
 (prefijos `hoja_`, `caja_`, `pantalla_`), `motiv_v3_incidencias_calidad`,
 `motiv_v3_incidencias_produccion`, `motiv_v3_limpieza` (`antes_`,
-`despues_`), **`motiv_v3_personajes`** (nuevo 22/08/2026, prefijos
-`referencia_` para la imagen que sube el operario y `personaje_` para
-el resultado que sube la Edge Function — es el ÚNICO preset que se usa
-tanto desde el navegador como desde una Edge Function, porque un
-preset unsigned no distingue quién sube). Retención acordada: 18
-meses (no automatizada). Variables `VITE_CLOUDINARY_CLOUD_NAME` y
-`VITE_CLOUDINARY_PRESET_*`.
+`despues_`), `motiv_v3_personajes` (prefijos `referencia_` desde el
+navegador y `personaje_` desde la Edge Function — el único preset usado
+desde los dos lados). Retención acordada: 18 meses (no automatizada).
 
 ## Variables de entorno del frontend (`.env.local`)
 
@@ -85,8 +80,8 @@ meses (no automatizada). Variables `VITE_CLOUDINARY_CLOUD_NAME` y
 `VITE_CLOUDINARY_CLOUD_NAME`, `VITE_CLOUDINARY_PRESET_PARTES`,
 `VITE_CLOUDINARY_PRESET_INCIDENCIAS_CALIDAD`,
 `VITE_CLOUDINARY_PRESET_INCIDENCIAS_PRODUCCION`,
-`VITE_CLOUDINARY_PRESET_LIMPIEZA`, **`VITE_CLOUDINARY_PRESET_PERSONAJES`**
-(nueva 22/08/2026). Todas públicas por diseño.
+`VITE_CLOUDINARY_PRESET_LIMPIEZA`, `VITE_CLOUDINARY_PRESET_PERSONAJES`.
+Todas públicas por diseño (también en `frontend/.env.example`).
 
 
 Seguridad de cuenta (Settings → Security, 20/08/2026): Resource list y
@@ -96,9 +91,6 @@ sin restringir. Fetch de vídeo restringido. Strict Transformations
 (imagen y vídeo) activado. PDF/ZIP delivery desactivado. Unsigned
 actions (auto-chaptering/transcription/video details) sin activar.
 Cada preset con `Allowed formats` (jpg/png/webp, sin SVG), tamaño
-máximo de archivo, y `Overwrite` desactivado. **Confirmar que
-`motiv_v3_personajes` se creó con estos mismos ajustes** de seguridad
-que los otros 4 (se creó en sesión, después de esta revisión de
-seguridad del 20/08).
-
-**`DEEPSEEK_API_KEY`** (nuevo 23/08/2026, usado por `generar-personaje` para la historia del personaje vía `_shared/deepseek_historia.ts`)
+máximo de archivo, y `Overwrite` desactivado. `[VERIFICAR]` que
+`motiv_v3_personajes` (creado después de esta revisión) tiene los
+mismos ajustes.

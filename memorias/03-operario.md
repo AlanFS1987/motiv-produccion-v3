@@ -2,13 +2,10 @@
 
 Shell propio (`operario/OperarioApp.tsx`), se muestra cuando
 `usuario.rol = 'operario'`. Cuatro pestañas: **Inicio**, **Mi línea**,
-**Historial**, **Limpieza** — sin cambios en `OperarioApp.tsx` desde
-19/08/2026, la gamificación no añadió pestañas propias aquí.
-
-**Construido 23/08/2026**: dentro de Inicio, una SEGUNDA barra (solo
-visible ahí, no en Mi línea/Historial/Limpieza) con 4 sub-vistas:
-Inicio (turno + tarjeta resumen), Ranking, Stats, Logros. Ver
-`04-gamificacion.md` para el detalle de cada una.
+**Historial**, **Limpieza**. Dentro de Inicio hay una segunda barra
+(solo visible ahí) con 4 sub-vistas: **Inicio** (turno + tarjeta
+resumen), **Ranking**, **Stats+Avatar**, **Logros** — las tres últimas
+son toda la gamificación del operario, descritas en `04`.
 
 ## Turno y pertenencia
 
@@ -26,44 +23,27 @@ vez de datos de un turno ajeno.
 
 ## Inicio
 
-**Construida y probada en real (22/08/2026)** —
 `InicioOperarioScreen.tsx`. Dos bloques:
+- Mensaje de estado del turno personal.
+- Tarjeta resumen de gamificación, solo lectura
+  (`ResumenGamificacionMini`, datos de `lib/inicio-gamificacion.ts`):
+  avatar, nivel, puntos totales, progreso al siguiente nivel, desglose
+  ciclo/piezas/rendimiento/limpieza, metros y tiempo plena totales.
+  La generación del personaje no está aquí sino en Stats+Avatar (`04`).
 
-- Mensaje de estado del turno personal (sin cambios desde antes).
-- **Tarjeta resumen de gamificación, SOLO LECTURA** (`ResumenGamificacionMini`,
-  en `InicioOperarioScreen.tsx`, reescrita 23/08/2026): avatar mini,
-  nivel, nombre+grupo(letra), puntos totales, barra de progreso,
-  puntos ciclo/piezas/rendimiento/limpieza (los 3 últimos de por
-  vida), metros totales, tiempo plena total. Usa
-  `frontend/src/lib/inicio-gamificacion.ts` (nuevo). La generación de
-  personaje SALIÓ de aquí — ver "Stats+Avatar" en `04-gamificacion.md`.
-
-Estilo: se mantuvo igual que el resto de `operario/` (colores
-`slate-*` fijos, sin variables de tema) para no mezclar la migración
-al sistema de temas con este cambio — ver `12-temas.md`.
+Estilo: colores `slate-*` fijos como el resto de `operario/`, sin
+migrar al sistema de temas (`12`).
 
 ## Mi línea
 
-**Fuente única: `parte.operario_id`** (decisión sesión 19/08/2026, ver
-`CLAUDE.md`). La tarjeta por línea se construye a partir de los partes
-de este turno donde el operario logueado es el `operario_id` —
-agrupados por línea —, no a partir de `asignacion_operario_linea`. Esa
-tabla ya no se consulta aquí: es solo la herramienta que usa el
-responsable para fijar qué operario se copia a `parte.operario_id`
-cuando se crea el siguiente parte de esa línea (ver `01-dominio.md`).
-
-Consecuencias de esto:
-- Si el responsable asigna a un operario a una línea al abrir turno
-  pero todavía no se ha creado ningún parte en ella (turno recién
-  abierto, entre lotes), esa línea **no aparece** en Mi línea hasta que
-  exista el primer parte con su `operario_id` — no hay un estado
-  intermedio "asignado sin parte" que representar; es la ausencia
-  natural de resultado en la consulta.
-- Si el responsable reasigna la línea a otro operario a mitad de
-  turno, el parte que ya estaba abierto **no cambia de dueño**: el
-  operario saliente lo sigue viendo (y puede seguir verificándolo) en
-  su Mi línea. El operario entrante solo verá esa línea a partir del
-  siguiente parte que se cree, que ya llevará su `operario_id`.
+Fuente única: `parte.operario_id` (regla en `01`, "Asignación
+operario → línea"). La tarjeta por línea se construye con los partes
+de este turno cuyo `operario_id` es el operario logueado, agrupados
+por línea; `asignacion_operario_linea` no se consulta. Consecuencias:
+- Una línea asignada pero sin ningún parte creado todavía no aparece.
+- Si el responsable reasigna la línea a mitad de turno, el parte ya
+  abierto sigue siendo del operario saliente (lo ve y puede
+  verificarlo); el entrante solo ve la línea desde el siguiente parte.
 
 Cada tarjeta muestra el parte activo de la línea (lote, modelo, marca,
 formato, tono, calibre — solo lectura) y el estado de **su propia**
@@ -100,7 +80,5 @@ Marcar un ítem: foto de **antes** (cámara, obligatoria) → foto de
 restricción UNIQUE (línea, turno, ítem) resuelve la concurrencia: si
 otro lo marcó antes, el INSERT falla y la app avisa "ya lo hizo un
 compañero". Fotos a Cloudinary carpeta `limpieza`, prefijos `antes_` /
-`despues_`. Cada ítem vale 1 punto (`checklist_items.puntos`), **ya
-sumado desde el 22/08/2026** por `v_puntos_limpieza_operario_por_turno`
-y agregado al total del operario (`v_puntos_operario_total_vida`) —
-ver `04-gamificacion.md`.
+`despues_`. Cada ítem vale 1 punto (columna `checklist_items.puntos`,
+editable por el admin, hoy todas a 1); cómo suma en `04`.

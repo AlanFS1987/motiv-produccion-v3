@@ -58,18 +58,18 @@ formato ┘
   `configuracion.fecha_inicio_rotacion`. Cada día hay exactamente una
   letra en cada tipo y una descansando.
 
-  **Valor real: 16/02/2026** (movido desde el 31/08/2026 original en
-  sesión 23/08/2026 — ver "Renumeración de ciclos" en
-  `04-gamificacion.md`, mismo motivo: alinear la numeración de ciclos
-  de gamificación con la de v2, sin dejar huecos negativos). El
-  31/08/2026 sigue siendo una fecha real dentro del patrón — es
-  justo donde empieza el ciclo 7 — así que no se perdió el plan de
-  lanzamiento original, solo se renumeró lo anterior. Tras este
-  cambio hizo falta repetir el ajuste manual de letras del admin
-  (`AjustarLetrasScreen`) para que la rotación calculada volviera a
-  coincidir con la realidad de la fábrica — ese ajuste es
-  independiente de esta fecha (ver `09-administrador.md`), así que es
-  seguro repetirlo cada vez que la fecha ancla cambie.Función SQL
+  **Valor real: `configuracion.fecha_inicio_rotacion` = 2026-02-16**
+  (lunes). Esta fecha es a la vez el ancla de la rotación y la del
+  cálculo de ciclos de gamificación (`fn_ciclo_id`, ver `04`). Estaba
+  en 31/08/2026 (lanzamiento de v3) y se movió en la sesión 23/08/2026
+  al migrar los datos de v2, para que sus ciclos quedaran numerados
+  0..6 sin `cycle_id` negativos. Como se movió exactamente 7×28 días,
+  el 31/08/2026 sigue siendo el inicio del ciclo 7 y la rotación no se
+  alteró. Reglas si alguna vez hay que moverla: debe seguir siendo
+  lunes, moverse en múltiplos de 28 días, y repetir después el ajuste
+  manual de letras del admin (`09`) para que la rotación calculada
+  vuelva a coincidir con la fábrica.
+  Función SQL
   `fn_turno_de_letra(fecha, letra)` y su inversa `fn_letra_de_turno`.
   La rotación **nunca se pausa**, ni en el cierre anual de fábrica.
 - **Estado del turno** (calculado en cliente, `lib/rotacion.ts`):
@@ -95,8 +95,8 @@ formato ┘
   Dentro de un tramo cubierto por suplente no se distingue qué persona
   física capturó cada parte — la trazabilidad es `turno.abierto_por` y
   `parte.responsable_id`.
-- **Cobertura por fuerza mayor** (procedimiento, no código — cierra
-  `07-pendientes.md` "relevo a media jornada"): si el titular tiene
+- **Cobertura por fuerza mayor** (procedimiento, no código): si el
+  titular tiene
   que abandonar el turno ya empezado, quien cubre **sigue con la
   sesión ya abierta del titular** en el dispositivo — no cierra sesión
   ni entra con otra cuenta. Como `parte.responsable_id` no cambia, el
@@ -124,8 +124,8 @@ vigente en ese momento a `parte.operario_id` (nullable), y a partir de
 ahí `asignacion_operario_linea` deja de leerse — ni "Mi línea" ni el
 cálculo de puntos vuelven a consultarla. Todo lo que "cuenta" (quién
 puede verificar el parte, a quién se atribuyen los puntos) usa siempre
-`parte.operario_id` (decisión sesión 19/08/2026, ver `CLAUDE.md` y
-`04-gamificacion.md`). Si se reasigna la línea a mitad de turno, los
+`parte.operario_id` (decisión sesión 19/08/2026; cómo se reparten los
+puntos entre varios operarios en `04`). Si se reasigna la línea a mitad de turno, los
 partes ya creados no cambian de dueño: siguen con el operario que
 tenían cuando se crearon; el nuevo operario solo queda vinculado a los
 partes que se creen a partir de ese momento.
@@ -143,9 +143,8 @@ partes que se creen a partir de ese momento.
    con `corrige_a_parte_id` apuntando al original; un trigger pone el
    original `vigente = false`. Todo cálculo filtra `vigente = true`.
    El responsable puede corregir sus propios partes durante 1 h desde
-   `completado_at` (política RLS); después, solo el administrador
-   (sin pantalla, y hoy sin permiso real de UPDATE en `parte` — ver
-   `07-pendientes.md`).
+   `completado_at` (política RLS); después, solo el administrador,
+   sin límite de tiempo (pantalla y permisos en `09`).
 
 ## Validaciones antes de completar un parte (cliente)
 
@@ -164,9 +163,12 @@ partes que se creen a partir de ese momento.
 ## m²
 
 `m² = piezas × ancho_mm × alto_mm / 1.000.000`, con ancho/alto sacados
-del nombre del formato. Implementado en `lib/formato.ts` (cliente) y
-`_shared/formato.ts` (Deno). No existe en SQL: las vistas de BD dejan
-`m2_total` en null.
+del nombre del formato. Existe en dos sitios que deben dar lo mismo:
+- Cliente y Deno: `lib/formato.ts` y `_shared/formato.ts` (informe de
+  turno, pestaña Resumen, captura).
+- SQL: columna `formato.area_m2` (derivada del nombre) — la usan las
+  vistas del dashboard (`08`) y de gamificación (`04`). `[VERIFICAR]`
+  que `area_m2` está aplicada en la BD real.
 
 ## Dos modos de calidad (siempre se muestran juntos)
 

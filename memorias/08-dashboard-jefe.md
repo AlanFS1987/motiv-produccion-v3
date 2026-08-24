@@ -16,13 +16,11 @@ nunca se combinan en una sola cifra.
 
 ## Fórmulas cerradas (todas en vistas SQL, nunca las calcula el cliente ni un LLM)
 
-- **m²** = piezas × `formato.area_m2` (columna añadida a `formato`,
-  derivada del nombre en mm — antes solo existía en TS,
-  `frontend/src/lib/formato.ts`).
+- **m²** = piezas × `formato.area_m2` (misma fórmula que en TS, `01`).
 - **% rendimiento** (turno): suelo de 480 min **por línea**, luego se
   suman numeradores/denominadores ya resueltos entre líneas — nunca
   un suelo único al turno completo (mismo criterio que
-  `v_rendimiento_linea_turno` de gamificación).
+  el rendimiento de gamificación, `04`).
 - **Calidad completa**: cada categoría (1ª/comercial/eco/contenedor)
   sobre el total de `piezas_entradas`.
 - **Calidad oficial** (métrica empresa): solo 1ª+comercial,

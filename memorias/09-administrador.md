@@ -29,12 +29,8 @@ propias pestañas de gestión.
   20/08/2026) ya lo permiten en BD. `contexto.responsableId` se
   rellena con el admin que corrige, no con el responsable original,
   igual que ya hacía el propio responsable al corregirse a sí mismo.
-  Sesión 21/08/2026: de paso se corrigió un fallo que ya existía
-  desde antes en `FotoPantallaMaquina` (afecta también al responsable,
-  no solo al admin) — el tono/calibre nunca fueron editables al
-  corregir un parte, el guardado enviaba siempre los valores
-  originales a pelo. Ahora hay campos editables con la misma
-  validación que el resto de la app (`esTonoCalibreValido`).
+  Tono y calibre son editables al corregir (campos con
+  `esTonoCalibreValido`, corregido 21/08/2026 para admin y responsable).
 - **Prueba de cámara** (`admin/PruebaCamaraScreen.tsx`) — pestaña
   "Cámara", solo de test, no toca ningún parte ni sube nada a
   Cloudinary. Deja probar **tanto la cámara nativa** (`<input
@@ -79,25 +75,19 @@ propias pestañas de gestión.
   (`obtenerLineasParaLimpieza` ya filtra `activo = true`); el
   histórico de `operario_checklist` no se toca. Permisos ya cubiertos
   por `checklist_items_admin_todo`, sin migración nueva.
-- **Recalcular ciclo anterior** *(desbloqueado 22/08/2026)* — ya no
-  depende de nada por construir: `fn_cerrar_ciclos_pendientes` (ver
-  `04-gamificacion.md`) es idempotente (`on conflict do update`), así
-  que llamarla a mano desde el SQL Editor
-  (`select fn_cerrar_ciclos_pendientes();`) recalcula cualquier ciclo
-  ya cerrado sin duplicar nada. Falta solo el botón en la UI del
-  admin que dispare esta misma llamada — hoy se hace directamente por
-  SQL.
+- **Recalcular ciclo anterior** — sin pantalla: se llama a mano
+  `select fn_cerrar_ciclos_pendientes();` desde el SQL Editor (es
+  idempotente, `04`).
 
-## Por construir
+## Por construir (detalle y orden en `07`)
 
-- **Fusión de modelos/marcas/productos/lotes duplicados** — el OCR
-  puede crear un registro nuevo por un typo o variación de nombre
-  cuando en realidad ya existía uno. Sin pantalla; hoy se corrige a
-  mano por SQL. Pendiente de Edge Function con `service_role` (no
-  encaja en el patrón de RLS por rol de usuario final).
-- **Botón de "Recalcular ciclo anterior" en la UI** — la función ya
-  existe y es segura de llamar (ver arriba); solo falta la pantalla
-  que la invoque en vez de hacerlo por SQL Editor.
+- Vista de usuarios con puntos, siguiente nivel y botón "otorgar
+  nivel" (BD lista: `v_admin_usuarios_gamificacion`,
+  `fn_otorgar_bonus_nivel`).
+- Botón "Recalcular ciclo anterior" en la UI.
+- Fusión de modelos/marcas/productos/lotes duplicados (el OCR crea
+  registros nuevos por typos). Hoy por SQL a mano. Necesita Edge
+  Function con `service_role`.
 
 ## Descartado (decisión de sesión)
 

@@ -142,5 +142,5 @@ limpia `resumen_calidad_enviado_at` (solo la reapertura automática por
 parte nuevo lo hace).
 
 ## Lo que el responsable no tiene todavía
-Historial de partes propio, ranking/stats/personaje/logros/equipo
-(diseñado: barra inferior de gamificación).
+Historial de partes propio y gamificación (puntos y niveles ya
+existen en BD, sin pantalla — `04`, `07`).

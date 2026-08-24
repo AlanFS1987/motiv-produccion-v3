@@ -1,16 +1,10 @@
 # 04 — Gamificación
 
-Estado (actualizado 22/08/2026): **construido y probado en real** —
-vistas de puntos completas (rendimiento + piezas + limpieza, operario
-y responsable), cierre de ciclo (`fn_cerrar_ciclos_pendientes` + cron
-semanal), niveles sembrados, `fuerza`/`resistencia`/`velocidad`,
-generación de personaje RPG (GPT Image 2), y la pantalla de Inicio del
-operario que muestra todo lo anterior. Queda por construir: la
-pantalla de Inicio del **responsable** (mismo patrón, reutilizando
-`frontend/src/lib/gamificacion.ts` tal cual), Ranking/Stats/Logros
-como pestañas propias, y logros del responsable (fase 2, aplazado a
-propósito). El resto de este archivo describe cómo funciona todo lo
-ya construido.
+Estado: **operario construido y probado en real** (puntos, niveles,
+cierre de ciclo, stats, 19 logros sembrados, personaje RPG, datos de
+v2 migrados). **Responsable**: puntos, niveles, cierre de ciclo y datos
+de v2 construidos en BD; sin pantalla de gamificación y sin logros
+propios (no existían en v2; hay que crearlos). Ver "Pendiente" al final.
 
 ## Principios (cerrados)
 
@@ -21,88 +15,46 @@ ya construido.
   consultar, agregando los partes vigentes por línea+turno. Evita el
   total desincronizado de v2.
 - Totales de por vida = suma de "fotos" de ciclos cerrados
-  (`historial_ciclos`) + ciclo actual en vivo. La foto la escribe
-  `fn_cerrar_ciclos_pendientes` (construida, ver sección "Cierre de
-  ciclo" más abajo) y la puede regenerar el admin llamando a la misma
-  función a mano (es idempotente).
-- **Reparto igualitario vs. atribución directa** (decisión de sesión
-  22/08/2026): los **puntos** (rendimiento, piezas) se reparten a
-  partes iguales entre los `operario_id` de una línea+turno cuando hay
-  más de uno, porque hace falta combinar primero para poder resolver
-  UN tramo no-lineal sobre el % o la cantidad conjunta. Las
-  **cantidades en bruto** que alimentan los logros de tramo (m²,
-  piezas, tiempos) NO se reparten — se atribuyen **directamente** por
-  `parte.operario_id`, porque cada parte ya es de quien es y no hay
-  ningún tramo que combinar antes. Es lo correcto que no vayan
-  cambiando de operario a cada rato.
+  (`historial_ciclos`) + ciclo actual en vivo.
+- Nada se acumula con `+=` en un contador mutable (lección de v2):
+  todo se recalcula desde totales, y `historial_ciclos` guarda la
+  aportación de cada ciclo, nunca un acumulado.
+- **Reparto igualitario vs. atribución directa**: los **puntos**
+  (rendimiento, piezas) de una línea+turno se reparten a partes
+  iguales entre los `parte.operario_id` distintos de esa línea+turno
+  (normalmente uno; puede haber más si el responsable reasignó a
+  mitad de turno). Se descartó ponderar por minutos: es infrecuente y
+  nunca tan desigual como para justificar la complejidad. Las
+  **cantidades en bruto** (m², piezas, tiempos) que alimentan logros y
+  stats NO se reparten: cada parte es de su `operario_id`. Regla de
+  quién es el operario del parte en `01`.
 
 ## Ciclo
 
-28 días desde `fecha_inicio_rotacion`, `fn_ciclo_id(fecha)` =
-`floor((fecha − inicio)/28)`. Nunca se pausa. Primer cierre: 28/09/2026.
+28 días desde `configuracion.fecha_inicio_rotacion` (valor y reglas en
+`01`), `fn_ciclo_id(fecha)` = `floor((fecha − inicio)/28)`. Nunca se
+pausa. Como 28 es múltiplo de 7 y el ancla es lunes, cada ciclo termina
+en domingo y el siguiente arranca en lunes — base del cron de cierre.
+Lanzamiento 31/08/2026 = ciclo 7; primer cierre real 28/09/2026.
 
-Como 28 es múltiplo exacto de 7 y `fecha_inicio_rotacion` es un lunes,
-**cada ciclo termina siempre en domingo y el siguiente arranca siempre
-en lunes** — propiedad matemática permanente, no coincidencia de este
-ciclo. Es la base del cron de cierre (ver más abajo).
+## Puntos del operario (por línea+turno)
 
-## Puntos del operario (por línea+turno, repartidos entre quien trabajó ahí)
-
-**Fuente del operario: `parte.operario_id`, siempre** (decisión sesión
-19/08/2026, ver `CLAUDE.md`). `asignacion_operario_linea` no interviene
-en el cálculo de puntos — es solo la semilla que copia el responsable
-al crear cada parte. `operario_ledger`, la vista base de todo este
-cálculo, **hoy todavía hace JOIN con `asignacion_operario_linea`** para
-resolver el operario; migrarla a `parte.operario_id` es trabajo
-pendiente (`07-pendientes.md` #5).
-
-Rendimiento y piezas se calculan agregados por línea+turno exactamente
-igual que hasta ahora (fórmulas más abajo, sin cambios). El cambio está
-en el último paso, la atribución: en vez de dar el resultado a "el"
-operario de la línea+turno, se reparte a **partes iguales** entre los
-`operario_id` distintos que tengan algún parte en esa línea+turno —
-normalmente uno solo; si el responsable reasignó la línea a mitad de
-turno, puede haber dos o más, y cada uno se lleva la misma fracción.
-
-Se decidió no ponderar el reparto por minutos/tiempo trabajado:
-reasignar una línea a mitad de turno es poco frecuente en la operativa
-real y nunca tan desigual (p. ej. 7 h uno, 1 h otro) como para
-justificar la complejidad de prorratear contra el suelo de 480 min del
-cálculo de rendimiento (ver más abajo). El reparto plano es una
-aproximación suficientemente justa para el caso excepcional, y mucho
-más simple de mantener y de explicar en planta.
-
-**Rendimiento** — construido en BD (`v_rendimiento_operario_por_turno`,
-`v_puntos_rendimiento_operario_ciclo`):
+**Rendimiento** (`v_rendimiento_operario_por_turno`,
+`v_puntos_rendimiento_operario_ciclo`, base `operario_ledger` que ya
+resuelve el operario por `parte.operario_id`):
 
 ```
-denominador = max(480, Σ minutos_total) -- por línea+turno
-numerador = Σ (minutos_plena + minutos_no_alimentada)
+denominador = max(480, Σ minutos_total)          -- por línea+turno
+numerador   = Σ (minutos_plena + minutos_no_alimentada)
 % = numerador / denominador
 ```
-El `max()` funciona en las dos direcciones, no solo hacia abajo:
+El `max()` funciona en las dos direcciones: si se reportan menos de
+480 min, el tiempo no reportado cuenta en contra; si se reportan más
+(contador de máquina sin resetear, el caso del aviso de 600 min de
+`validaciones-parte.ts`), el denominador real diluye el % en vez de
+dispararlo. Una línea sin ningún parte en el turno no genera fila.
 
-- **Si se reportan MENOS de 480 min** (línea sin parte durante parte
-  del turno, tiempo muerto sin registrar): el denominador no baja de
-  480, así que ese tiempo "invisible" cuenta en contra igual que si
-  hubiera sido tiempo parado — evita que dividir solo entre lo poco
-  reportado infle el % artificialmente.
-- **Si se reportan MÁS de 480 min** (contador de la máquina sin
-  resetear entre turnos — mismo caso que dispara el aviso no
-  bloqueante `UMBRAL_MINUTOS_ATIPICO = 600` en
-  `validaciones-parte.ts`, que se guarda igual): el denominador crece
-  con el dato real y **diluye** el % hacia abajo, en vez de disparar
-  un porcentaje absurdo. El suelo matemático absorbe la anomalía sin
-  que haga falta detectarla ni corregirla a mano.
-
-En ambos casos el resultado es el mismo objetivo: un % ajustado a la
-realidad de un turno de 8h, tanto si se reportó de menos como de más.
-Solo aplica cuando ya existe al menos un parte para esa línea+turno —
-si una línea no tuvo ningún parte en todo el turno, no genera fila en
-`operario_ledger` (no es que salga con 0%, es que no entra en el
-cálculo).
-
-Tabla `puntos_rendimiento` (operario, máx. 15), 6 tramos:
+Tabla `puntos_rendimiento` (máx. 15), 6 tramos contiguos:
 
 | % | Puntos |
 |---|---|
@@ -113,16 +65,11 @@ Tabla `puntos_rendimiento` (operario, máx. 15), 6 tramos:
 | 62,50–74,99 | 12 |
 | 75,00–100,00 | 15 |
 
-Tramos contiguos, sin huecos.
-
-**Piezas** — construida (`v_puntos_piezas_operario_por_linea_turno`,
-`20260822150000_vistas_puntos_metros_piezas_limpieza.sql`), tabla
-`puntos_piezas` (7 formatos × 5 tramos, 2/5/9/12/15 puntos), por
-piezas totales de la línea+turno **y formato** (si cambia el formato a
-mitad, cada formato se puntúa aparte y se suman ANTES de repartir
-entre operarios). Mismo reparto igualitario que rendimiento si hay más
-de un operario en esa línea+turno. El último tramo de cada formato
-tiene `max = null` (sin límite superior).
+**Piezas** (`v_piezas_formato_linea_turno` → `v_puntos_piezas_linea_turno`
+→ `v_puntos_piezas_operario_por_linea_turno`), tabla `puntos_piezas`
+(7 formatos × 5 tramos), por piezas totales de la línea+turno **y
+formato** (si cambia el formato a mitad, cada formato se puntúa aparte
+y se suman antes de repartir). Último tramo sin límite (`max = null`).
 
 | Formato | 2 | 5 | 9 | 12 | 15 (sin límite) |
 |---|---|---|---|---|---|
@@ -134,36 +81,29 @@ tiene `max = null` (sin límite superior).
 | 600x600 | 4.000–5.999 | 6.000–7.999 | 8.000–9.999 | 10.000–11.999 | ≥12.000 |
 | 900x900 | 1.500–2.199 | 2.200–2.999 | 3.000–3.799 | 3.800–4.499 | ≥4.500 |
 
-**Limpieza** — construida (`v_puntos_limpieza_operario_por_turno`),
-puntos según `checklist_items.puntos` de cada ítem marcado en
-`operario_checklist` (no siempre 1 fijo por ítem — cada ítem tiene su
-propio valor). Atribuida directamente por `operario_checklist.operario_id`
-(quien marcó el ítem), sin relación con la asignación de línea ni con
-el reparto anterior — cualquier operario del turno puede limpiar
-cualquier línea. Se agrega **por turno completo**, no por línea (un
-operario puede limpiar varias líneas distintas de las suyas).
+**Limpieza** (`v_puntos_limpieza_operario_por_turno`): 1 punto por
+ítem marcado en `operario_checklist` (`checklist_items.puntos`),
+atribuido a quien lo marcó, agregado por turno completo (no por
+línea; cualquier operario del turno limpia cualquier línea).
 
-**Total del operario** (por turno) = piezas (por línea) + rendimiento
-(por línea) + limpieza (del turno completo, sin línea). Sumado en
-`v_puntos_operario_total_vida` (ampliada 22/08/2026 para incluir
-piezas y limpieza, antes solo rendimiento).
+**Total** (por turno) = piezas + rendimiento + limpieza. Por vida:
+`v_puntos_operario_total_vida`, y por categoría
+`v_puntos_{piezas,rendimiento,limpieza}_operario_total_vida`
+(histórico cerrado + ciclo en vivo). Por ciclo:
+`v_puntos_operario_ciclo` (cualquier ciclo, lleva `username` horneado
+porque PostgREST no puede resolver embeds sobre una vista con UNION).
 
 ## Puntos del responsable (por turno completo, nunca por línea)
 
-**Metros** — construida (`v_puntos_metros_responsable_por_turno` +
-`v_metros_responsable_por_turno`), tabla `puntos_metros`, sobre m²
-totales del turno (todas las líneas juntas), máx. 45 puntos, último
-tramo sin límite superior (`21000, null, 45`). Mismo filtro que
-`v_rendimiento_responsable_por_turno` (solo `vigente=true`, sin
-`completado=true`) **a propósito** — para que "metros + rendimiento"
-del responsable sigan contando exactamente el mismo conjunto de
-partes. Si algún día se añade `completado=true` a una, hay que
-añadirlo a la otra a la vez.
+**Metros** (`v_metros_responsable_por_turno` →
+`v_puntos_metros_responsable_por_turno`), tabla `puntos_metros` sobre
+m² totales del turno, máx. 45, último tramo sin límite. Mismo filtro
+que rendimiento (solo `vigente=true`, sin `completado=true`) a
+propósito; si se cambia uno, cambiar el otro.
 
-**Rendimiento** — construido en BD (`v_rendimiento_responsable_por_turno`,
-`v_puntos_rendimiento_responsable_ciclo`), mismos principios que el
-operario pero denominador 2880 min (6 líneas × 480) y escala propia,
-máx. 45 puntos, 10 tramos:
+**Rendimiento** (`v_rendimiento_responsable_por_turno`,
+`v_puntos_rendimiento_responsable_ciclo`): mismos principios, denominador
+2880 min (6 × 480), tabla `puntos_rendimiento_responsable`, máx. 45:
 
 | % | Puntos |
 |---|---|
@@ -178,38 +118,23 @@ máx. 45 puntos, 10 tramos:
 | 83,33–91,66 | 38 |
 | 91,67–100,00 | 45 |
 
-**Total del responsable** (por turno) = metros + rendimiento. Sin
-limpieza — esa capa es solo del operario. Sumado en
-`v_puntos_responsable_total_vida` (nueva, 22/08/2026, análoga a la del
-operario — hasta hoy solo existía la del operario).
+**Total** = metros + rendimiento (sin limpieza). Por vida:
+`v_puntos_responsable_total_vida`; por ciclo:
+`v_puntos_responsable_ciclo`. Sin desglose por categoría en
+`historial_ciclos` todavía (fase 2).
 
-## Niveles (9, compartidos por operario y responsable)
+## Niveles (9, compartidos)
 
-Tabla única `niveles` — 9 niveles reales (contenido de v2, sembrados
-22/08/2026): nombre, descripción, umbrales de puntos totales, color de
-marco, nº de estrellas, efecto de aura, y dos prompts (`prompt_base`,
-`prompt_imagen`) usados para la generación del personaje RPG (ver más
-abajo).
+Tabla `niveles` (contenido de v2): nombre, descripción, umbrales,
+color, estrellas, aura, `prompt_base`, `prompt_imagen`. El responsable
+usa los mismos 9 niveles con umbrales **×1,5** — columnas generadas
+`umbral_min_responsable`/`umbral_max_responsable` (no hay tabla aparte:
+evita que se editen unos umbrales y se olviden los otros). Motivo del
+×1,5: el responsable suma ~60 pts/turno frente a ~33,5 del operario;
+sube algo más rápido (~450 turnos a Leyenda vs ~537) pero no
+desproporcionado.
 
-El responsable usa **los mismos 9 niveles** (mismo nombre, color,
-estrellas, prompts), pero sus umbrales de puntos son **×1,5** los del
-operario — decisión de sesión 22/08/2026: viendo que en v2 operario y
-responsable progresaban a ritmo parecido, y que el responsable
-consigue más puntos por turno de forma constante (60 vs. ~33,5 de
-media del operario con la rotación entre líneas), un ×1,5 hace que el
-responsable suba **sensiblemente más rápido pero no desproporcionado**
-(sube en ~450 turnos hasta Leyenda, frente a ~537 del operario).
-
-No existe una tabla `niveles_responsable` — se probó ese diseño y se
-descartó: los umbrales del responsable no son datos independientes,
-son siempre `umbral × 1,5` de forma fija, así que guardarlos en una
-tabla aparte solo crearía el riesgo de que alguien edite un umbral del
-operario y se olvide de actualizar el del responsable. En vez de eso,
-`niveles` tiene dos columnas generadas (`umbral_min_responsable`,
-`umbral_max_responsable`, `stored`, se recalculan solas) — mismo
-patrón que `parte.calibre_std_pct`.
-
-| Nivel | Umbral operario | Umbral responsable (×1,5) |
+| Nivel | Operario | Responsable |
 |---|---|---|
 | 1. Aprendiz | 0–499 | 0–749 |
 | 2. Operario | 500–1.499 | 750–2.249 |
@@ -221,446 +146,167 @@ patrón que `parte.calibre_std_pct`.
 | 8. Titan | 14.000–17.999 | 21.000–26.999 |
 | 9. Leyenda | 18.000–∞ | 27.000–∞ |
 
-`fn_nivel_actual(usuario_id)` (nueva, 22/08/2026) devuelve el nivel
-actual de cualquier operario o responsable, resolviendo sola qué
-vista de puntos y qué columna de umbral usar según el rol.
+`fn_nivel_actual(usuario_id)` resuelve nivel actual según rol.
 
-## Logros — 19 del operario, 100% por consulta, sin tabla de progreso
+## Logros del operario — 19, 100 % por consulta
 
-Solo operario por ahora — logros del responsable son fase 2,
-aplazados a propósito hasta tener estos 19 funcionando en real.
+`logros_definicion` con los 19 logros reales de v2 (sembrados
+23/08/2026, `20260823170000_seed_logros_definicion.sql`, confirmado en
+real 24/08). Motor genérico en `lib/logros.ts` que resuelve cada fila
+por `condicion_tipo`; nada hardcodeado por nombre. No hay tabla de
+progreso (`operario_logro` se eliminó): solo importa cuántas veces se
+tiene / en qué tramo va.
 
-Con "Ciclo Legendario" (48 pts/turno → 1.000 pts/ciclo) sustituyendo a
-"Turno Legendario" del CSV original de v2, los 19 logros no necesitan
-ningún motor que escriba nada — se calculan siempre al vuelo. Por eso
-**`operario_logro` (tabla de progreso guardado) se eliminó entera**
-(20260822140000_logros_sin_motor.sql) — con todo por consulta, no
-había nada que esa tabla necesitara guardar (ni siquiera "cuándo se
-consiguió por primera vez": solo importa cuántas veces se tiene / en
-qué tramo va).
+- **16 de tramo** (acumulado de por vida, se repite cada N):
+  `sum(columna)/condicion_valor` sobre `historial_ciclos` + ciclo
+  actual en vivo (`v_produccion_operario_ciclo`). m² total, 5 tiempos,
+  m² por categoría ×3, piezas por formato ×7 (`formato_nombre`).
+- **3 de ciclo**: Bestia del Ciclo (600+ pts), Ciclo Legendario
+  (1.000+ pts — sustituye al "Turno Legendario" de v2), Rey de Reyes
+  (1º del ranking del ciclo, `v_ganador_por_ciclo` /
+  `v_veces_rey_de_reyes`, sin `condicion_valor`).
 
-Dos categorías (no tres — "turno" ya no existe):
-
-- **16 de tramo** (acumulado de por vida, se repite cada N unidades):
-  `sum(columna) / condicion_valor` sobre `historial_ciclos` (cerrados)
-  + `v_produccion_operario_ciclo` filtrada al ciclo actual (en vivo).
-  m² total, 5 tiempos, m² por categoría ×3, piezas por formato ×7.
-- **3 de ciclo** (se evalúan sobre un ciclo entero): Bestia del Ciclo
-  (600+ pts), Ciclo Legendario (1.000+ pts) — `count(*)` de
-  `historial_ciclos`/`v_puntos_operario_ciclo` que cumplen la
-  condición; Rey de Reyes (1º del ranking del ciclo) — comparando
-  `puntos_ciclo` agrupado por `cycle_id`, sin `condicion_valor`
-  numérico.
-
-`logros_definicion` ganó 3 columnas para poder cargar el CSV real de
-v2: `rol` (default `operario`, prepara el terreno para la fase 2),
-`formato_nombre` (solo la usan los 7 logros de piezas por formato), y
-`condicion_valor` pasó a nullable (Rey de Reyes no tiene umbral
-numérico). Los 19 datos del CSV en sí (contenido) siguen sin sembrar
-en BD — solo el esquema está listo.
-
-Vistas de apoyo construidas: `v_produccion_operario_ciclo` (equivalente
-a `historial_ciclos` pero para el ciclo aún sin cerrar, para
-CUALQUIER ciclo), `v_puntos_operario_ciclo` (puntos totales por
-operario+ciclo, cualquier ciclo).
+Columna `rol` (default `operario`) lista para los logros del
+responsable, que hay que diseñar desde cero.
 
 ## Cierre de ciclo
 
-`fn_cerrar_ciclos_pendientes()` (`20260822170000_cerrar_ciclo_cron.sql`,
-ampliada en `20260822180000_fuerza_resistencia_velocidad.sql`) — la
-pieza que faltaba, con fecha límite 28/09/2026 (primer cierre real),
-ya construida y con margen de sobra.
+`fn_cerrar_ciclos_pendientes()` — recorre todo `cycle_id` anterior al
+actual **sin fila en `historial_ciclos`** y escribe la foto del ciclo
+para operarios y responsables (puntos totales y por categoría,
+fuerza/resistencia/velocidad, m², piezas, tiempos, m² por categoría,
+piezas por formato). Idempotente (`on conflict do update`): la misma
+llamada sirve para "recalcular ciclo anterior" (`09`). Disparada por el
+cron `cerrar-ciclos-pendientes` (lunes 8:00 Madrid, detalle en `05`);
+si el cron falla un lunes, el siguiente cierra lo que falte.
 
-- **Disparador puro calendario**: gracias a que el ciclo dura 28 días
-  desde un lunes, cada ciclo termina siempre en domingo y el
-  siguiente arranca siempre en lunes. El cron (`cerrar-ciclos-pendientes`)
-  corre **solo los lunes** (`0 * * * 1`, cada hora en punto UTC), con
-  la condición interna `extract(hour from now() at time zone
-  'Europe/Madrid') = 8` — nunca cierra antes de las 8:00 Madrid, que
-  da margen de sobra sobre el cierre automático del turno N (07:00) y
-  la ventana de corrección de 1h del responsable.
-- **Autocontenida y con red de seguridad**: recorre TODO `cycle_id`
-  anterior al actual sin fila en `historial_ciclos` (no solo "el que
-  acaba de terminar") — si el cron falla un lunes, el siguiente cierra
-  lo que falte.
-- **Idempotente** (`on conflict (usuario_id, cycle_id) do update`) —
-  la misma función sirve para "recalcular ciclo anterior"
-  (`09-administrador.md`), ya no bloqueado.
-- Escribe filas para operario Y responsable (usa
-  `v_metros_responsable_ciclo`, `v_puntos_metros_responsable_ciclo`,
-  `v_puntos_responsable_ciclo`, construidas para esto).
+**Ojo**: el `not exists` es a nivel de `cycle_id`, no por usuario. Si
+un ciclo ya tiene alguna fila (p. ej. por migración de datos) el cron
+lo salta entero; producción real de ese ciclo habría que cerrarla a
+mano. No aplica al ciclo 6 (fábrica parada hasta el 31/08).
 
-## Fuerza / resistencia / velocidad
-
-Construido a partir del código real de v2 (compartido en sesión),
-corrigiendo dos problemas que tenía:
+## Stats: fuerza / resistencia / velocidad / vida
 
 - `fuerza = m2_total / 1000`, `resistencia = (tiempo_plena +
-  tiempo_no_alimentada) / 100` — igual que v2, sin techo (crecen para
-  siempre, coherente con puntos/niveles). La proporción real
-  m²/minutos no cambia según se acumule por turno, ciclo o vida
-  entera, así que los mismos divisores siguen equilibrando ambas
-  medidas a cualquier escala.
-- **Velocidad, corregida**: v2 la calculaba como media ponderada
-  arbitraria (`fuerza*0.6 + resistencia*0.4`, "por poner algo") y la
-  acumulaba SUMANDO el valor de cada parte — doble error, porque
-  sumar una tasa ya calculada la infla cuantos más partes haya. Ahora:
-  `velocidad = m2_total / tiempo_plena` (m² por minuto de máquina
-  realmente produciendo, sin diluir con `tiempo_no_alimentada`, que sí
-  cuenta para resistencia/rendimiento pero no representa producción
-  real). Y **nunca se suma** en ningún nivel — se recalcula siempre
-  desde los totales (por ciclo al cerrar; de toda la vida en
-  `v_stats_vida`, sumando m² y `tiempo_plena` por separado y dividiendo
-  al final, nunca promediando ratios ya hechos).
-- Se guardan en `historial_ciclos` como la aportación de ESE ciclo
-  (delta), igual que `m2_total`/`piezas_total` — nunca como un
-  contador mutable actualizado con `+=` (el patrón de v2 que
-  `07-arquitectura.md 9.3` documenta evitar a propósito).
-- Se calcula también para el responsable (`v_tiempo_responsable_ciclo`
-  nueva, con `tiempo_plena` y `minutos_rendimiento` por separado).
+  tiempo_no_alimentada) / 100` — como v2, sin techo.
+- `velocidad = m2_total / tiempo_plena` (m²/min de máquina
+  produciendo). Corrige a v2, que usaba una media ponderada arbitraria
+  y la sumaba parte a parte. Nunca se suma: se recalcula desde totales
+  (por ciclo al cerrar; de por vida en `v_stats_vida` sumando m² y
+  `tiempo_plena` por separado).
+- `vida` = puntos totales de por vida (los que deciden el nivel),
+  expuesto con ese nombre para tratar los 4 stats uniformemente.
 
-`v_stats_vida` — fuerza/resistencia/velocidad de toda la vida
-(histórico + ciclo en vivo), para cualquier usuario y rol. Sin
-pantalla que lo muestre todavía (pendiente, ver `07-pendientes.md`).
+`v_stats_vida` (histórico + ciclo en vivo, cualquier rol) expone
+además `m2_total_vida` y `horas_plena_vida` en crudo. Para el
+responsable: `v_tiempo_responsable_ciclo`.
 
-## Stats — el cuarto (vida) y el snapshot por nivel
+## Snapshot de stats por nivel y generaciones
 
-Los stats pasan de 3 a **4**: fuerza, resistencia, velocidad y
-**vida**. Vida no es un cálculo nuevo — es un alias directo de los
-puntos totales de vida (los mismos que deciden el nivel), expuesto
-con el nombre que le toca dentro del grupo de 4 para que la pantalla
-de Stats trate a los 4 de forma uniforme.
+**Problema**: la carta de personaje de un nivel debe mostrar los stats
+que tenía el usuario **al alcanzar ese nivel**, no los del momento de
+generar (la generación es manual y puede retrasarse semanas).
 
-### Problema de diseño: cartas ligadas al pasado, no al presente
+**Solución** (`20260823100000` + `20260823150000`): tabla
+`personaje_stats_nivel` — una fila por `(usuario_id, nivel_id)` con los
+4 stats congelados y `generaciones_usadas` (0–3). **La existencia de
+la fila es el estado "nivel otorgado"**, y cada nivel alcanzado lleva
+sus propias 3 generaciones de personaje. No hay contador plano
+(`usuario.generaciones_disponibles` queda sin significado; ver `07`).
 
-Decisión de sesión 23/08/2026: cuando se genera una carta de
-personaje para un nivel ya alcanzado, sus stats mostrados deben ser
-los que tenía el usuario **cuando alcanzó ese nivel**, no los stats en
-vivo del momento de generar — así una carta de nivel 1 generada
-semanas tarde (la generación es siempre manual, puede retrasarse
-cualquier cantidad de tiempo) sigue mostrando el pasado del operario,
-no un presente inflado por producción posterior.
-
-Esto exige un snapshot de stats por nivel, separado de la generación
-de la carta (que puede no ocurrir nunca para un nivel dado).
-
-### Por qué NO es un trigger reactivo a los puntos
-
-Se descartó un trigger que se disparase "al cruzar X puntos" porque
-recrearía el mismo patrón de contador mutable que la lección de v2 ya
-enseñó a evitar (ver "Fuerza / resistencia / velocidad" arriba): los
-puntos no tienen un único punto de mutación (vienen de `parte`,
-`operario_checklist` y el cierre de ciclo), así que un contador
-persistido de puntos necesitaría triggers en 3 sitios distintos, y
-cualquier corrección de parte que no re-disparase el trigger
-correspondiente desincronizaría el contador para siempre sin que
-nadie lo note — exactamente el bug de v2, aplicado ahora a niveles.
-
-### Solución: el administrador es el disparador manual
-
-En vez de detección automática, el administrador otorga el bonus a
-mano desde la vista de usuarios (ampliada con puntos totales, puntos
-para el siguiente nivel, y un botón "otorgar generaciones"). Sin
-ventana de tiempo que se cierre: el botón queda disponible
-indefinidamente hasta que se pulsa, así que un despiste del admin
-retrasa el bonus pero nunca lo pierde — y es poco probable que el
-admin no entre a la app al menos una vez al día.
-
-Construido en `20260823100000_personaje_stats_nivel_bonus.sql`:
-
-- **`personaje_stats_nivel`** — snapshot de los 4 stats por
-  `(usuario_id, nivel_id)`, con `unique (usuario_id, nivel_id)`. La
-  **existencia de la fila ES el estado "ya otorgado"** — sin columna
-  de control aparte, nada que sincronizar en dos sitios. El UNIQUE de
-  paso previene doble clic sin lógica extra.
-- **`fn_otorgar_bonus_nivel(usuario_id)`** — llamada por el botón del
-  admin. Orden deliberado: primero persiste el snapshot de stats,
-  DESPUÉS otorga las 3 generaciones (`fn_otorgar_generaciones_por_nivel`,
-  que ya existía pero hasta ahora no la llamaba nada con este
-  propósito — solo se usaba para devolver 1 generación si fallaba la
-  API externa). Si el nivel actual ya tenía fila, no hace nada y
-  devuelve `otorgado=false` — idempotente.
-- **`v_admin_usuarios_gamificacion`** — una fila por operario/
-  responsable con puntos totales, nivel actual, puntos que faltan
-  para el siguiente nivel, y `bonus_nivel_actual_otorgado` (booleano
-  listo para el `disabled` del botón en el frontend).
-
-| **`fn_otorgar_bonus_nivel(uuid)`** | **nueva 23/08/2026**, security definer. Botón del admin: guarda el snapshot de stats del nivel actual y, solo la primera vez para ese nivel, otorga +3 generaciones. Idempotente. |
-
-**[RESUELTO 23/08/2026]** La Edge Function `generar-personaje` fue
-reescrita ese mismo día: ya lee las stats CONGELADAS de
-`personaje_stats_nivel` del nivel elegido (nunca `v_stats_vida` ni
-`fn_nivel_actual` en vivo) — ver "Generaciones ligadas a CADA NIVEL"
-más abajo.
+Se descartó un trigger que detectase "cruzar X puntos": los puntos no
+tienen un único punto de mutación (parte, checklist, cierre de ciclo)
+y un contador persistido volvería a desincronizarse como en v2. En su
+lugar **el administrador otorga el nivel a mano**: `fn_otorgar_bonus_nivel(usuario_id)`
+guarda el snapshot del nivel actual (idempotente; si ya tenía fila,
+`otorgado=false`). Vista de apoyo `v_admin_usuarios_gamificacion`
+(puntos, siguiente nivel, `bonus_nivel_actual_otorgado`). La pantalla
+del admin que llama a esto **no está construida** (`07`).
+`[VERIFICAR]` si `fn_otorgar_bonus_nivel` sigue llamando a
+`fn_otorgar_generaciones_por_nivel` (modelo antiguo de contador plano):
+con el modelo por nivel, crear la fila ya da las 3 generaciones.
 
 ## Personaje RPG
 
-**Proveedor: GPT Image 2** (`gpt-image-2`, salió el 21/04/2026 —
-posterior al corte de conocimiento del asistente, confirmado por
-búsqueda web en sesión). Constante única en
-`supabase/functions/_shared/openai_images.ts`, junto con `IMAGE_SIZE`
-(`672x1008`) e `IMAGE_QUALITY` (`medium`) — probado en real: coste
-2-5 céntimos por generación, calidad muy por encima de lo esperado
-para esos parámetros "baratos".
+**Proveedor**: GPT Image 2 (`gpt-image-2`, `images/edits` con imagen
+de referencia). Constantes en `_shared/openai_images.ts`: `IMAGE_SIZE`
+672x1008, `IMAGE_QUALITY` medium — 2-5 céntimos por generación,
+calidad muy por encima de lo esperado. **Historia** con DeepSeek
+(`_shared/deepseek_historia.ts`).
 
-**Flujo (igual que v1/v2, NO texto→imagen puro)**: `images/edits` de
-OpenAI, con imagen de referencia:
+**Flujo** (pantalla Stats+Avatar, `StatsAvatarOperarioScreen.tsx`,
+`lib/stats-avatar.ts`, función `generarPersonajeParaNivel`):
+1. El operario elige **el nivel** (de los ya alcanzados con
+   generaciones restantes, `v_niveles_disponibles_generar`) y
+   **cualquier imagen de su galería** (no se le pide foto en fábrica,
+   "les incomoda") + texto libre opcional.
+2. Cliente: `procesarFotoLibre` (1024 px, WebP) → Cloudinary preset
+   `motiv_v3_personajes`.
+3. Edge Function `generar-personaje` (`05`): consume 1 generación de
+   ese nivel (`fn_consumir_generacion_nivel`), lee los stats congelados
+   de `personaje_stats_nivel`, compone el prompt = `niveles.prompt_imagen`
+   + `PROMPT_ESTILO_Y_SEGURIDAD` (código) + texto del operario, llama
+   a GPT Image 2, sube a Cloudinary, genera la historia con DeepSeek
+   (`prompt_base` + `prompt_imagen` + 4 stats + texto; máx. 3 frases
+   cortas, humor de fábrica) y guarda con `fn_guardar_personaje_generado`
+   (atómico: el nuevo pasa a `seleccionada`). Si DeepSeek falla no
+   lanza: guarda historia `null` y responde `historia_pendiente: true`
+   (el admin la rellena a mano; sin reintento). Si falla la imagen,
+   devuelve la generación (`fn_devolver_generacion_nivel`).
+4. `fn_seleccionar_personaje` (cliente, `auth.uid()`) permite cambiar
+   entre los ya generados.
 
-1. El operario elige **cualquier imagen de su galería** (fotos
-   normales de móvil — playa, fiesta, terraza; no se le pide que se
-   haga una foto en fábrica, "les incomoda").
-2. Se procesa en cliente (`procesarFotoLibre`, reutilizada de
-   incidencias — reducida a 1024px de ancho máximo, WebP) antes de
-   subir a Cloudinary (preset `motiv_v3_personajes`, el mismo preset
-   unsigned sirve para el lado cliente y para el servidor).
-3. La Edge Function `generar-personaje` compone el prompt final en 3
-   partes, en este orden: `niveles.prompt_imagen` (BD, el "qué" —
-   marco, aura, entorno del nivel ELEGIDO por el operario) (nivel_id del body — desde 23/08/2026 no es necesariamente el nivel actual en vivo) + prompt fijo de estilo y
-   seguridad (código, `PROMPT_ESTILO_Y_SEGURIDAD`) + texto libre
-   opcional del operario.
-4. Llama a `images/edits` con esa imagen + ese prompt, sube el
-   resultado a Cloudinary, y guarda con `fn_guardar_personaje_generado`
-   (atómico: desmarca el `seleccionada` anterior, inserta el nuevo ya
-   seleccionado — el personaje recién generado pasa a ser
-   automáticamente el que se ve).
+`PROMPT_ESTILO_Y_SEGURIDAD` pide retrato vertical **fotorrealista** de
+la persona convertida en personaje RPG, con fidelidad de rasgos y
+coherencia con la progresión de niveles; excluye logos/IP de la foto
+y contenido sexual/violento. (Una versión antigua de este doc decía
+"estilo ilustrado, nunca fotorrealismo" — no es lo que hace el prompt.)
 
-**Prompt de estilo y seguridad** (`PROMPT_ESTILO_Y_SEGURIDAD`, en
-código) — pide un **acabado fotorrealista** en retrato vertical: "el
-resultado debe parecer una fotografía fotorrealista de la persona
-transformada en un personaje de videojuego RPG", con **fidelidad de
-rasgos** con quien sube la foto (es su alter ego, no un genérico) y
-coherencia visual con la progresión de niveles. Excluye
-explícitamente logotipos, marcas y elementos de IP que aparezcan en
-la foto de referencia (sustituidos por diseños originales), y
-contenido sexual/violento. Nota histórica: una versión anterior de
-este documento decía "nunca foto-realismo puro, estilo ilustrado" —
-eso NO es lo que hace el prompt real; si el estilo debe cambiar, se
-cambia la constante en `generar-personaje/index.ts`.
+**Generación siempre manual**: nunca se dispara sola al subir de nivel.
 
-**Generación siempre manual** (decisión de sesión): el usuario pulsa
-un botón, nunca se dispara sola al subir de nivel. Si ya tiene un
-personaje del nivel anterior, se queda con él hasta que pida uno
-nuevo a mano.
-
-**[SUSTITUIDO 23/08/2026]** El modelo de contador plano
-(`usuario.generaciones_disponibles` + `fn_consumir_generacion` +
-`fn_otorgar_generaciones_por_nivel`) quedó reemplazado por las
-generaciones POR NIVEL (`personaje_stats_nivel.generaciones_usadas`,
-`fn_consumir_generacion_nivel`/`fn_devolver_generacion_nivel`
-restringidas a service_role) — ver la sección "Generaciones ligadas a
-CADA NIVEL" más abajo, que es la vigente. Lo único que sobrevive sin
-cambios del modelo antiguo es el índice único
-`uq_personaje_rpg_seleccionada` y la garantía de que un fallo de API
-externa devuelve la generación consumida.
-
-## Pantallas
-
-**Inicio del operario** — construida y probada en real
-(`InicioOperarioScreen.tsx`, reescrita 23/08/2026): tarjeta de SOLO
-LECTURA (nivel + estrellas + progreso al siguiente nivel + puntos
-totales y desglose por categoría + avatar activo, vía
-`lib/inicio-gamificacion.ts`) + sub-barra interna con 4 vistas:
-Resumen, Ranking, Stats, Logros. La GENERACIÓN del personaje
-(selector de nivel + imagen de referencia + texto libre + botón) vive
-en la pestaña **Stats+Avatar** (`StatsAvatarOperarioScreen.tsx`), no
-aquí.
-
-**Construido 23/08/2026 — Ranking, Stats+Avatar, Logros** (las 3
-sub-vistas que faltaban dentro de Inicio, ver `03-operario.md`):
+## Pantallas del operario (sub-vistas de Inicio, ver `03`)
 
 - **Ranking** (`RankingOperarioScreen.tsx`, `lib/ranking.ts`): toggle
-  ciclo actual/anterior, podio 1º-2º-3º + 4º-5º listados + "tú" si
-  quedas fuera del top 5 (sin revelar posiciones intermedias). Debajo,
-  **Reyes del formato**: histórico (récord absoluto de un solo parte,
-  con TODOS los empates si los hay) y actual (más piezas acumuladas
-  en el ciclo, sumando líneas/turnos), más "tu marca" en cada uno de
-  los 7 formatos. El histórico se resuelve barato gracias a
-  `parte.formato_id` denormalizado (trigger `trg_parte_set_formato_id`)
-  + índice `idx_parte_formato_record` — sin eso habría que escanear
-  `parte` entera por cada consulta.
-  Avatar en el podio: el top 3 muestra la imagen del personaje RPG
-activo del operario (si tiene uno generado) en vez del icono
-genérico — vía `v_avatar_activo_operario`, una vista fina que expone
-solo `imagen_url` para poder saltar la RLS restrictiva de
-`personaje_rpg` sin abrir toda la tabla (mismo patrón que Reyes del
-formato con el username). 4º/5º puesto y "Tú" siguen siendo solo
-texto.
-- **Stats+Avatar fusionados en una sola pestaña** (decisión de
-  sesión — iban a ser 2 separadas): 4 barras SIEMPRE EN VIVO
-  (fuerza/resistencia/velocidad/vida, `v_stats_vida` + puntos
-  totales), con 6 tramos logarítmicos (10/100/1.000/10.000/100.000/
-  1.000.000) para fuerza/resistencia/vida y rango simple 6-11 para
-  velocidad — colores fijos por stat (roja/naranja/azul/verde), no
-  por tramo. Debajo, la tarjeta del avatar activo + su historia +
-  gestión (elegir entre generados / generar nuevo).
-- **Logros** (`LogrosOperarioScreen.tsx`, `lib/logros.ts`): motor
-  100% GENÉRICO que lee `logros_definicion` y resuelve cada fila según
-  `condicion_tipo` — nada hardcodeado por nombre de logro. **`logros_
-  definicion` sigue vacía** (los 19 datos del CSV de v2 nunca se
-  sembraron) — la pantalla funciona pero no muestra nada hasta que se
-  siembren, usando exactamente los `condicion_tipo` documentados al
-  principio de `lib/logros.ts`. Bloqueado = icono apagado + "???".
-  Desbloqueado (tramo) = contador ×N + barra hacia el siguiente tramo.
-  Desbloqueado (ciclo: bestia/legendario/rey de reyes) = solo contador
-  ×N, sin barra (no hay "siguiente tramo" progresivo).
+  ciclo actual/anterior; podio 1º-3º (con avatar del personaje activo
+  vía `v_avatar_activo_operario`) + 4º-5º + "tú" si quedas fuera del
+  top 5. Debajo **Reyes del formato**: histórico (récord de un solo
+  parte, `v_rey_formato_historico`, con empates; apoyado en
+  `parte.formato_id` denormalizado + `idx_parte_formato_record`),
+  actual (más piezas en el ciclo, `v_rey_formato_actual`) y "tu marca"
+  por formato (`v_mi_mejor_parte_por_formato`).
+- **Stats+Avatar** (`StatsAvatarOperarioScreen.tsx`): 4 barras en vivo
+  (`v_stats_vida` + puntos), 6 tramos logarítmicos (10 … 1.000.000)
+  para fuerza/resistencia/vida y rango 6-11 para velocidad, color fijo
+  por stat. Debajo, avatar activo + historia + gestión (elegir /
+  generar).
+- **Logros** (`LogrosOperarioScreen.tsx`): bloqueado = icono apagado
+  + "???"; tramo = contador ×N + barra al siguiente; ciclo = solo ×N.
 
-**Desglose de puntos de por vida** (`20260823110000_desglose_puntos_
-historial_ciclos.sql`): `historial_ciclos` ganó 3 columnas
-(`puntos_piezas`, `puntos_rendimiento`, `puntos_limpieza`, aportación
-de ESE ciclo) — antes solo se guardaba `puntos_ciclo` ya sumado, así
-que no se podía calcular "puntos piezas totales de por vida" para
-ciclos ya cerrados. `fn_cerrar_ciclos_pendientes` las rellena ahora.
-Vistas nuevas: `v_puntos_piezas_operario_total_vida`,
-`v_puntos_rendimiento_operario_total_vida`,
-`v_puntos_limpieza_operario_total_vida`. `v_stats_vida` ganó
-`m2_total_vida`/`horas_plena_vida` en crudo (ya se calculaban
-internamente, solo faltaba exponerlos).
+## Datos migrados de v2
 
-**Generaciones ligadas a CADA NIVEL, no un contador plano**
-(`20260823150000_generaciones_por_nivel.sql`, reemplaza el diseño
-anterior de `usuario.generaciones_disponibles`): cada fila de
-`personaje_stats_nivel` lleva su propio `generaciones_usadas` (0-3).
-El operario elige PARA QUÉ NIVEL de los que ya alcanzó quiere generar
-— la Edge Function usa las stats CONGELADAS de `personaje_stats_nivel`
-de ese nivel (nunca `fn_nivel_actual`/`v_stats_vida` en vivo) tanto
-para la imagen como para la historia. RPCs RPCs `fn_consumir_generacion_nivel`/`fn_devolver_generacion_nivel`
-(`p_usuario_id, p_nivel_id`) — **[CORREGIDO 23/08/2026, fix real tras
-desplegar]**: el primer diseño usaba `auth.uid()` como
-`fn_seleccionar_personaje`, pero se llaman desde DENTRO de
-`generar-personaje` con el cliente `supabaseAdmin` (`service_role`) —
-con `service_role`, `auth.uid()` siempre es `null` (no lleva el JWT
-del usuario), así que lanzaban "No hay sesión activa" en producción
-pese a que el usuario sí tenía sesión válida. Corrección: vuelven a
-recibir `p_usuario_id` como parámetro (como la `fn_consumir_
-generacion` original), pero con el permiso de ejecución RESTRINGIDO a
-`service_role` (`revoke ... from public, authenticated, anon`) — así
-ningún cliente puede llamarlas directamente con el `usuario_id` de
-otra persona. Mismo nivel de seguridad que `auth.uid()`, solo que la
-barrera la impone Postgres (quién puede ejecutar la función) en vez
-de la función misma. Vista `v_niveles_disponibles_generar` para el
-selector del frontend. `usuario.generaciones_disponibles` queda SIN
-USO (columna sin borrar, inofensiva).
+Script de un solo uso (`scripts/migrar_v2_historial.sql`). Solo dos
+tablas tocadas: `historial_ciclos` y `personaje_stats_nivel`.
+- **Operarios** (23/08): 19 reales (`operario1` era de pruebas),
+  recalculados parte a parte con fórmulas de v3, cruzados por
+  `username`. 104 filas en `historial_ciclos`. `personaje_stats_nivel`
+  reconstruido simulando cuándo cruzó cada uno cada umbral (nadie pasa
+  de nivel 3; Aprendiz excluido, no es una "subida"; 3/3 generaciones).
+- **Responsables** (24/08): `hectorn`, `radu`, `valentina`, `joaquina`
+  (la cuenta genérica `responsable` de v2 se dejó fuera), desde
+  `turnos` de v2 recalculando `puntos_metros` + rendimiento por turno.
+  Ciclo 6 incompleto (el export llega al 09/08). `personaje_stats_nivel`
+  NO reconstruido para ellos (`07`).
+- **Renumeración**: con el ancla en 31/08 los ciclos de v2 salían
+  negativos (y `fn_ciclo_id(hoy)` también). Se hizo
+  `update historial_ciclos set cycle_id = cycle_id + 7 where cycle_id < 0`
+  y se movió el ancla a 2026‑02‑16 (7 ciclos antes). Ciclos migrados:
+  0..6. Consecuencias sobre la rotación en `01`.
 
-`fn_seleccionar_personaje` es DISTINTA y sigue con `auth.uid()` sin
-cambios — esa sí la llama el cliente directamente con su propia
-sesión (no pasa por una Edge Function con `service_role`), ahí
-`auth.uid()` es el patrón correcto.
+## Pendiente (detalle en `07`)
 
-**Historia con DeepSeek** (`_shared/deepseek_historia.ts`, integrada
-en `generar-personaje`): existía en v2 pero no estaba documentado
-aquí. Antes, `historia` se rellenaba con `niveles.prompt_base` tal
-cual (genérico, igual para todos en ese nivel). Ahora: prompt de
-sistema con reglas de estilo heredadas de v2 (máximo 3 frases
-completas y CORTAS — no un párrafo narrativo comprimido, cada frase
-una pincelada suelta, máximo 1 máquina/problema por frase; humor de
-fábrica; nada de poesía barata; contexto real de máquinas y
-problemas de la fábrica) + `prompt_base` + `prompt_imagen` + los 4
-stats (congelados del nivel que se está generando) + texto libre del
-operario. Si DeepSeek falla, la función NUNCA lanza — devuelve `null`,
-`generar-personaje` guarda igual (imagen + stats correctos, historia
-`null`), y responde `historia_pendiente: true` para que el frontend
-avise "tu historia se está preparando" — el administrador la rellena
-a mano en la BD, sin mecanismo de reintento automático todavía.
-Secret nuevo: `DEEPSEEK_API_KEY`.
-
-**Migración de datos reales de v2** (script de un solo uso, no
-migración de esquema — `scripts/migrar_v2_historial.sql` o donde lo
-guardaras): 19 operarios reales (de 20 en el CSV; `operario1` era
-cuenta de pruebas, se quedó fuera aposta) migrados desde datos en
-bruto de v2 (parte a parte), RECALCULANDO puntos con las fórmulas
-reales de v3 (no copiando los puntos ya calculados en v2) — cruce por
-`username`, nunca por id (los ids de v2 y v3 no coinciden). Insertados
-en `historial_ciclos` con `cycle_id` negativo (anterior a
-`fecha_inicio_rotacion`, nunca choca con ciclos reales). `personaje_
-stats_nivel` reconstruido simulando cronológicamente cuándo cruzó cada
-operario cada umbral — nadie pasa de nivel 3, coherente con lo
-esperado. Nivel 1 (Aprendiz) explícitamente EXCLUIDO de estas filas
-(no es una "subida", todos empiezan ahí) tras corregir un error real
-del primer intento del script (si ves código o docs que lo contradigan,
-están desactualizados). Cada nivel migrado quedó con 3/3 generaciones
-sin gastar (`generaciones_usadas` default 0), listas para usar con el
-selector nuevo.
-### Renumeración de ciclos (sesión 23/08/2026, el mismo día de la migración)
-
-Al migrar, `fn_ciclo_id` calculó cycle_id NEGATIVOS para los datos de
-v2 (sus fechas son anteriores al 31/08/2026, la fecha ancla de
-entonces) — funcionaban bien para sumar "puntos totales", pero
-quedaban invisibles para el toggle de Ranking (que solo mira el ciclo
-de hoy y el inmediatamente anterior) y, más grave: **hoy mismo, antes
-de que arrancara el ciclo real, `fn_ciclo_id(hoy)` también daba
-negativo** (-1) — el mismo cajón que la migración más reciente.
-
-Se corrigió con dos UPDATE, sin tocar ninguna fórmula ni vista:
-
-```sql
-update historial_ciclos set cycle_id = cycle_id + 7 where cycle_id < 0;
-update configuracion set valor = '2026-02-16' where clave = 'fecha_inicio_rotacion';
-```
-
-Resultado: los ciclos migrados pasaron de -6..-1 a 0..6 (bien, ya no
-son negativos, y sin descuadres — este SEGUNDO update). El "+7" no es
-arbitrario: son exactamente 7 ciclos de 28 días, así que el ciclo 7
-sigue arrancando el 31/08/2026 (la fecha ancla original) — el plan de
-lanzamiento no cambió, solo se renumeró lo anterior para que quede en
-la misma línea temporal creciente. Hoy (23/08/2026) es el **ciclo 6**
-en vivo — cerrado en `historial_ciclos` (por la migración), sin datos
-en vivo todavía porque no ha habido ningún `parte` real de v3 (solo
-pruebas de gamificación/personaje) — normal, no es un bug.
-
-**Aviso sobre el cierre del ciclo 6**: como el ciclo 6 ya tiene fila
-en `historial_ciclos` (por la migración), `fn_cerrar_ciclos_
-pendientes` lo saltará sin más cuando llegue el ciclo 7 (el `not
-exists` del loop es a nivel de cycle_id, no por operario) — si
-hubiera producción real de v3 durante el ciclo 6 (23-30/08/2026), se
-perdería de "puntos totales" al cerrar, porque nunca se escribiría en
-`historial_ciclos`. Confirmado en sesión: la fábrica está parada
-hasta el turno de mañana del lunes (ya en ciclo 7), así que no aplica
-— pero si alguna vez se necesita producción real ANTES de que empiece
-un ciclo nuevo tras una migración/renumeración así, hay que cerrar
-ese ciclo a mano (fuera del loop automático) antes de que el cron lo
-dé por bueno solo por tener fila.
-
-**IMPORTANTE para cualquier sesión futura**: `fecha_inicio_rotacion`
-NO es solo el ancla de los ciclos de puntos — es la MISMA fecha que
-decide el patrón de rotación real de turnos (M/T/N/descanso por
-letra). Cualquier cambio futuro de esta fecha exige repetir el ajuste
-manual de letras del admin para que la rotación calculada vuelva a
-coincidir con la realidad — es un paso manual, no automático, y hay
-que avisar de que hace falta cada vez.
-
-**Alcance exacto de la migración de v2** (por si se pregunta en otra
-sesión): SOLO dos tablas, `historial_ciclos` (104 filas, puntos/stats
-por operario+ciclo) y `personaje_stats_nivel` (niveles cruzados con
-stats congeladas, sin Aprendiz). Ninguna otra tabla se tocó — ni
-`parte`, ni `lote`/`producto`, ni ningún catálogo. La tabla de
-staging `stg_migracion_v2` fue temporal y ya se borró.
-
-**Migración de RESPONSABLES (sesión 24/08/2026, ampliación de la
-migración de operarios del 23/08/2026)**: 4 responsables reales
-(`hectorn`, `radu`, `valentina`, `joaquina` — la cuenta genérica
-`responsable` de v2, 3 turnos, se dejó fuera a propósito, sin
-equivalente directo en v3) migrados desde `turnos` de v2 (ya
-agregados a nivel de turno completo, sin necesidad de reconstruir
-desde `partes`, a diferencia del operario). Mismo criterio que
-operarios: RECALCULADO con las fórmulas de v3 (`puntos_metros` +
-`puntos_rendimiento_responsable`, resueltos por turno, nunca por
-ciclo agregado) desde datos en bruto, nunca copiando los puntos ya
-calculados en v2 (que además usaba una escala distinta — minutos
-absolutos en vez de %). A diferencia de la migración de operarios,
-esta se hizo YA con el ancla corregida (2026-02-16), así que
-`cycle_id` se calculó llamando directamente a `fn_ciclo_id()` — sin
-ningún "+7" de renumeración. Ciclo 6 queda incompleto (el export de
-v2 solo llega al 09/08/2026, 6 de los 28 días del ciclo).
-`personaje_stats_nivel` NO se reconstruyó para responsables —
-pendiente si se quiere el mismo efecto retroactivo de generaciones
-que tienen los operarios.
-**Pendiente**: Inicio/gamificación del **responsable** — no
-construido (solo el operario tiene las 4 sub-vistas). Reutilizaría
-`frontend/src/lib/gamificacion.ts` y buena parte del patrón de
-`inicio-gamificacion.ts`/`ranking.ts`/`stats-avatar.ts`, pero el
-responsable no tiene aún desglose puntos_piezas/rendimiento/limpieza
-por categoría (solo metros+rendimiento, sin piezas/limpieza — fase 2),
-ni logros propios (`logros_definicion.rol` está listo para
-`'responsable'` pero sin datos), ni Reyes del formato (concepto
-pensado solo para operario). Requiere diseño propio, no es un simple
-"copiar y cambiar el rol".
+- Gamificación del **responsable** en su app: reutilizaría
+  `lib/gamificacion.ts` y el patrón de `inicio-gamificacion`/`ranking`/
+  `stats-avatar`, pero necesita diseño propio (sin piezas/limpieza,
+  sin Reyes del formato, logros por crear).
+- Logros del responsable (`logros_definicion.rol = 'responsable'`).
+- Pantalla del admin para otorgar niveles.
