@@ -19,6 +19,7 @@ import {
   listarLineas,
   listarOperariosParaAsignar,
   obtenerOCrearTurno,
+  estaFabricaCerrada,
   listarAsignaciones,
   asignarOperario,
   cerrarTurnoManualmente,
@@ -69,6 +70,7 @@ export function TurnoScreen() {
   const [conteoCompletados, setConteoCompletados] = useState<Record<string, number>>({});
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fabricaCerrada, setFabricaCerrada] = useState(false);
   const [guardandoLinea, setGuardandoLinea] = useState<string | null>(null);
   const [lineaEnCaptura, setLineaEnCaptura] = useState<Linea | null>(null);
   const [lineaConIncidencia, setLineaConIncidencia] = useState<Linea | null>(null);
@@ -113,6 +115,21 @@ export function TurnoScreen() {
       // con líneas/operarios: hace falta saberlo antes de decidir si
       // merece la pena traer el resto.
       if ((info.estado === "abierto" || info.estado === "en_revision") && info.fecha && info.tipo) {
+        // Comprobar el cierre de fábrica ANTES de intentar crear el
+        // turno — la rotación nunca se pausa por vacaciones, así que
+        // sin este chequeo, `obtenerOCrearTurno` chocaría con el
+        // trigger de BD (fn_bloquear_turno_en_cierre) y el
+        // responsable vería un error crudo de Postgres en vez de un
+        // aviso claro. Detectado en sesión 26/08/2026.
+        const cerrada = await estaFabricaCerrada(info.fecha);
+        if (cerrada) {
+          setFabricaCerrada(true);
+          setTurnoInfo(info);
+          setTurnoId(null);
+          return;
+        }
+        setFabricaCerrada(false);
+
         const turno = await obtenerOCrearTurno(info.fecha, info.tipo, usuario.id);
 
         if (turno.cerrado_at) {
@@ -136,6 +153,7 @@ export function TurnoScreen() {
         setConteoIncidenciasProduccion(await contarIncidenciasProduccionPorLinea(turno.id));
         setSugerenciasContinuar(await obtenerSugerenciasContinuarPorLinea(turno.id));
       } else {
+        setFabricaCerrada(false);
         setTurnoInfo(info);
         setTurnoId(null);
       }
@@ -270,6 +288,19 @@ useEffect(() => {
 
   if (error) {
     return <div className="p-6 text-center text-red-600">{error}</div>;
+  }
+
+  if (fabricaCerrada) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 rounded-2xl bg-white p-12 text-center shadow-sm">
+        <Lock size={40} className="text-slate-400" aria-hidden />
+        <p className="text-lg font-medium text-slate-900">Fábrica cerrada (periodo de vacaciones)</p>
+        <p className="max-w-sm text-sm text-slate-500">
+          No hay ningún turno que abrir durante este periodo. Puedes seguir
+          consultando tus partes, stats y ranking desde el menú.
+        </p>
+      </div>
+    );
   }
 
   if (!turnoInfo || turnoInfo.estado === "descanso") {

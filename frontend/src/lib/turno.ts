@@ -132,6 +132,26 @@ export async function esRefuerzo(turnoId: string, operarioId: string): Promise<b
   if (error) throw error;
   return data !== null;
 }
+/**
+ * ¿Está la fábrica cerrada (periodo de vacaciones) en esta fecha? —
+ * espejo en cliente de `fn_fabrica_cerrada` (BD). Se consulta ANTES
+ * de intentar `obtenerOCrearTurno`: sin esto, un responsable al que
+ * le toca turno por rotación durante el cierre veía un error crudo
+ * de Postgres (el trigger `fn_bloquear_turno_en_cierre` rechaza el
+ * insert) en vez de un aviso claro. Detectado en sesión 26/08/2026 —
+ * la rotación nunca se pausa por cierre de fábrica (01-dominio.md),
+ * así que este chequeo es indispensable antes de crear el turno.
+ */
+export async function estaFabricaCerrada(fecha: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("cierre_fabrica")
+    .select("id")
+    .lte("fecha_inicio", fecha)
+    .gte("fecha_fin", fecha)
+    .maybeSingle();
+  if (error) throw error;
+  return data !== null;
+}
 
 /**
  * Busca el turno de (fecha, tipo). Si no existe, lo crea con

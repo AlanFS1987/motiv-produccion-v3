@@ -41,7 +41,7 @@ propias pestañas de gestión.
   comprobar si el bug de recarga sigue dándose en el dispositivo de
   turno.
 
-  **Investigación cerrada por el momento (sesión 26/08/2026)**: se
+  **Investigación cerrada (sesión 26/08/2026) — causa real encontrada y corregida**: se
   probaron varias correcciones a distintos niveles durante horas
   (sin éxito, sin listar aquí cada intento individual) y el bug
   persiste. Se confirmó además que **no es un problema de gama del
@@ -51,31 +51,51 @@ propias pestañas de gestión.
   y el bug sigue dándose igual — descarta tanto "falta de RAM" como
   "gestión agresiva de batería de MIUI" como causa.
 
-  Hipótesis final, sin confirmar: **descarte de pestañas en segundo
-  plano por el propio Chrome** (`chrome://discards`), independiente de
-  MIUI — al abrir la app de Cámara nativa, la pestaña pasa a segundo
-  plano de verdad (como cambiar de app) y Chrome puede liberar su
-  memoria por su cuenta; a diferencia de las apps nativas, no existe
-  ningún ajuste de usuario para eximir una pestaña concreta de esto.
-  Si esta hipótesis es correcta, no hay arreglo posible desde el
-  código de la app ni desde ajustes del sistema — solo evitar el
-  patrón `<input capture>` por completo, que es lo que ya se hace en
-  producción con `useCamaraLive`.
+  **[RESUELTO 26/08/2026] Causa real encontrada, no era descarte de
+  pestaña ni un bug de React**: la hipótesis del descarte de Chrome
+  (`chrome://discards`) de arriba quedó descartada con
+  `document.wasDiscarded === false` al reproducir en la PWA instalada.
+  El verdadero culpable era un bug en `AuthContext.tsx`: Supabase
+  reemite el evento `SIGNED_IN` (no solo `TOKEN_REFRESHED`, que era lo
+  único contemplado) al recuperar el foco — y abrir la cámara nativa
+  cuenta como perder y recuperar el foco. La guarda que ya existía
+  para ignorar refrescos de sesión sin cambios reales comparaba contra
+  la variable `usuario` capturada en un closure obsoleto (el efecto de
+  `onAuthStateChange` se crea una sola vez al montar, `deps=[]`), así
+  que ese valor quedaba congelado en `null` para siempre y la guarda
+  nunca se cumplía. Cada `SIGNED_IN` disparaba `setCargando(true)` →
+  pantalla completa de "Cargando..." → recarga del perfil → toda la
+  app se desmontaba y volvía a montar desde cero, perdiendo cualquier
+  estado en curso (foto de la cámara incluida). Este era también el
+  motivo por el que el intento anterior de arreglarlo (commit
+  `b50a6d0`) nunca llegó a funcionar de verdad, pese a que el
+  comentario del código decía que ya estaba solucionado.
 
-  **Solución permanente**: cámara en vivo (`useCamaraLive`), ya en
-  producción en todos los flujos reales — la pestaña nunca pierde el
-  foco, así que nunca se dispara el descarte. La cámara nativa se
-  mantiene solo aquí, en esta pantalla de test, por si en el futuro
-  cambia el comportamiento de Chrome/MIUI y vale la pena reconsiderarla.
+  Confirmado con un `console.log(evento)` temporal en consola remota:
+  salía `SIGNED_IN`, nunca `TOKEN_REFRESHED`, con la app ya
+  autenticada.
 
-  **Línea abierta, sin plan concreto todavía**: probar el mismo flujo
-  con la app instalada como PWA (modo standalone) en vez de como
-  pestaña de Chrome — conectado con el punto de PWA en `07`,
-  "Por construir". Expectativa baja: si la causa real es el descarte
-  de Chrome y no la gestión de apps de MIUI, pasar a PWA no debería
-  cambiar nada (ya se descartó también la vía de la excepción de
-  batería, que sí aplicaría distinto a una PWA instalada que a una
-  pestaña suelta).
+  Fix aplicado en `AuthContext.tsx`: la guarda ahora comprueba
+  `usuarioRef.current` (el ref que ya existía para este propósito,
+  pero que no se estaba usando en el sitio correcto) en vez de
+  `usuario`, cubre tanto `TOKEN_REFRESHED` como `SIGNED_IN`, y añade
+  una comprobación extra de que el `id` de usuario coincide antes de
+  saltarse la recarga — para no ignorar por error un `SIGNED_IN` de un
+  usuario distinto (login real desde `Login.tsx`).
+
+  **Alcance real del fix**: no es solo un arreglo de la cámara. Afecta
+  a cualquier situación en la que la PWA/pestaña pierda y recupere el
+  foco (bloquear pantalla, cambiar de app, notificaciones) — antes de
+  este fix, cualquier jefe/admin que hiciera eso mientras trabajaba
+  podía perder su pestaña activa y sus datos cargados sin previo
+  aviso, no solo al usar la cámara.
+
+  La cámara nativa (`<input capture>`) se mantiene solo en esta
+  pantalla de test; producción sigue usando `useCamaraLive` (nunca
+  pierde el foco, así que nunca disparaba este bug de todos modos) —
+  sin necesidad ya de reconsiderar el cambio a `<input capture>` en
+  producción, pero el fix de `AuthContext.tsx` protege por igual a
+  toda la app independientemente de qué método de cámara se use.
 
 - **Cambio de rol** (`admin/AjustarLetrasScreen.tsx`, mismo lib
   `admin-usuarios.ts`) — en la misma pantalla de Rotación, además de

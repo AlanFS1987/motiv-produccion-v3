@@ -84,9 +84,18 @@ formato ┘
   rol `suplente`, pero esa vía queda sin uso en la práctica — ver más
   abajo, "Suplente y refuerzo".
 - **Cierre de fábrica** (`cierre_fabrica`, fecha inicio/fin): trigger
-  impide insertar turnos en ese rango. No tiene pantalla; se gestiona
-  por SQL.
-
+  impide insertar turnos en ese rango, gestionado desde
+  `admin/CierreFabricaScreen.tsx` (`09`). Como la rotación nunca se
+  pausa (ver arriba), un responsable al que le toca turno por rotación
+  durante el cierre seguía viendo "estado: abierto" en el cliente —
+  bug real detectado en sesión 26/08/2026: `TurnoScreen.tsx` intentaba
+  crear el turno, chocaba con el trigger de BD, y el responsable veía
+  el error crudo de Postgres en vez de un aviso claro. Corregido:
+  `TurnoScreen.tsx` comprueba `estaFabricaCerrada(fecha)`
+  (`lib/turno.ts`, espejo en cliente de `fn_fabrica_cerrada`) ANTES de
+  llamar a `obtenerOCrearTurno`, y muestra una pantalla de "Fábrica
+  cerrada (periodo de vacaciones)" en su lugar — mismo patrón visual
+  que la pantalla de "día de descanso".
 ## Suplente y refuerzo
 
 - **Cuenta compartida `suplente`: descartada** (decisión cerrada,
