@@ -63,21 +63,21 @@ ambigüedad `nivel_id` en `fn_otorgar_bonus_nivel`).
 1. Admin: botón "Recalcular ciclo anterior" (hoy por SQL Editor;
    la vista de usuarios con puntos/nivel/botón "otorgar nivel" ya
    está construida, ver `04`/`09`).
-3. Admin: fusión de modelos/marcas/productos/lotes duplicados (Edge
+2. Admin: fusión de modelos/marcas/productos/lotes duplicados (Edge
    Function con `service_role`).
-4. `personaje_stats_nivel` para los 4 responsables migrados de v2
+3. `personaje_stats_nivel` para los 4 responsables migrados de v2
    (mismo efecto retroactivo que tienen los operarios).
-5. Pantalla de fábrica: diapositivas 4 (Ranking) y 5 (Reyes del
+4. Pantalla de fábrica: diapositivas 4 (Ranking) y 5 (Reyes del
    formato) — la mecánica y las vistas ya existen (`10`); ahora
    incluiría también el ranking de responsables (`04`).
-6. Refactor de `TurnoScreen.tsx` (hook `useTurnoActual`, componentes
+5. Refactor de `TurnoScreen.tsx` (hook `useTurnoActual`, componentes
    `EstadoTurnoBloqueado`, `TarjetaLinea`, máquina de estados pura).
-7. Tests unitarios (rotación, validaciones, normalización, tramos) y
+6. Tests unitarios (rotación, validaciones, normalización, tramos) y
    paquete de dominio compartido frontend/Deno para dejar de duplicar
    `normalizacion`/`formato`/informe.
-8. Migrar el interior de las pantallas al sistema de temas (lista en
+7. Migrar el interior de las pantallas al sistema de temas (lista en
    `12`).
-9. PWA; retención de 18 meses en Cloudinary (automatizar el borrado
+8. PWA; retención de 18 meses en Cloudinary (automatizar el borrado
    de huérfanas requeriría Edge Function con `service_role`).
 10. Shell para `jefe_rectificado` (como jefe, solo lectura) — previsto,
     sin prisa.

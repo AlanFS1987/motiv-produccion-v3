@@ -17,7 +17,7 @@ export function LogrosOperarioScreen() {
     setCargando(true);
     setError(null);
     try {
-      const resumen = await obtenerLogros(usuario.id);
+      const resumen = await obtenerLogros(usuario.id, usuario.rol as "operario" | "responsable");
       setLogros(resumen.logros);
       setDesbloqueados(resumen.desbloqueados);
       setTotal(resumen.total);
