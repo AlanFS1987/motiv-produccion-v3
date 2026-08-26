@@ -78,6 +78,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Se mantiene sincronizado ante login/logout/refresco de token
 const { data: suscripcion } = supabase.auth.onAuthStateChange((evento, nuevaSesion) => {
   if (!activo) return;
+
+  // TEMPORAL — quitar este console.log en cuanto se confirme en
+  // consola remota que el evento al volver de la cámara es
+  // TOKEN_REFRESHED.
+  console.log("[Auth] evento:", evento, "usuarioRef.current:", usuarioRef.current?.username);
+
   setSesion(nuevaSesion);
 
   // TOKEN_REFRESHED se dispara solo, sin que el usuario haga nada,
@@ -90,7 +96,15 @@ const { data: suscripcion } = supabase.auth.onAuthStateChange((evento, nuevaSesi
   // tiraba por tierra cualquier captura de foto en curso. Detectado
   // en sesión — antes de este fix, CADA foto "en el acto" perdía el
   // progreso al volver de la cámara.
-  if (evento === "TOKEN_REFRESHED" && usuario) {
+  //
+  // OJO: se usa usuarioRef.current, NUNCA la variable `usuario` de
+  // arriba — esta función se crea una sola vez al montar (deps=[]
+  // de este efecto), así que `usuario` quedaría congelado para
+  // siempre en su valor inicial (null) y esta guarda nunca se
+  // cumpliría. usuarioRef sí se lee "fresco" en cada llamada — bug
+  // real detectado en sesión 26/08/2026, el fix anterior (commit
+  // b50a6d0) nunca llegó a funcionar por este motivo.
+  if (evento === "TOKEN_REFRESHED" && usuarioRef.current) {
     return;
   }
 
