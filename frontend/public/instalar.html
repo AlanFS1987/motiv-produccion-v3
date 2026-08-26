@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Instalar Motiv Producción</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --tinta: #1D2126;
+    --tinta-suave: #565C63;
+    --linea: #DAD9D2;
+    --fondo: #F3F2ED;
+    --superficie: #FFFFFF;
+    --glaseado: #14636E;
+    --glaseado-claro: #E3EEEE;
+    --glaseado-oscuro: #0D4952;
+    --horno: #C08A2E;
+    --horno-claro: #FBF0DC;
+    --radio: 14px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--fondo);
+    color: var(--tinta);
+    line-height: 1.5;
+    background-image:
+      linear-gradient(var(--linea) 1px, transparent 1px),
+      linear-gradient(90deg, var(--linea) 1px, transparent 1px);
+    background-size: 64px 64px;
+    background-attachment: fixed;
+  }
+
+  h1, h2, h3 { font-family: 'Archivo', sans-serif; margin: 0; }
+
+  .envoltorio {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 48px 20px 80px;
+  }
+
+  header.cabecera {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  .marca {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .marca-icono {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+  }
+
+  .marca-texto {
+    font-family: 'Archivo', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.02em;
+    color: var(--tinta-suave);
+    text-transform: uppercase;
+  }
+
+  h1 {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin-bottom: 12px;
+  }
+
+  .subtitulo {
+    font-size: 16px;
+    color: var(--tinta-suave);
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  .aviso {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background: var(--horno-claro);
+    border: 1px solid #E9D2A0;
+    border-radius: var(--radio);
+    padding: 16px 18px;
+    margin: 32px 0 40px;
+    font-size: 14px;
+    color: #6B4B15;
+  }
+
+  .aviso svg { flex-shrink: 0; margin-top: 2px; }
+
+  nav.pestanas {
+    display: flex;
+    gap: 6px;
+    background: var(--superficie);
+    border: 1px solid var(--linea);
+    border-radius: 999px;
+    padding: 5px;
+    margin-bottom: 32px;
+  }
+
+  nav.pestanas button {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-family: 'Archivo', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 12px 8px;
+    border-radius: 999px;
+    color: var(--tinta-suave);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  nav.pestanas button svg { width: 18px; height: 18px; }
+
+  nav.pestanas button.activa {
+    background: var(--glaseado);
+    color: #fff;
+  }
+
+  section.panel {
+    display: none;
+  }
+
+  section.panel.activo {
+    display: block;
+    animation: aparecer 0.2s ease;
+  }
+
+  @keyframes aparecer {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .requisito {
+    font-size: 13px;
+    color: var(--tinta-suave);
+    background: var(--superficie);
+    border: 1px solid var(--linea);
+    border-radius: var(--radio);
+    padding: 10px 16px;
+    margin-bottom: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .requisito b { color: var(--tinta); }
+
+  ol.pasos {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .paso {
+    background: var(--superficie);
+    border: 1px solid var(--linea);
+    border-radius: var(--radio);
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 40px 1fr 120px;
+    gap: 18px;
+    align-items: center;
+  }
+
+  .paso-numero {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--glaseado-claro);
+    color: var(--glaseado-oscuro);
+    font-family: 'Archivo', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .paso-texto p {
+    margin: 0;
+    font-size: 15px;
+  }
+
+  .paso-texto strong {
+    font-weight: 500;
+  }
+
+  .paso-ilustracion {
+    width: 120px;
+    height: 90px;
+    background: var(--fondo);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .paso-ilustracion svg { width: 100%; height: 100%; }
+
+  footer.pie {
+    margin-top: 48px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--tinta-suave);
+  }
+
+  .pie-nota {
+    margin-top: 6px;
+    font-size: 12px;
+  }
+
+  @media (max-width: 560px) {
+    .paso {
+      grid-template-columns: 32px 1fr;
+    }
+    .paso-ilustracion {
+      grid-column: 1 / -1;
+      width: 100%;
+      height: 100px;
+    }
+    nav.pestanas button span.etiqueta-larga { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="envoltorio">
+
+  <header class="cabecera">
+    <div class="marca">
+      <svg class="marca-icono" viewBox="0 0 34 34" fill="none">
+        <rect width="34" height="34" rx="8" fill="#14636E"/>
+        <path d="M9 12h6v6H9v-6Z" fill="#fff"/>
+        <path d="M17 12h6v6h-6v-6Z" fill="#C08A2E"/>
+        <path d="M9 20h6v6H9v-6Z" fill="#C08A2E"/>
+        <path d="M17 20h6v6h-6v-6Z" fill="#fff"/>
+      </svg>
+      <span class="marca-texto">Motiv Producción</span>
+    </div>
+    <h1>Instala la app en tu dispositivo</h1>
+    <p class="subtitulo">Sigue los pasos de tu sistema para tener Motiv Producción como una app más, con icono propio y sin la barra del navegador.</p>
+  </header>
+
+  <div class="aviso">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="9" stroke="#C08A2E" stroke-width="1.5"/><path d="M10 6v5" stroke="#C08A2E" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="13.5" r="1" fill="#C08A2E"/></svg>
+    <div>Abre este enlace desde el navegador indicado en cada pestaña — algunos pasos no aparecen si usas otro navegador distinto al recomendado.</div>
+  </div>
+
+  <nav class="pestanas" id="pestanas">
+    <button data-panel="android" class="activa">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M6 9v7a1 1 0 0 0 1 1h1v3a1.5 1.5 0 0 0 3 0v-3h2v3a1.5 1.5 0 0 0 3 0v-3h1a1 1 0 0 0 1-1V9H6Z" fill="currentColor"/><path d="M6.5 8a5.5 5.5 0 0 1 11 0" stroke="currentColor" stroke-width="1.4"/><circle cx="9" cy="6" r=".6" fill="currentColor"/><circle cx="15" cy="6" r=".6" fill="currentColor"/><path d="M5.5 10.5v4M18.5 10.5v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <span class="etiqueta-larga">Android</span>
+    </button>
+    <button data-panel="ios">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M15.5 4.8c-.9.1-1.9.7-2.5 1.4-.5.6-1 1.6-.8 2.5.9.1 1.9-.5 2.5-1.2.6-.6 1-1.6.8-2.7Z" fill="currentColor"/><path d="M18.8 16.4c-.4 1-1 1.9-1.7 2.7-.9 1.1-1.9 2.2-3.2 2.2-1.3 0-1.7-.8-3.1-.8-1.5 0-2 .8-3.2.8-1.3 0-2.2-1.1-3.1-2.3-1.9-2.6-2.6-6.4-1.1-9.1.8-1.4 2.1-2.3 3.5-2.3 1.3 0 2.2.9 3.2.9 1 0 1.7-.9 3.2-.9 1.1 0 2.3.6 3.1 1.6-2.7 1.5-2.3 5.4.4 6.2Z" fill="currentColor"/></svg>
+      <span class="etiqueta-larga">iPhone</span>
+    </button>
+    <button data-panel="windows">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 6.2 10.5 5.3v6.1H4V6.2Zm0 11.6 6.5 1v-6H4v5Zm7.4-11.7L20 4.5v6.9h-8.6V6.1Zm0 6.9H20v7L11.4 18.6v-5.6Z" fill="currentColor"/></svg>
+      <span class="etiqueta-larga">Windows</span>
+    </button>
+  </nav>
+
+  <section class="panel activo" id="panel-android">
+    <div class="requisito">
+      <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8.5" stroke="#565C63"/><path d="M6 10l2.5 2.5L14 7" stroke="#565C63" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Requiere <b>Google Chrome</b>
+    </div>
+    <ol class="pasos">
+      <li class="paso">
+        <div class="paso-numero">1</div>
+        <div class="paso-texto"><p>Abre este enlace en <strong>Chrome</strong> desde tu móvil.</p></div>
+        <div class="paso-ilustracion">
+          <svg viewBox="0 0 120 90"><rect x="30" y="6" width="60" height="78" rx="8" fill="#fff" stroke="#DAD9D2"/><rect x="36" y="16" width="48" height="52" rx="3" fill="#E3EEEE"/><circle cx="60" cy="76" r="3" fill="#DAD9D2"/><circle cx="60" cy="42" r="10" fill="#14636E"/><path d="M56 42l3 3 6-7" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </li>
+      <li class="paso">
+        <div class="paso-numero">2</div>
+        <div class="paso-texto"><p>Toca el icono de los <strong>tres puntos</strong> (⋮), arriba a la derecha.</p></div>
+        <div class="paso-ilustracion">
+          <svg viewBox="0 0 120 90"><rect x="30" y="6" width="60" height="78" rx="8" fill="#fff" stroke="#DAD9D2"/><rect x="36" y="10" width="48" height="10" rx="2" fill="#F3F2ED"/><circle cx="76" cy="15" r="1.6" fill="#14636E"/><circle cx="80" cy="15" r="1.6" fill="#14636E"/><circle cx="84" cy="15" r="1.6" fill="#14636E"/><circle cx="80" cy="15" r="7" fill="none" stroke="#C08A2E" stroke-width="1.6"/></svg>
+        </div>
+      </li>
+      <li class="paso">
+        <div class="paso-numero">3</div>
+        <div class="paso-texto"><p>Toca <strong>«Instalar aplicación»</strong> en el menú.</p></div>
+        <div class="paso-ilustracion">
+          <svg viewBox="0 0 120 90"><rect x="30" y="6" width="60" height="78" rx="8" fill="#fff" stroke="#DAD9D2"/><rect x="40" y="30" width="40" height="8" rx="2" fill="#F3F2ED"/><rect x="40" y="42" width="40" height="8" rx="2" fill="#E3EEEE"/><rect x="40" y="42" width="40" height="8" rx="2" fill="none" stroke="#14636E" stroke-width="1.6"/><rect x="40" y="54" width="40" height="8" rx="2" fill="#F3F2ED"/></svg>
+        </div>
+      </li>
+      <li class="paso">
+        <div class="paso-numero">4</div>
+        <div class="paso-texto"><p>Confirma tocando <strong>«Instalar»</strong> en la ventana que aparece.</p></div>
+        <div class="paso-ilustracion">
+          <svg viewBox="0 0 120 90"><rect x="20" y="30" width="80" height="34" rx="8" fill="#fff" stroke="#DAD9D2"/><rect x="30" y="38" width="30" height="6" rx="2" fill="#F3F2ED"/><rect x="30" y="48" width="60" height="10" rx="5" fill="#14636E"/><rect x="35" y="52" width="20" height="2" fill="#fff"/></svg>
+        </div>
+      </li>
+      <li class="paso">
+        <div class="paso-numero">5</div>
+        <div class="paso-texto"><p>Busca el icono de <strong>Motiv Producción</strong> en tu pantalla de inicio.</p></div>
+        <div class="paso-ilustracion">
+          <svg viewBox="0 0 120 90"><rect x="42" y="20" width="36" height="36" rx="9" fill="#14636E"/><path d="M50 33h7v7h-7v-7Z" fill="#fff"/><path d="M59 33h7v7h-7v-7Z" fill="#C08A2E"/><path d="M50 42h7v7h-7v-7Z" fill="#C08A2E"/><path d="M59 42h7v7h-7v-7Z" fill="#fff"/><rect x="46" y="61" width="28" height="4" rx="2" fill="#DAD9D2"/></svg>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="panel" id="panel-ios">
+    <div class="requisito">
+      <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><path d="M10 3l1.4 3.3L15 7l-3.3 1.4L10 12l-1.4-3.6L5 7l3.6-.7L10 3Z" fill="#565C63"/></svg>
+      Requiere <b>Safari</b> — no funciona desde Chrome en iPhone
+    </div>
+    <ol class="pasos">
+      <li class="paso">
+        <div class="paso-numero">1</div>
+        <div class="paso-texto"><p>Abre este enlace en <strong>Safari</strong>.</p></div>
+        <div class="paso-ilustracion">
+          <svg viewBox="0 0 120 90"><rect x="34" y="4" width="52" height="82" rx="10" fill="#fff" stroke="#DAD9D2"/><rect x="40" y="14" width="40" height="54" rx="3" fill="#E3EEEE"/><circle cx="60" cy="41" r="10" fill="#fff" stroke="#14636E" stroke-width="1.6"/><path d="M64 37l-9 4 4-9 5 5Z" fill="#C08A2E"/><rect x="53" y="78" width="14" height="3" rx="1.5" fill="#DAD9D2"/></svg>
+        </div>
+      </li>
+      <li class="paso">
+        <div class="paso-numero">2</div>
+        <div class="paso-texto"><p>Toca el icono de <strong>Compartir</strong> (el cuadrado con la flecha hacia arriba), abajo en el centro.</p></div>
+        <div class="paso-ilustracion">
+          <svg viewBox="0 0 120 90"><rect x="34" y="4" width="52" height="82" rx="10" fill="#fff" stroke="#DAD9D2"/><rect x="40" y="66" width="40" height="14" rx="3" fill="#F3F2ED"/><circle cx="60" cy="73" r="8" fill="none" stroke="#C08A2E" stroke-width="1.6"/><path d="M60 69v7M57 72l3-3 3 3" stroke="#14636E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </li>
+      <li class="paso">
+        <div class="paso-numero">3</div>
+        <div class="paso-texto"><p>Desliza hacia abajo y toca <strong>«Añadir a pantalla de inicio»</strong>.</p></div>
+        <div class="paso-ilustracion">
+          <svg viewBox="0 0 120 90"><rect x="24" y="14" width="72" height="62" rx="8" fill="#fff" stroke="#DAD9D2"/><rect x="32" y="24" width="56" height="8" rx="2" fill="#F3F2ED"/><rect x="32" y="36" width="56" height="8" rx="2" fill="#F3F2ED"/><rect x="32" y="48" width="56" height="8" rx="2" fill="#E3EEEE"/><rect x="32" y="48" width="56" height="8" rx="2" fill="none" stroke="#14636E" stroke-width="1.6"/><rect x="36" y="51" width="8" height="2" fill="#14636E"/></svg>
+        </div>
+      </li>
+      <li class="paso">
+        <div class="paso-numero">4</div>
+        <div class="paso-texto"><p>Toca <strong>«Añadir»</strong>, arriba a la derecha.</p></div>
+        <div class="paso-ilustracion">
+          <svg viewBox="0 0 120 90"><rect x="20" y="30" width="80" height="34" rx="8" fill="#fff" stroke="#DAD9D2"/><circle cx="38" cy="47" r="10" fill="#E3EEEE"/><rect x="53" y="43" width="26" height="4" rx="2" fill="#F3F2ED"/><rect x="80" y="40" width="18" height="10" rx="5" fill="#14636E"/></svg>
+        </div>
+      </li>
+      <li class="paso">
+        <div class="paso-numero">5</div>
+        <div class="paso-texto"><p>Busca el icono de <strong>Motiv Producción</strong> en tu pantalla de inicio.</p></div>
+        <div class="paso-ilustracion">
+          <svg viewBox="0 0 120 90"><rect x="42" y="20" width="36" height="36" rx="9" fill="#14636E"/><path d="M50 33h7v7h-7v-7Z" fill="#fff"/><path d="M59 33h7v7h-7v-7Z" fill="#C08A2E"/><path d="M50 42h7v7h-7v-7Z" fill="#C08A2E"/><path d="M59 42h7v7h-7v-7Z" fill="#fff"/><rect x="46" y="61" width="28" height="4" rx="2" fill="#DAD9D2"/></svg>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="panel" id="panel-windows">
+    <div class="requisito">
+      <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8.5" stroke="#565C63"/><path d="M6 10l2.5 2.5L14 7" stroke="#565C63" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Requiere <b>Chrome</b> o <b>Edge</b>
+    </div>
+    <ol class="pasos">
+      <li class="paso">
+        <div class="paso-numero">1</div>
+        <div class="paso-texto"><p>Abre este enlace en <strong>Chrome</strong> o <strong>Edge</strong> desde tu ordenador.</p></div>
+        <div class="paso-ilustracion">
+          <svg viewBox="0 0 120 90"><rect x="10" y="10" width="100" height="62" rx="6" fill="#fff" stroke="#DAD9D2"/><rect x="10" y="10" width="100" height="14" rx="6" fill="#F3F2ED"/><circle cx="60" cy="47" r="12" fill="#E3EEEE"/><path d="M55 47l4 4 8-9" stroke="#14636E" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><rect x="44" y="78" width="32" height="4" rx="2" fill="#DAD9D2"/></svg>
+        </div>
+      </li>
+      <li class="paso">
+        <div class="paso-numero">2</div>
+        <div class="paso-texto"><p>Busca el icono de <strong>instalar</strong> (⊕) al final de la barra de direcciones.</p></div>
+        <div class="paso-ilustracion">
+          <svg viewBox="0 0 120 90"><rect x="10" y="10" width="100" height="62" rx="6" fill="#fff" stroke="#DAD9D2"/><rect x="10" y="10" width="100" height="14" rx="6" fill="#F3F2ED"/><rect x="18" y="14" width="60" height="7" rx="3.5" fill="#fff" stroke="#DAD9D2"/><circle cx="90" cy="17.5" r="7" fill="none" stroke="#C08A2E" stroke-width="1.6"/><path d="M90 14v7M86.5 17.5h7" stroke="#14636E" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </div>
+      </li>
+      <li class="paso">
+        <div class="paso-numero">3</div>
+        <div class="paso-texto"><p>Haz clic en <strong>«Instalar»</strong>.</p></div>
+        <div class="paso-ilustracion">
+          <svg viewBox="0 0 120 90"><rect x="20" y="24" width="80" height="40" rx="8" fill="#fff" stroke="#DAD9D2"/><rect x="30" y="34" width="20" height="20" rx="4" fill="#E3EEEE"/><rect x="58" y="34" width="30" height="6" rx="2" fill="#F3F2ED"/><rect x="58" y="46" width="30" height="8" rx="4" fill="#14636E"/></svg>
+        </div>
+      </li>
+      <li class="paso">
+        <div class="paso-numero">4</div>
+        <div class="paso-texto"><p>Confirma en la ventana que aparece. La app se abrirá en su <strong>propia ventana</strong>, sin barra de navegador.</p></div>
+        <div class="paso-ilustracion">
+          <svg viewBox="0 0 120 90"><rect x="14" y="14" width="92" height="60" rx="6" fill="#fff" stroke="#14636E" stroke-width="1.6"/><rect x="14" y="14" width="92" height="10" rx="6" fill="#E3EEEE"/><circle cx="24" cy="19" r="2" fill="#C08A2E"/><rect x="30" y="34" width="60" height="8" rx="2" fill="#F3F2ED"/><rect x="30" y="46" width="40" height="8" rx="2" fill="#F3F2ED"/></svg>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <footer class="pie">
+    <div>¿No ves ningún icono de instalación? Actualiza tu navegador a la última versión e inténtalo de nuevo.</div>
+    <div class="pie-nota">Motiv Producción funciona sin conexión una vez instalada.</div>
+  </footer>
+
+</div>
+
+<script>
+  var botones = document.querySelectorAll('#pestanas button');
+  var paneles = document.querySelectorAll('.panel');
+
+  botones.forEach(function (boton) {
+    boton.addEventListener('click', function () {
+      botones.forEach(function (b) { b.classList.remove('activa'); });
+      paneles.forEach(function (p) { p.classList.remove('activo'); });
+      boton.classList.add('activa');
+      document.getElementById('panel-' + boton.dataset.panel).classList.add('activo');
+    });
+  });
+
+  var ua = navigator.userAgent || '';
+  var detectado = null;
+  if (/iPhone|iPad|iPod/i.test(ua)) {
+    detectado = 'ios';
+  } else if (/Windows/i.test(ua) && !/Mobi/i.test(ua)) {
+    detectado = 'windows';
+  } else if (/Android/i.test(ua)) {
+    detectado = 'android';
+  }
+  if (detectado) {
+    var objetivo = document.querySelector('#pestanas button[data-panel="' + detectado + '"]');
+    if (objetivo) objetivo.click();
+  }
+</script>
+
+</body>
+</html>
