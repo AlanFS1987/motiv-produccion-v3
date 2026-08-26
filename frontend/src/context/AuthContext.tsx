@@ -104,7 +104,17 @@ const { data: suscripcion } = supabase.auth.onAuthStateChange((evento, nuevaSesi
   // cumpliría. usuarioRef sí se lee "fresco" en cada llamada — bug
   // real detectado en sesión 26/08/2026, el fix anterior (commit
   // b50a6d0) nunca llegó a funcionar por este motivo.
-  if (evento === "TOKEN_REFRESHED" && usuarioRef.current) {
+  // TOKEN_REFRESHED y SIGNED_IN pueden dispararse solos, sin que el
+  // usuario haga nada, al recuperar el foco (mecanismo interno de
+  // Supabase) — confirmado en consola remota 26/08/2026: al volver
+  // de la cámara nativa el evento real es SIGNED_IN, no
+  // TOKEN_REFRESHED como se asumía antes. Si ya tenemos un perfil
+  // cargado para ESE MISMO usuario, no hace falta recargar nada.
+  if (
+    (evento === "TOKEN_REFRESHED" || evento === "SIGNED_IN") &&
+    usuarioRef.current &&
+    usuarioRef.current.id === nuevaSesion?.user.id
+  ) {
     return;
   }
 
