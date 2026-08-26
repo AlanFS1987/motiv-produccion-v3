@@ -97,7 +97,10 @@ export function RankingOperarioScreen() {
                           )}
                         </div>
                         <p className="text-center text-xs font-medium text-slate-900">{entrada.username}</p>
-                        <p className="mb-1 text-[11px] text-slate-500">{entrada.puntos.toLocaleString("es-ES")} pts</p>
+                        <p className="text-[11px] text-slate-500">{entrada.puntos.toLocaleString("es-ES")} pts</p>
+                        <p className="mb-1 text-[10px] text-slate-400">
+                          {entrada.cantidad} partes{entrada.ptsPromedio !== null ? ` · ${entrada.ptsPromedio.toFixed(1)} pts/p` : ""}
+                        </p>
                         <div
                           className="flex items-center justify-center rounded-t-md text-sm font-medium"
                           style={{
@@ -120,19 +123,29 @@ export function RankingOperarioScreen() {
                 {podio.top5
                   .filter((e) => e.posicion > 3)
                   .map((e) => (
-                    <div key={e.operarioId} className="flex items-center justify-between px-1 py-1.5 text-sm">
-                      <span className="text-slate-600">
-                        {e.posicion}º {e.username}
-                      </span>
-                      <span className="font-medium text-slate-900">{e.puntos.toLocaleString("es-ES")} pts</span>
+                    <div key={e.operarioId} className="flex flex-col gap-0.5 px-1 py-1.5">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-slate-600">
+                          {e.posicion}º {e.username}
+                        </span>
+                        <span className="font-medium text-slate-900">{e.puntos.toLocaleString("es-ES")} pts</span>
+                      </div>
+                      <p className="text-right text-[11px] text-slate-400">
+                        {e.cantidad} partes{e.ptsPromedio !== null ? ` · ${e.ptsPromedio.toFixed(1)} pts/p` : ""}
+                      </p>
                     </div>
                   ))}
               </div>
 
               {podio.tuEntrada && !podio.tuEntradaEnTop5 && (
-                <div className="mt-2 flex items-center justify-between rounded-lg bg-blue-50 p-2 text-sm">
-                  <span className="font-medium text-blue-700">Tú · {podio.tuEntrada.posicion}º</span>
-                  <span className="font-medium text-blue-700">{podio.tuEntrada.puntos.toLocaleString("es-ES")} pts</span>
+                <div className="mt-2 flex flex-col gap-0.5 rounded-lg bg-blue-50 p-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-blue-700">Tú · {podio.tuEntrada.posicion}º</span>
+                    <span className="font-medium text-blue-700">{podio.tuEntrada.puntos.toLocaleString("es-ES")} pts</span>
+                  </div>
+                  <p className="text-right text-[11px] text-blue-500">
+                    {podio.tuEntrada.cantidad} partes{podio.tuEntrada.ptsPromedio !== null ? ` · ${podio.tuEntrada.ptsPromedio.toFixed(1)} pts/p` : ""}
+                  </p>
                 </div>
               )}
             </>

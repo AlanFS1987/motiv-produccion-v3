@@ -1,9 +1,16 @@
 # 02 — App del responsable (comportamiento real)
 
-Roles que la usan: `responsable` (titular, con letra) y `suplente`.
-Shell: `App.tsx` con tres pestañas — **Turno**, **Resumen**, **Lotes**.
-Principalmente en móvil. Todo lo descrito aquí está construido salvo
-donde se indique.
+Rol que la usa: `responsable` (titular, con letra). El rol `suplente`
+existe en el enum pero no hay ninguna cuenta con él ni se creará
+(decisión cerrada, ver `01`, "Suplente y refuerzo") — la cobertura de
+turnos se hace siempre con las credenciales del titular, nunca con una
+cuenta aparte.
+
+Shell: `App.tsx` con cuatro pestañas arriba — **Turno**, **Resumen**,
+**Lotes**, **Historial** — más un botón flotante **Progreso** fijo
+abajo del todo, que abre un panel con toda la gamificación (Ranking,
+Ranking resp., Stats, Equipo, Logros — detalle en `04`). Principalmente
+en móvil. Todo lo descrito aquí está construido salvo donde se indique.
 
 ## Pestaña Turno (`TurnoScreen.tsx`)
 
@@ -14,7 +21,7 @@ el instante exacto del próximo cambio (`setTimeout` + `visibilitychange`).
 
 | Estado | Qué se ve | Qué se puede hacer |
 |---|---|---|
-| `descanso` | Mensaje "hoy es tu descanso" | Nada de gestión. Si hace falta trabajar: entrar como suplente. |
+| `descanso` | Mensaje "hoy es tu descanso" | Nada de gestión. Si hace falta cubrir el turno de otro: con las credenciales del titular que le toca (`01`). |
 | `antes` | Cuándo empieza el turno | Nada |
 | `abierto` | Tarjeta de refuerzo + 6 tarjetas de línea + incidencias generales + Cerrar turno | Todo |
 | `en_revision` | Igual, con aviso | Continuar partes ya abiertos, corregir partes cerrados, cerrar turno. **No** crear partes nuevos (nuevo lote / nuevo tono / continuar del turno anterior deshabilitados). |
@@ -141,6 +148,16 @@ orden y estado. Botón **Finalizar** / **Reabrir**. Reabrir a mano no
 limpia `resumen_calidad_enviado_at` (solo la reapertura automática por
 parte nuevo lo hace).
 
-## Lo que el responsable no tiene todavía
-Historial de partes propio y gamificación (puntos y niveles ya
-existen en BD, sin pantalla — `04`, `07`).
+## Pestaña Historial y botón Progreso
+
+**Historial** (`HistorialResponsableScreen.tsx`): reutiliza el mismo
+acordeón turno → línea → parte del jefe (`VistaDetalladaScreen`), con
+el filtro de responsable fijado al propio usuario y oculto. Es dato de
+trabajo, por eso vive como pestaña de arriba y no dentro de Progreso.
+
+**Progreso** (botón flotante, `ProgresoFlotante.tsx`): abre un panel
+con 5 sub-vistas — Ranking (de operarios), Ranking resp. (de
+responsables), Stats (avatar + 4 barras), Equipo (los operarios de su
+letra, con avatar y stats congeladas), Logros (18 propios). Toda la
+mecánica de puntos, niveles, ciclos y logros del responsable está
+descrita en `04`.

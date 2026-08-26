@@ -79,37 +79,40 @@ formato ┘
   también la fecha de ayer. `turno.cerrado_at` (manual o automático)
   prevalece sobre el cálculo.
 - **Quién puede abrir un turno**: un responsable solo el que le toca
-  por su letra (política RLS lo comprueba con `fn_turno_de_letra`); el
-  `suplente` cualquiera dentro de la franja.
+  por su letra (política RLS lo comprueba con `fn_turno_de_letra`). La
+  política también deja abrir cualquier turno dentro de la franja a un
+  rol `suplente`, pero esa vía queda sin uso en la práctica — ver más
+  abajo, "Suplente y refuerzo".
 - **Cierre de fábrica** (`cierre_fabrica`, fecha inicio/fin): trigger
   impide insertar turnos en ese rango. No tiene pantalla; se gestiona
   por SQL.
 
 ## Suplente y refuerzo
 
-- **Suplente** (responsable): una única cuenta ficticia `rol=suplente`,
-  sin letra, exenta del candado de rotación (política RLS de `turno`:
-  el suplente puede abrir cualquiera dentro de la franja). ⚠️ **Esa
-  cuenta no existe hoy en `usuario`** (comprobado 24/08/2026): todo lo
-  que se describe aquí está soportado por RLS y por el enum, pero sin
-  la fila creada nadie puede usarlo — ver `07`. Se mantiene
-  como cuenta compartida (decisión cerrada, sesión 19/08/2026): no se
-  amplía a que cualquier responsable pueda abrir turno de otra letra.
-  Dentro de un tramo cubierto por suplente no se distingue qué persona
-  física capturó cada parte — la trazabilidad es `turno.abierto_por` y
-  `parte.responsable_id`.
-- **Cobertura por fuerza mayor** (procedimiento, no código): si el
-  titular tiene
-  que abandonar el turno ya empezado, quien cubre **sigue con la
-  sesión ya abierta del titular** en el dispositivo — no cierra sesión
-  ni entra con otra cuenta. Como `parte.responsable_id` no cambia, el
-  UPDATE de los partes pendientes nunca choca con la política RLS
-  (`responsable_id = auth.uid()`). Si el titular no llega a incorporarse
-  desde el principio, el turno se abre directamente con la cuenta
-  `suplente`. Si la sesión del titular caduca o se cierra sola mientras
-  está ausente, quien cubre debe volver a entrar **con las credenciales
-  del titular** (no con las suyas propias ni con `suplente`) para no
-  romper la continuidad de `responsable_id` en los partes ya abiertos.
+- **Cuenta compartida `suplente`: descartada** (decisión cerrada,
+  sesión 25/08/2026). No se creará ninguna cuenta ficticia para cubrir
+  turnos. El rol `suplente` sigue existiendo como valor del enum
+  `rol_usuario` en BD (inofensivo, sin usarse activamente; no hay
+  necesidad de quitarlo del esquema), y la política RLS de `turno` que
+  le daría vía libre dentro de la franja también sigue ahí sin uso —
+  simplemente no hay ni habrá ninguna fila con ese rol en `usuario`.
+- **Cobertura por fuerza mayor** (procedimiento, no código): cuando uno
+  o dos responsables cubren a otro — tanto si el titular tiene que
+  abandonar un turno ya empezado como si no llega a incorporarse desde
+  el principio — **siempre se usan las credenciales del titular que se
+  está cubriendo**, nunca una cuenta aparte ni las credenciales propias
+  de quien cubre. En el caso de abandono a mitad de turno, quien cubre
+  simplemente sigue con la sesión ya abierta del titular en el
+  dispositivo — no cierra sesión ni entra con otra cuenta. Como
+  `parte.responsable_id` no cambia, el UPDATE de los partes pendientes
+  nunca choca con la política RLS (`responsable_id = auth.uid()`). Si
+  la sesión del titular caduca o se cierra sola mientras está ausente,
+  o si el titular no llega a incorporarse desde el principio, quien
+  cubre debe entrar **con las credenciales del titular** para no romper
+  la continuidad de `responsable_id` en los partes. Dentro de un tramo
+  cubierto así no se distingue qué persona física capturó cada
+  parte — la trazabilidad sigue siendo `turno.abierto_por` y
+  `parte.responsable_id`, ambos con la identidad del titular.
 - **Refuerzo** (operario): tabla `refuerzo_operario_turno`. El
   responsable da de alta a un operario que no es de su letra; solo
   entonces aparece en el desplegable de asignación a línea y el

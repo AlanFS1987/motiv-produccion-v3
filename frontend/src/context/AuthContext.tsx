@@ -18,7 +18,6 @@ export interface PerfilUsuario {
   username: string;
   rol: RolUsuario;
   letra: "A" | "B" | "C" | "D" | null;
-  generaciones_disponibles: number;
 }
 
 interface AuthContextValue {
@@ -45,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function cargarPerfil(userId: string) {
       const { data, error } = await supabase
         .from("usuario")
-        .select("id, username, rol, letra, generaciones_disponibles")
+        .select("id, username, rol, letra ")
         .eq("id", userId)
         .single();
 

@@ -22,9 +22,11 @@ nace de una foto o de un formulario. No hay modo offline (decisión
 cerrada: el OCR necesita red igualmente y la fábrica tiene wifi).
 
 Usuarios: **24 reales cargados** (4 responsables A/B/C/D, 17 operarios
-4/5/4/4, jefe, administrador, pantalla), máximo 30. ⚠️ **No existe la
-cuenta `suplente`** — hay que crearla antes del 31/08 (`07`). Roles del
-enum: `responsable`,
+4/5/4/4, jefe, administrador, pantalla), máximo 30. No hay ni habrá
+cuenta `suplente`: decisión cerrada (sesión 25/08/2026) de no usar una
+cuenta compartida para cubrir turnos — se cubre siempre con las
+credenciales del titular (`01`). El rol se queda en el enum, sin uso.
+Roles del enum: `responsable`,
 `suplente`, `operario`, `jefe`, `produccion`, `calidad`,
 `administrador`, `pantalla`, `jefe_rectificado`. Solo responsables y
 operarios llevan letra de rotación; el resto no. `jefe_rectificado`
@@ -65,7 +67,7 @@ está previsto (como `jefe`, solo lectura) pero sin shell propio todavía.
 | Telegram: incidencias calidad, incidencias producción, nuevos lotes, resumen de turno, resumen calidad | Construido |
 | Operario: Inicio (Inicio / Ranking / Stats+Avatar / Logros), Mi línea, Historial, Limpieza | Construido y probado en real |
 | Gamificación operario: puntos (rendimiento+piezas+limpieza), niveles, cierre de ciclo, stats, 19 logros sembrados, personaje RPG, datos de v2 migrados | **Construido** (`04`) |
-| Gamificación responsable: puntos (metros+rendimiento), niveles, cierre de ciclo, datos de v2 migrados | Construido en BD; **sin pantalla** y sin logros propios (`04`) |
+| Gamificación responsable: puntos (metros+rendimiento), niveles, cierre de ciclo (tabla propia `historial_ciclo_responsable`), pestaña "Progreso" (Ranking, Ranking resp., Stats, Equipo, Logros), 18 logros propios, historial de partes propio | **Construido** (`04`) |
 | Dashboard del jefe (Vista Rápida, Detallada, Incidencias) | Construido (`08`) |
 | Panel de administrador | Construido (`09`); faltan fusión de catálogo, vista de usuarios con bonus de nivel y botón "recalcular ciclo" |
 | Pantalla de fábrica (carrusel, rol `pantalla`) | Construido parcialmente: 3 de 5 diapositivas reales (`10`) |
@@ -134,7 +136,8 @@ está previsto (como `jefe`, solo lectura) pero sin shell propio todavía.
 
 ```
 frontend/src/
-  App.tsx                      shell del responsable (Turno/Resumen/Lotes); bifurca por rol a
+  App.tsx                      shell del responsable (Turno/Resumen/Lotes/Historial +
+                               botón flotante Progreso); bifurca por rol a
                                OperarioApp / JefeApp / AdminApp / PantallaCarrusel; RolSinInterfaz para el resto
   main.tsx                     <AuthProvider> + <ThemeProvider>
   context/AuthContext.tsx      sesión + perfil `usuario`
@@ -145,9 +148,10 @@ frontend/src/
     parte.ts                   crear/completar/corregir partes, sugerencias, lotes del turno anterior
     lote.ts                    gestión de lotes
     operario.ts                Mi línea, limpieza, verificación del operario
-    gamificacion.ts            puntos/nivel/personaje — genérico operario+responsable
+    gamificacion.ts            tipos NivelInfo/PersonajeInfo (reducido 25/08/2026)
     inicio-gamificacion.ts     tarjeta resumen de Inicio del operario
-    ranking.ts / logros.ts / stats-avatar.ts
+    equipo.ts                  pestaña Equipo del responsable (04)
+    ranking.ts / logros.ts / stats-avatar.ts   soportan rol operario+responsable
     dashboard-jefe.ts / dashboard-detallada.ts / dashboard-incidencias.ts
     admin-usuarios.ts / admin-partes.ts / admin-cierre-fabrica.ts / admin-checklist.ts
     pantalla-carrusel.ts / ceria.ts
@@ -160,8 +164,10 @@ frontend/src/
     ResumenScreen.tsx, GestionLotes.tsx, OperariosRefuerzoCard.tsx, ThemeSwitcher.tsx
     captura-parte/             wizard: hoja, tono, continuar, caja, codbar, pantalla, aviso
     incidencias/
+    responsable/               ProgresoFlotante (botón+panel), RankingResponsableScreen,
+                               EquipoScreen, HistorialResponsableScreen (04)
     operario/                  OperarioApp, InicioOperarioScreen (+Ranking/StatsAvatar/Logros), MiLinea, Historial, Limpieza, Verificacion*
-    jefe/                      JefeApp, VistaRapida, VistaDetallada, Incidencias
+    jefe/                      JefeApp, VistaRapida, VistaDetallada (+prop responsableFijo), Incidencias
     admin/                     AdminApp, AjustarLetras, CorreccionPartes, PruebaCamara, CierreFabrica, Checklist
     pantalla/                  PantallaCarrusel
     ceria/                     CeriaScreen
@@ -193,7 +199,9 @@ pantalla para ello (descartado a propósito, ver `09`).
   la semilla al crear el parte. Regla completa en `01`, sección
   "Asignación operario → línea".
 - Las políticas de UPDATE en `parte` para responsables exigen
-  `responsable_id = auth.uid()`: un suplente no puede completar un
-  parte abierto por el titular ni al revés. Procedimiento de cobertura
-  en `01`, "Suplente y refuerzo".
+  `responsable_id = auth.uid()`: quien cubre un turno de otro
+  responsable no puede completar un parte abierto por el titular con
+  su propia cuenta ni al revés — por eso la cobertura siempre se hace
+  con las credenciales del titular, nunca con una cuenta aparte.
+  Procedimiento completo en `01`, "Suplente y refuerzo".
 - Pendientes ordenados en `07-pendientes.md`.

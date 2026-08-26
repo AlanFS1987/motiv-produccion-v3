@@ -12,8 +12,9 @@ import { AdminApp } from "./components/admin/AdminApp";
 import { PantallaCarrusel } from "./components/pantalla/PantallaCarrusel";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { RolSinInterfaz } from "./components/RolSinInterfaz";
-
-type Pestana = "turno" | "resumen" | "lotes";
+import { HistorialResponsableScreen } from "./components/responsable/HistorialResponsableScreen";
+import { ProgresoFlotante } from "./components/responsable/ProgresoFlotante";
+type Pestana = "turno" | "resumen" | "lotes" | "historial";
 
 export default function App() {
   const { sesion, usuario, cargando, errorPerfil } = useAuth();
@@ -67,7 +68,7 @@ function AppAutenticada({ username }: { username: string }) {
     return <RolSinInterfaz rol={usuario?.rol ?? "desconocido"} />;
   }
   return (
-  <div className="min-h-screen bg-[var(--fondo)]">
+  <div className="flex min-h-screen flex-col bg-[var(--fondo)]">
       {/* Cabecero de ancho completo */}
       <header className="border-b border-[var(--borde)] bg-[var(--superficie)]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
@@ -99,20 +100,29 @@ function AppAutenticada({ username }: { username: string }) {
           <BotonPestana activa={pestana === "lotes"} onClick={() => setPestana("lotes")}>
             Lotes
           </BotonPestana>
+          <BotonPestana activa={pestana === "historial"} onClick={() => setPestana("historial")}>
+            Historial
+          </BotonPestana>
         </div>
       </div>
 
       {/* Contenido: se adapta al ancho disponible, sin quedarse en
           una tira estrecha en pantallas grandes ni desbordarse en
           móvil */}
-      <main className="mx-auto max-w-6xl p-4">
-        {pestana === "turno" ? (
-          <TurnoScreen />
-        ) : pestana === "resumen" ? (
-          <ResumenScreen />
-        ) : (
-          <GestionLotes />
-        )}
+      <main className="relative flex-1">
+        <div className="mx-auto max-w-6xl p-4 pb-24">
+          {pestana === "turno" ? (
+            <TurnoScreen />
+          ) : pestana === "resumen" ? (
+            <ResumenScreen />
+          ) : pestana === "lotes" ? (
+            <GestionLotes />
+          ) : (
+            <HistorialResponsableScreen />
+          )}
+        </div>
+
+        <ProgresoFlotante />
       </main>
     </div>
   );

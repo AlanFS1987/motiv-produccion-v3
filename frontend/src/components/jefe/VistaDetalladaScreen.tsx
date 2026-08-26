@@ -350,12 +350,12 @@ function BloqueTurno({ turno }: { turno: TurnoDetalle }) {
   );
 }
 
-export function VistaDetalladaScreen() {
+export function VistaDetalladaScreen({ responsableFijo }: { responsableFijo?: string } = {}) {
   const [fechaDesde, setFechaDesde] = useState(fechaISOHaceNDias(7));
   const [fechaHasta, setFechaHasta] = useState(fechaISOHaceNDias(0));
   const [turnoFiltro, setTurnoFiltro] = useState<"" | "M" | "T" | "N">("");
   const [lineaFiltro, setLineaFiltro] = useState("");
-  const [responsableFiltro, setResponsableFiltro] = useState("");
+  const [responsableFiltro, setResponsableFiltro] = useState(responsableFijo ?? "");
 
   const [lineasOpciones, setLineasOpciones] = useState<string[]>([]);
   const [responsablesOpciones, setResponsablesOpciones] = useState<string[]>([]);
@@ -370,13 +370,15 @@ export function VistaDetalladaScreen() {
       .select("nombre")
       .order("nombre")
       .then(({ data }) => setLineasOpciones((data ?? []).map((l) => l.nombre as string)));
-    supabase
-      .from("usuario")
-      .select("username")
-      .in("rol", ["responsable", "suplente"])
-      .order("username")
-      .then(({ data }) => setResponsablesOpciones((data ?? []).map((u) => u.username as string)));
-  }, []);
+    if (!responsableFijo) {
+      supabase
+        .from("usuario")
+        .select("username")
+        .in("rol", ["responsable", "suplente"])
+        .order("username")
+        .then(({ data }) => setResponsablesOpciones((data ?? []).map((u) => u.username as string)));
+    }
+  }, [responsableFijo]);
 
   async function buscar() {
     setCargando(true);
@@ -453,21 +455,23 @@ export function VistaDetalladaScreen() {
             ))}
           </select>
         </label>
-        <label className="flex flex-col text-xs text-slate-500">
-          Responsable
-          <select
-            value={responsableFiltro}
-            onChange={(e) => setResponsableFiltro(e.target.value)}
-            className="mt-0.5 rounded border border-slate-300 px-2 py-1 text-sm"
-          >
-            <option value="">Todos</option>
-            {responsablesOpciones.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-        </label>
+        {!responsableFijo && (
+          <label className="flex flex-col text-xs text-slate-500">
+            Responsable
+            <select
+              value={responsableFiltro}
+              onChange={(e) => setResponsableFiltro(e.target.value)}
+              className="mt-0.5 rounded border border-slate-300 px-2 py-1 text-sm"
+            >
+              <option value="">Todos</option>
+              {responsablesOpciones.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <button
           type="button"
           onClick={buscar}

@@ -79,23 +79,13 @@ export async function seleccionarPersonaje(personajeId: string): Promise<Persona
   return data as PersonajeInfo;
 }
 
-export async function obtenerGeneracionesDisponibles(usuarioId: string): Promise<number> {
-  const { data, error } = await supabase
-    .from("usuario")
-    .select("generaciones_disponibles")
-    .eq("id", usuarioId)
-    .single();
-  if (error) throw new Error(error.message);
-  return (data?.generaciones_disponibles as number | undefined) ?? 0;
-}
 
 // ---------------------------------------------------------------
 // Generaciones POR NIVEL (sesión 23/08/2026) — sustituye al contador
 // plano de arriba para el flujo real de "Generar avatar": cada nivel
 // alcanzado tiene sus propias 3 generaciones, y solo permiten generar
 // LA CARTA DE ESE NIVEL (con sus stats congeladas), no el nivel
-// actual en vivo. obtenerGeneracionesDisponibles() de arriba queda
-// sin uso en este flujo — se deja por si algo más la necesitara.
+// actual en vivo.
 // ---------------------------------------------------------------
 
 export interface NivelDisponibleGenerar {

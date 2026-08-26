@@ -1,8 +1,8 @@
 # 06 — Esquema de base de datos
 
 Contrastado con la BD real el 19/08/2026 y actualizado con cada
-migración hasta `20260824130000`. `supabase db diff --linked` sin
-diferencias (21/08/2026). Para regenerar: `information_schema.columns`,
+migración hasta `20260825200000` (sesión 25/08/2026: gamificación del
+responsable). Para regenerar: `information_schema.columns`,
 `pg_policies`, `pg_proc`, `cron.job`.
 
 Extensiones: `pg_trgm`, `pgcrypto`, `pg_cron`, `pg_net`.
@@ -25,12 +25,16 @@ Fila `telegram_webhook_secret`.
 
 **usuario** — id PK = `auth.users.id`, username unique, rol, letra
 (solo responsables y operarios; null para el resto),
-`generaciones_disponibles` (sin significado desde 23/08/2026 — el
-contador real es `personaje_stats_nivel.generaciones_usadas`; la
-columna sigue leyéndose en código, ver `07`), created_at. Índice
-único parcial: una sola fila con rol = suplente. 24 usuarios reales
-(4 responsables A/B/C/D, 17 operarios, jefe, admin, pantalla —
-comprobado 24/08/2026). La fila `suplente` **está sin crear** (`07`).
+`generaciones_disponibles` (sin significado desde 23/08/2026; ya no se
+lee en ningún sitio del código tras la limpieza de la sesión
+25/08/2026 — la columna sigue existiendo en la tabla, inofensiva),
+created_at. Índice único parcial: una sola fila con rol = suplente.
+24 usuarios reales (4 responsables A/B/C/D, 17 operarios, jefe, admin,
+pantalla — comprobado 24/08/2026). La fila `suplente` **no existe ni
+se creará**: decisión cerrada en sesión 25/08/2026 de no usar una
+cuenta compartida para cubrir turnos (detalle en `01`, "Suplente y
+refuerzo"); el índice único parcial y el rol del enum se quedan sin
+uso.
 
 **modelo / marca** — id, nombre, nombre_normalizado (trigger),
 created_at. Índice GIN trgm.
@@ -113,14 +117,27 @@ seleccionada. Índice único `uq_personaje_rpg_seleccionada`.
 resistencia, velocidad, vida congelados; `generaciones_usadas` int
 default 0 check 0-3. La existencia de la fila = nivel otorgado (`04`).
 
-**historial_ciclos** — usuario, rol, cycle_id, fecha_cierre,
-puntos_ciclo, puntos_piezas, puntos_rendimiento, puntos_limpieza
-(desglose solo para operarios), fuerza, resistencia, velocidad,
-m2_total, m2_std, m2_com, m2_contenedor, piezas_total, tiempo_*,
-piezas_por_formato jsonb; unique (usuario, cycle_id). Contiene los
-datos migrados de v2 (ciclos 1..6; 100 filas de operario + 23 de
-responsable, comprobado 24/08/2026 — `04`);
-el primer cierre automático real será el del ciclo 7 (28/09/2026).
+**historial_ciclos** — usuario, rol (redundante desde 25/08/2026,
+siempre `'operario'` — el responsable se separó a su propia tabla, ver
+siguiente; limpieza pendiente sin prisa, `07`), cycle_id, fecha_cierre,
+puntos_ciclo, puntos_piezas, puntos_rendimiento, puntos_limpieza,
+fuerza, resistencia, velocidad, m2_total, m2_std, m2_com, m2_contenedor,
+piezas_total, tiempo_*, piezas_por_formato jsonb; unique (usuario,
+cycle_id). Contiene los datos migrados de v2 de operario (ciclos 1..6,
+100 filas, comprobado 24/08/2026 — `04`); el primer cierre automático
+real será el del ciclo 7 (28/09/2026).
+
+**historial_ciclo_responsable** (25/08/2026) — la misma "foto de
+ciclo" que `historial_ciclos` pero para responsable, en tabla propia
+(no comparte fila con operario: columnas y vocabulario distintos,
+motivo en `04`). usuario_id, cycle_id, fecha_cierre, puntos_ciclo,
+m2_total, m2_contenedor, m2_com, m2_std, minutos_plena,
+minutos_no_alimentada, minutos_saturacion, minutos_banco,
+minutos_maquina, verificaciones_codbar, puntos_equipo_ciclo,
+operario_gano_ciclo, turnos_trabajados, fuerza, resistencia, velocidad;
+unique (usuario_id, cycle_id). 23 filas migradas de v2 (ciclos 1..6,
+desde `responsable_ledger`, comprobado 25/08/2026 — `04`); se escribe
+solo vía `fn_cerrar_ciclos_pendientes` o backfill manual.
 
 **ceria_prompts**, **ceria_conversaciones**, **ceria_mensajes** — `11`.
 
@@ -152,9 +169,20 @@ Producción/stats/logros operario: `v_piezas_operario_formato_ciclo` →
 Responsable: `v_metros_responsable_por_turno` →
 `v_puntos_metros_responsable_por_turno`,
 `v_rendimiento_responsable_por_turno`,
-`v_puntos_rendimiento_responsable_ciclo`, `v_metros_responsable_ciclo`,
+`v_puntos_rendimiento_responsable_ciclo`, `v_metros_responsable_ciclo`
+(ahora también da m² por categoría),
 `v_puntos_metros_responsable_ciclo` → `v_puntos_responsable_ciclo`,
-`v_tiempo_responsable_ciclo`, `v_puntos_responsable_total_vida`.
+`v_tiempo_responsable_ciclo` (ahora los 5 tiempos por separado),
+`v_puntos_responsable_total_vida` (reescrita 25/08/2026 para sumar
+`historial_ciclo_responsable`, ver nota de bug más abajo).
+
+Gamificación responsable — nuevas 25/08/2026:
+`v_verificaciones_codbar_responsable_ciclo`,
+`v_operarios_de_responsable_ciclo` → `v_puntos_equipo_responsable_ciclo`,
+`v_partes_operario_ciclo` (para operario), `v_turnos_responsable_ciclo`,
+`v_equipo_avatar_stats` (avatar + stats **congeladas**, primera vista
+del proyecto así), `v_ganador_por_ciclo_responsable` +
+`v_veces_lider_indiscutible`. Detalle de cada una en `04`.
 
 Personaje/admin: `v_niveles_disponibles_generar`,
 `v_admin_usuarios_gamificacion`.
@@ -176,12 +204,12 @@ Personaje/admin: `v_niveles_disponibles_generar`,
 | `fn_buscar_modelo_similar`, `fn_buscar_marca_similar` | pg_trgm, top 5 |
 | `fn_notificar_telegram()`, `fn_disparar_resumen_turno(uuid)`, `fn_disparar_resumen_calidad()` | security definer, leen app_secrets, `net.http_post` |
 | `fn_encolar_resumenes_turno_pendientes()` | cierre automático + reintento |
-| `fn_cerrar_ciclos_pendientes()` | security definer, idempotente (`04`) |
+| `fn_cerrar_ciclos_pendientes()` | security definer, idempotente; escribe en `historial_ciclos` (operario) y `historial_ciclo_responsable` (responsable, tabla separada desde 25/08/2026), cada bloque con su propio `not exists` (`04`) |
 | `fn_nivel_actual(uuid)` | security definer, stable |
 | `fn_guardar_personaje_generado(uuid, uuid, text, text)` | security definer, atómico; la llama `generar-personaje` |
 | `fn_consumir_generacion_nivel(p_usuario_id, p_nivel_id)`, `fn_devolver_generacion_nivel(…)` | security definer, ejecución **solo service_role** |
 | `fn_seleccionar_personaje(p_personaje_id)` | security definer, `auth.uid()`; la llama el cliente |
-| `fn_otorgar_bonus_nivel(uuid)` | security definer, idempotente; botón del admin (`04`) |
+| `fn_otorgar_bonus_nivel(uuid)` | security definer, idempotente; botón del admin (`04`). Reparada 25/08/2026: quitada la llamada muerta a `fn_otorgar_generaciones_por_nivel`, `velocidad` ahora con `coalesce`, y añadido `#variable_conflict use_column;` para resolver la ambigüedad `nivel_id` (parámetro de salida vs. columna) que la hacía fallar con error `42702` |
 | `fn_consumir_generacion(uuid)`, `fn_otorgar_generaciones_por_nivel` | modelo antiguo de contador plano, sin uso; sin borrar |
 
 Eliminada: `fn_es_responsable_de_turno` (21/08/2026, sin uso y con
@@ -214,6 +242,7 @@ llama):
 | personaje_rpg | propio; jefe; admin | propio; admin | propio | — |
 | personaje_stats_nivel | propio; admin | — (solo funciones definer) | — | — |
 | historial_ciclos | propio; jefe; admin; operario/responsable/pantalla (ranking, 24/08) | — | — | — |
+| historial_ciclo_responsable | propio; `fn_rol_actual() in ('responsable','jefe','administrador','pantalla')` (25/08) | — | solo `fn_cerrar_ciclos_pendientes` (security definer) o backfill manual | — |
 | usuario | cualquier rol conocido (24/08) | — | admin | — |
 | configuracion | `configuracion_select_autenticados`: cualquier autenticado (lo necesitan `rotacion.ts` y la pantalla) | admin | admin | admin |
 | modelo, marca, formato, producto, linea, checklist_items, logros_definicion, puntos_*, niveles, cierre_fabrica | autenticados | admin | admin | admin |

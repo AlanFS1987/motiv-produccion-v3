@@ -252,11 +252,10 @@ Deno.serve(async (req: Request) => {
   });
 
   // ══════════════════════════════ FASE 1 — elegir herramienta ═════
-  const historialSinUltimo = historialLimpio.slice(0, -1);
   const fase1 = await llamarOpenAI({
     messages: [
       { role: "system", content: buildSystemPrompt(fechaActual) },
-      ...historialSinUltimo,
+      ...historialLimpio,
       { role: "user", content: pregunta },
     ],
     tools: TOOLS,
