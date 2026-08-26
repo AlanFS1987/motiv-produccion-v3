@@ -35,68 +35,49 @@ propias pestañas de gestión.
   "Cámara", solo de test, no toca ningún parte ni sube nada a
   Cloudinary. Deja probar **tanto la cámara nativa** (`<input
   capture="environment">`, el método que usaba v2 y que el resto de
-  la app abandonó por el bug de recarga en varios Xiaomi) **como la
-  cámara en vivo del navegador** (`useCamaraLive`, el método actual en
-  producción), una junto a la otra, para comparar nitidez/tamaño de
-  archivo y comprobar si el bug de recarga sigue dándose en el
-  dispositivo de turno. Confirmado en sesión 21/08/2026 en un Redmi
-  Note 12 Pro+: la cámara nativa sigue recargando la app — sigue sin
-  ser una opción viable para el flujo real, se mantiene la cámara en
-  vivo. Pendiente de investigar la causa exacta (aparentemente ligada
-  a que Chrome/MIUI descarta la pestaña en 2º plano, no a falta de
-  RAM — a confirmar con `chrome://discards`).
+  la app abandonó por el bug de recarga) **como la cámara en vivo del
+  navegador** (`useCamaraLive`, el método actual en producción), una
+  junto a la otra, para comparar nitidez/tamaño de archivo y
+  comprobar si el bug de recarga sigue dándose en el dispositivo de
+  turno.
+
+  **Investigación cerrada por el momento (sesión 26/08/2026)**: se
+  probaron varias correcciones a distintos niveles durante horas
+  (sin éxito, sin listar aquí cada intento individual) y el bug
+  persiste. Se confirmó además que **no es un problema de gama del
+  dispositivo**: se probó en un Redmi Note 12 Pro+ (gama media-alta,
+  el mismo modelo ya probado en sesión 21/08/2026) con la batería en
+  modo "Máximo rendimiento" (sin ninguna restricción de MIUI activa)
+  y el bug sigue dándose igual — descarta tanto "falta de RAM" como
+  "gestión agresiva de batería de MIUI" como causa.
+
+  Hipótesis final, sin confirmar: **descarte de pestañas en segundo
+  plano por el propio Chrome** (`chrome://discards`), independiente de
+  MIUI — al abrir la app de Cámara nativa, la pestaña pasa a segundo
+  plano de verdad (como cambiar de app) y Chrome puede liberar su
+  memoria por su cuenta; a diferencia de las apps nativas, no existe
+  ningún ajuste de usuario para eximir una pestaña concreta de esto.
+  Si esta hipótesis es correcta, no hay arreglo posible desde el
+  código de la app ni desde ajustes del sistema — solo evitar el
+  patrón `<input capture>` por completo, que es lo que ya se hace en
+  producción con `useCamaraLive`.
+
+  **Solución permanente**: cámara en vivo (`useCamaraLive`), ya en
+  producción en todos los flujos reales — la pestaña nunca pierde el
+  foco, así que nunca se dispara el descarte. La cámara nativa se
+  mantiene solo aquí, en esta pantalla de test, por si en el futuro
+  cambia el comportamiento de Chrome/MIUI y vale la pena reconsiderarla.
+
+  **Línea abierta, sin plan concreto todavía**: probar el mismo flujo
+  con la app instalada como PWA (modo standalone) en vez de como
+  pestaña de Chrome — conectado con el punto de PWA en `07`,
+  "Por construir". Expectativa baja: si la causa real es el descarte
+  de Chrome y no la gestión de apps de MIUI, pasar a PWA no debería
+  cambiar nada (ya se descartó también la vía de la excepción de
+  batería, que sí aplicaría distinto a una PWA instalada que a una
+  pestaña suelta).
 
 - **Cambio de rol** (`admin/AjustarLetrasScreen.tsx`, mismo lib
   `admin-usuarios.ts`) — en la misma pantalla de Rotación, además de
   la letra, se puede cambiar el rol de cualquier usuario entre
   responsable/suplente/operario/jefe/producción/calidad.
-  **⚠️ Revisar**: la decisión de sesión 25/08/2026 (`01`, "Suplente y
-  refuerzo") cierra que no se creará ninguna cuenta `suplente`; esta
-  pantalla sigue ofreciéndolo como opción de rol asignable, lo que
-  permitiría crear justo lo que se descartó. Pendiente decidir si se
-  quita de la UI o se deja a criterio del admin. Al pasar a
-  un rol sin letra se limpia `letra` en el mismo UPDATE. `suplente`
-  sigue siendo fila única (índice parcial existente) — el error de
-  Postgres se muestra tal cual si se intenta duplicar. Ascender a
-  `administrador` está bloqueado con doble barrera: la UI no lo
-  ofrece como opción, y además un trigger en BD
-  (`fn_bloquear_ascenso_admin`, migración
-  `20260821230000_bloquear_ascenso_admin.sql`) rechaza cualquier
-  UPDATE que ponga `rol = 'administrador'` viniendo de un rol
-  distinto — probado en real forzando el valor desde el inspector del
-  navegador. El alta de la primera cuenta admin sigue siendo por SQL
-  a mano (INSERT), eso no lo toca el trigger.
-- **Cierre de fábrica** (`admin/CierreFabricaScreen.tsx`,
-  `lib/admin-cierre-fabrica.ts`) — alta/baja de periodos de
-  vacaciones sobre `cierre_fabrica` (listado + formulario
-  desde/hasta + eliminar). La tabla y el trigger de bloqueo
-  (`fn_bloquear_turno_en_cierre`) ya existían; esto era solo la
-  pantalla. Permisos ya cubiertos por la política
-  `cierre_fabrica_admin_todo`, sin migración nueva.
-- **Checklist de limpieza** (`admin/ChecklistScreen.tsx`,
-  `lib/admin-checklist.ts`) — activar/desactivar los 6 ítems de
-  `checklist_items` y ajustar sus puntos. Un ítem desactivado
-  desaparece de la pantalla de Limpieza del operario
-  (`obtenerLineasParaLimpieza` ya filtra `activo = true`); el
-  histórico de `operario_checklist` no se toca. Permisos ya cubiertos
-  por `checklist_items_admin_todo`, sin migración nueva.
-- **Recalcular ciclo anterior** — sin pantalla: se llama a mano
-  `select fn_cerrar_ciclos_pendientes();` desde el SQL Editor (es
-  idempotente, `04`).
-
-## Por construir (detalle y orden en `07`)
-
-- Botón "Recalcular ciclo anterior" en la UI (vista de usuarios con
-  puntos/nivel/botón "otorgar nivel" ya construida, ver más arriba).
-- Fusión de modelos/marcas/productos/lotes duplicados (el OCR crea
-  registros nuevos por typos). Hoy por SQL a mano. Necesita Edge
-  Function con `service_role`.
-
-## Descartado (decisión de sesión)
-
-- **Alta de usuarios desde la app** — se queda en SQL a mano
-  (`Dashboard → Authentication → Add user` + `INSERT` en `usuario`).
-  Riesgo de seguridad valorado como mayor que la comodidad ganada,
-  dado el tamaño de la fábrica (máx. 30 usuarios): automatizarlo mal
-  abriría la puerta a que cualquier fallo de validación de rol en el
-  frontend permitiera crear una cuenta `administrador`.

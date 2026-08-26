@@ -19,50 +19,61 @@ ambigüedad `nivel_id` en `fn_otorgar_bonus_nivel`).
 
 ## Verificaciones pendientes con casos reales
 
-7. Cierre automático de turno por cron + envío a Telegram: el cron
-   `resumenes-turno-pendientes` corre cada hora y termina bien
-   (comprobado 24/08), pero el camino completo con un turno real sin
-   cerrar nunca se ha visto. Forzable con
-   `select fn_encolar_resumenes_turno_pendientes();`.
 8. Primer cierre real de ciclo: lunes 28/09/2026, 8:00 Madrid (ciclo
    7). El cron `cerrar-ciclos-pendientes` ya corre los lunes sin error
    (devuelve 0 filas porque los ciclos 1..6 ya tienen fila).
-9. Camino "Continuar mismo lote+tono" con cambio de turno real: sin
-   probar de punta a punta.
+
 10. Tras el lanzamiento del 31/08, con partes reales: Ranking del
     ciclo actual (operario y responsable), Equipo, Historial del
     responsable, Vista Detallada del jefe, Logros (operario y
     responsable).
-11. `[VERIFICAR]` nombres de secrets con `supabase secrets list` (el
-    `telegram_webhook_secret` de `app_secrets` existe, 19 caracteres —
-    comparar byte a byte) y ajustes de seguridad del preset
-    `motiv_v3_personajes` en Cloudinary (`05`).
-12. Cámara nativa recarga la app en Xiaomi/Redmi — investigación
-    abierta, estado en `09`.
-13. Confirmar que el botón "otorgar generaciones" también funciona
-    para operarios tras el fix de `#variable_conflict` en
-    `fn_otorgar_bonus_nivel` (probablemente sí — nunca se había
-    disparado el bug con ellos porque ya venían con generaciones desde
-    el seed inicial; no confirmado explícitamente, ver `04`).
+
+11. Confirmar en el linter de Supabase (Database → Advisors) que tras
+    aplicar `..._fix_search_path_20_funciones.sql`,
+    `function_search_path_mutable` baja a 0 filas — la primera vez que
+    se intentó aplicar falló por colisión de nombre de migración
+    (`schema_migrations_pkey` duplicado, mismo prefijo `20260826` que
+    otra migración del mismo día) y se corrigió renombrando el
+    archivo, sin confirmar todavía que quedó aplicada. De paso probar
+    en real que los 4 flujos afectados por las restricciones de RPC
+    del 26/08/2026 siguen funcionando: generar personaje/avatar,
+    botón "otorgar generaciones" del admin, y el cierre de ciclo (vía
+    cron, la próxima vez que corra).
 
 ## Decisiones por tomar
 
-- Modelo principal de OCR: GPT-4o-mini (principal hoy) vs Claude Haiku
-  (fallback). En prueba de coste/calidad desde 20/08, sin fecha.
-- `[DECISIÓN PENDIENTE]` umbral de "minutos atípicos" (hoy 600).
-- Identificador de modelo de OCR fijo en código: moverlo a
-  configuración/secret para no redesplegar cuando se retire.
-- Migraciones duplicadas de mismo propósito (`20260816230000`/
-  `20260816230001` resumen automático; `20260820220000`/
-  `20260821220000` seeds de Ceria): resultado en BD correcto, pero
-  confusas. Squash general de migraciones antes del 31/08 (no hay
-  datos reales de v3 todavía).
+- `extension_in_public`: `pg_trgm` vive en el esquema `public` en vez
+  de uno propio (`extensions`). Cosmético, sin prisa (lint de
+  seguridad 26/08/2026, ver `06`).
+- `auth_leaked_password_protection`: comprobación de contraseñas
+  filtradas (HaveIBeenPwned) desactivada en Supabase Auth. Toggle en
+  el panel, sin código — pendiente decidir si se activa (lint de
+  seguridad 26/08/2026, ver `06`).
+
+## Seguridad — pendiente de un refactor concreto
+
+- `fn_disparar_resumen_turno(uuid)` sigue expuesta a `anon`/
+  `authenticated` vía RPC (lint de seguridad 26/08/2026, ver `06`). A
+  diferencia de las otras 10 funciones `security definer` señaladas
+  por el linter, esta la llama un trigger NO `security definer`
+  (`fn_trigger_resumen_turno_cierre`), que corre con los permisos de
+  quien cierra el turno de verdad — restringirla sin más rompería el
+  cierre manual de turno en producción. Requiere hacer también ese
+  trigger `security definer` antes de poder restringir la función sin
+  riesgo. Dejada fuera a propósito de la migración de seguridad del
+  26/08/2026, junto con las otras 10.
 
 ## Por construir (orden sugerido)
 
 1. Admin: botón "Recalcular ciclo anterior" (hoy por SQL Editor;
    la vista de usuarios con puntos/nivel/botón "otorgar nivel" ya
-   está construida, ver `04`/`09`).
+   está construida, ver `04`/`09`). Nota 26/08/2026: cuando se
+   construya, `fn_cerrar_ciclos_pendientes` ya no tiene `GRANT` para
+   `authenticated` (restringida a `service_role` por seguridad) — el
+   botón necesitará o bien llamarla vía Edge Function con
+   `service_role`, o bien devolverle el `GRANT` y añadirle un check de
+   `fn_rol_actual() = 'administrador'` (mismo patrón ya usado en
+   `fn_otorgar_bonus_nivel`, ver `06`).
 2. Admin: fusión de modelos/marcas/productos/lotes duplicados (Edge
    Function con `service_role`).
 3. `personaje_stats_nivel` para los 4 responsables migrados de v2
@@ -79,6 +90,12 @@ ambigüedad `nivel_id` en `fn_otorgar_bonus_nivel`).
    `12`).
 8. PWA; retención de 18 meses en Cloudinary (automatizar el borrado
    de huérfanas requeriría Edge Function con `service_role`).
+9. Squash de migraciones — ya desbloqueado: las 3 tablas temporales
+   del import v2 (`staging_responsable_v2`, `stg_migracion_v2`,
+   `tmp_puntos_turno`) se borraron el 26/08/2026, confirmado que nada
+   dependía de ellas. Listo para ejecutar en cuanto se confirme el
+   punto 11 de arriba (mejor squashear con el esquema de seguridad ya
+   verificado en real, no a medias).
 10. Shell para `jefe_rectificado` (como jefe, solo lectura) — previsto,
     sin prisa.
 11. Base de conocimiento de averías — no empezado.

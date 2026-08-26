@@ -1,9 +1,10 @@
 # 06 — Esquema de base de datos
 
 Contrastado con la BD real el 19/08/2026 y actualizado con cada
-migración hasta `20260825200000` (sesión 25/08/2026: gamificación del
-responsable). Para regenerar: `information_schema.columns`,
-`pg_policies`, `pg_proc`, `cron.job`.
+migración hasta `20260826` (sesión 26/08/2026: limpieza de tablas
+temporales de la migración v2, y endurecimiento de seguridad — RPCs
+`security definer` expuestas de más y `search_path` fijo en todas las
+funciones, a raíz del linter de Supabase).
 
 Extensiones: `pg_trgm`, `pgcrypto`, `pg_cron`, `pg_net`.
 
@@ -142,11 +143,21 @@ solo vía `fn_cerrar_ciclos_pendientes` o backfill manual.
 
 **ceria_prompts**, **ceria_conversaciones**, **ceria_mensajes** — `11`.
 
+**Tablas temporales del import v2 → v3 — eliminadas 26/08/2026**:
+`staging_responsable_v2`, `stg_migracion_v2`, `tmp_puntos_turno`
+cumplieron su función de backfill (ver `04`, `historial_ciclo_responsable`)
+y no formaban parte del diseño de v3. Verificado antes de borrar que
+ningún objeto (vista/función/trigger) dependía de ellas. Deja el
+camino libre para el squash de migraciones (`07`).
+
 ## Vistas
 
 Todas sin `security_invoker`: se evalúan como el owner y saltan RLS
 (convención en `CLAUDE.md`). Es lo que permite que `pantalla`, Ranking
-y Logros lean agregados de tablas cuya RLS no les cubre.
+y Logros lean agregados de tablas cuya RLS no les cubre. El linter de
+Supabase marca las 49 vistas del proyecto como `security_definer_view`
+(nivel ERROR) — es exactamente este comportamiento por diseño, no un
+hueco: revisado en sesión 26/08/2026, no requiere ningún cambio.
 
 Dashboard (`08`): `v_produccion_turno`, `v_calidad_turno`,
 `v_calidad_modelo`, `v_calidad_lote`.
@@ -194,6 +205,11 @@ Personaje/admin: `v_niveles_disponibles_generar`,
 
 ## Funciones
 
+Todas las funciones del esquema tienen `search_path` fijo
+(`set search_path = public`) desde el 26/08/2026 — antes 20 de ellas
+no lo tenían (lint `function_search_path_mutable`). `ALTER FUNCTION
+... SET search_path`, sin tocar el cuerpo de ninguna.
+
 | Función | Notas |
 |---|---|
 | `fn_rol_actual()` | security definer, stable, `set search_path = public` |
@@ -207,14 +223,15 @@ Personaje/admin: `v_niveles_disponibles_generar`,
 | `fn_parte_set_formato_id()` | trigger before insert en parte |
 | `fn_calcular_calibre_com_pct()` | trigger before insert/update en parte |
 | `fn_buscar_modelo_similar`, `fn_buscar_marca_similar` | pg_trgm, top 5 |
-| `fn_notificar_telegram()`, `fn_disparar_resumen_turno(uuid)`, `fn_disparar_resumen_calidad()` | security definer, leen app_secrets, `net.http_post` |
+| `fn_notificar_telegram()`, `fn_disparar_resumen_calidad()` | security definer, leen app_secrets, `net.http_post` |
+| `fn_disparar_resumen_turno(uuid)` | security definer, lee app_secrets, `net.http_post`. **Pendiente de restringir** (`07`): la llama un trigger no-definer (`fn_trigger_resumen_turno_cierre`) que corre con los permisos de quien cierra el turno de verdad — restringir su ejecución a `service_role` sin antes hacer también ese trigger `security definer` rompería el cierre manual de turno. Sigue expuesta a `anon`/`authenticated` vía RPC (lint 26/08/2026, sin arreglar a propósito) |
 | `fn_encolar_resumenes_turno_pendientes()` | cierre automático + reintento |
-| `fn_cerrar_ciclos_pendientes()` | security definer, idempotente (`on conflict do update`); escribe en `historial_ciclos` (operario) y `historial_ciclo_responsable` (responsable, tabla separada desde 25/08/2026). **Sin `not exists` desde las reescrituras del 25/08**: recorre TODO `cycle_id` anterior al actual con datos en las vistas en vivo y sobrescribe cualquier fila que ya exista — ya no distingue "cerrar por primera vez" de "recalcular a propósito". Detalle y por qué no es un riesgo hoy en `04` |
-| `fn_nivel_actual(uuid)` | security definer, stable |
-| `fn_guardar_personaje_generado(uuid, uuid, text, text)` | security definer, atómico; la llama `generar-personaje` |
+| `fn_cerrar_ciclos_pendientes()` | security definer, idempotente (`on conflict do update`); escribe en `historial_ciclos` (operario) y `historial_ciclo_responsable` (responsable, tabla separada desde 25/08/2026). **Sin `not exists` desde las reescrituras del 25/08**: recorre TODO `cycle_id` anterior al actual con datos en las vistas en vivo y sobrescribe cualquier fila que ya exista — ya no distingue "cerrar por primera vez" de "recalcular a propósito". Detalle y por qué no es un riesgo hoy en `04`. Ejecución **solo service_role** desde 26/08/2026 (lint de seguridad: sin caller legítimo por RPC hoy — la dispara solo el cron; cuando se construya el botón admin "Recalcular ciclo anterior", ver `07`, decidir entre check de rol o llamada vía Edge Function) |
+| `fn_nivel_actual(uuid)` | security definer, stable. Ejecución **solo service_role** desde 26/08/2026 — su propio comentario ya decía que no estaba pensada como RPC libre; hoy solo la usa internamente `fn_otorgar_bonus_nivel` |
+| `fn_guardar_personaje_generado(uuid, uuid, text, text)` | security definer, atómico; la llama `generar-personaje`. Ejecución **solo service_role** desde 26/08/2026 (lint de seguridad: no tenía `auth.uid()` ni restricción de ejecución — cualquiera con la clave anon podía insertar un personaje arbitrario para cualquier usuario_id) |
 | `fn_consumir_generacion_nivel(p_usuario_id, p_nivel_id)`, `fn_devolver_generacion_nivel(…)` | security definer, ejecución **solo service_role** |
 | `fn_seleccionar_personaje(p_personaje_id)` | security definer, `auth.uid()`; la llama el cliente |
-| `fn_otorgar_bonus_nivel(uuid)` | security definer, idempotente; botón del admin (`04`). Reparada 25/08/2026: quitada la llamada muerta a `fn_otorgar_generaciones_por_nivel`, `velocidad` ahora con `coalesce`, y añadido `#variable_conflict use_column;` para resolver la ambigüedad `nivel_id` (parámetro de salida vs. columna) que la hacía fallar con error `42702` |
+| `fn_otorgar_bonus_nivel(uuid)` | security definer, idempotente; botón del admin (`04`). Reparada 25/08/2026: quitada la llamada muerta a `fn_otorgar_generaciones_por_nivel`, `velocidad` ahora con `coalesce`, y añadido `#variable_conflict use_column;` para resolver la ambigüedad `nivel_id` (parámetro de salida vs. columna) que la hacía fallar con error `42702`. **26/08/2026 (lint de seguridad)**: añadida comprobación interna `fn_rol_actual() = 'administrador'` — antes cualquier usuario autenticado, o incluso anon, podía llamarla con cualquier usuario_id y auto-otorgarse el bonus sin pasar por el admin. El botón del frontend sigue llamándola igual (sesión propia del admin, rol `authenticated`), así que no se le tocó el `GRANT` |
 | `fn_consumir_generacion(uuid)`, `fn_otorgar_generaciones_por_nivel` | modelo antiguo de contador plano, sin uso; sin borrar |
 
 Eliminada: `fn_es_responsable_de_turno` (21/08/2026, sin uso y con
@@ -222,15 +239,39 @@ bug de diseño).
 
 **Patrón de seguridad de RPCs `security definer`** (depende de QUIÉN
 llama):
-- Llamadas directamente por el cliente: NUNCA reciben `usuario_id`,
-  resuelven `auth.uid()` (ej. `fn_seleccionar_personaje`). Un id que
-  manda el cliente sería explotable al saltarse RLS.
+- Llamadas directamente por el cliente, sin lógica de rol: NUNCA
+  reciben `usuario_id`, resuelven `auth.uid()` (ej.
+  `fn_seleccionar_personaje`). Un id que manda el cliente sería
+  explotable al saltarse RLS.
 - Llamadas desde una Edge Function con `service_role`: `auth.uid()`
   siempre es `null`, así que reciben `p_usuario_id` (ya validado por
   JWT en la función) y se restringe la ejecución a `service_role`
   (`revoke execute from public, authenticated, anon`). Ej.
-  `fn_consumir_generacion_nivel`. Se aprendió a base de fallo real
-  ("No hay sesión activa" en producción, 23/08/2026).
+  `fn_consumir_generacion_nivel`, y desde 26/08/2026 también
+  `fn_guardar_personaje_generado`, `fn_nivel_actual`,
+  `fn_cerrar_ciclos_pendientes`, `fn_disparar_resumen_calidad`. Se
+  aprendió a base de fallo real ("No hay sesión activa" en
+  producción, 23/08/2026).
+- Llamadas directamente por el cliente CON `usuario_id` como
+  parámetro, cuando la función necesita actuar sobre un usuario
+  distinto de quien llama (ej. el admin otorgando algo a otro): el
+  `GRANT` a `authenticated` se mantiene, pero el cuerpo comprueba
+  `fn_rol_actual()` y lanza excepción si no es el rol esperado. Único
+  caso hoy: `fn_otorgar_bonus_nivel` (comprobación añadida
+  26/08/2026, antes no existía — ver tabla de arriba). A diferencia
+  del patrón anterior, aquí la barrera vive DENTRO de la función, no
+  en el `GRANT`, porque el caller legítimo sigue siendo un `authenticated`
+  normal (el admin), no un `service_role`.
+
+Auditoría completa de las 11 funciones `security definer` señaladas
+por el linter de Supabase (26/08/2026): 5 reparadas (arriba), 1
+pendiente (`fn_disparar_resumen_turno`), y 5 sin acción por ser
+seguras tal cual o no ser invocables por RPC en la práctica —
+`fn_seleccionar_personaje` y `fn_rol_actual` (ya usan `auth.uid()`
+correctamente); `fn_notificar_telegram`, `fn_marcar_corregido_no_vigente`
+y `fn_bloquear_ascenso_admin` (funciones de trigger, `returns trigger`
+— Postgres no permite ejecutarlas fuera de un trigger real, así que
+el linter las marca pero no son explotables vía RPC).
 
 ## Políticas RLS (permisivas, se combinan con OR)
 
@@ -259,3 +300,12 @@ La pantalla de fábrica no lee `parte`: lee vistas (owner). Desde
 Nota: el comentario final de `20260101000010_rls.sql` ("rol pantalla
 sin login, service_role desde el backend") describe un diseño
 descartado — el real es con login (`10`). La migración no se edita.
+
+## Extensiones y otras notas de seguridad (26/08/2026)
+
+- `pg_trgm` vive en el esquema `public` (lint `extension_in_public`).
+  Cosmético — pendiente decidir si se mueve a un esquema `extensions`
+  dedicado (`07`).
+- `auth_leaked_password_protection` (comprobación de contraseñas
+  filtradas contra HaveIBeenPwned) está desactivado en Supabase Auth.
+  Toggle en el panel, sin código — pendiente de decidir (`07`).
