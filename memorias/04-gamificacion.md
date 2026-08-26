@@ -439,11 +439,28 @@ bloques (`on conflict do update`): la misma llamada sirve para
 `cerrar-ciclos-pendientes` (lunes 8:00 Madrid, detalle en `05`); si el
 cron falla un lunes, el siguiente cierra lo que falte.
 
-**Ojo**: el `not exists` es a nivel de `cycle_id`, no por usuario, en
-cada tabla por separado. Si un ciclo ya tiene alguna fila (p. ej. por
-migración de datos) el cron lo salta entero para ese rol; producción
-real de ese ciclo habría que cerrarla a mano. No aplica al ciclo 6
-(fábrica parada hasta el 31/08).
+**Ojo (revisado 26/08/2026)**: la versión final de la función (tras
+las reescrituras del 25/08 al añadir columnas a
+`historial_ciclo_responsable`) ya **no tiene ningún `not exists`**: el
+bucle recorre todo `cycle_id` anterior al actual con datos en las
+vistas en vivo, y el `on conflict do update` sobrescribe la fila
+exista o no. Ya no distingue "cerrar por primera vez" de "recalcular
+un ciclo a propósito" — ambos casos hacen lo mismo.
+
+En la práctica esto no es un riesgo: para que se sobrescriba un ciclo
+migrado de v2 (1-6) haría falta que alguien abra el cierre de fábrica
+antes de tiempo, se complete un parte con fecha ≤ 30/08, y corra la
+función antes de borrar ese parte — `fn_bloquear_turno_en_cierre`
+bloquea la creación de turnos (y por tanto de partes) en cualquier
+rango de `cierre_fabrica`, admin incluido, así que no puede ocurrir
+por accidente mientras el cierre esté activo. A partir del 31/08 el
+ciclo actual siempre será ≥7, así que el bucle no vuelve a tocar los
+ciclos 1-6 en ningún caso futuro.
+
+Si algún día se quiere blindar estructuralmente (para que
+"recalcular ciclo anterior" nunca pueda alcanzar un ciclo migrado),
+la opción más simple es restringir el bucle a
+`v_cycle_id = v_ciclo_actual - 1`. No implementado, prioridad baja.
 
 **Nota de tipos**: la inicialización interna
 `v_ciclo_actual := fn_ciclo_id(now()::date)` necesita el cast explícito
@@ -490,8 +507,10 @@ y un contador persistido volvería a desincronizarse como en v2. En su
 lugar **el administrador otorga el nivel a mano**: `fn_otorgar_bonus_nivel(usuario_id)`
 guarda el snapshot del nivel actual (idempotente; si ya tenía fila,
 `otorgado=false`). Vista de apoyo `v_admin_usuarios_gamificacion`
-(puntos, siguiente nivel, `bonus_nivel_actual_otorgado`). La pantalla
-del admin que llama a esto **no está construida** (`07`).
+(puntos, siguiente nivel, `bonus_nivel_actual_otorgado`). Pantalla
+construida y probada en real (`admin/GamificacionScreen.tsx` +
+`lib/admin-gamificacion.ts`, sesión 24/08/2026; botón verificado con
+un responsable el 25/08 tras el fix de `#variable_conflict`).
 
 **Estado de la función tras la reparación de la sesión 25/08/2026**
 (migración `20260825100000_fix_bonus_nivel.sql` +

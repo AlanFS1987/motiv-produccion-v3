@@ -29,7 +29,7 @@ async function obtenerFechaInicioRotacion(): Promise<string> {
     .select("valor")
     .eq("clave", "fecha_inicio_rotacion")
     .maybeSingle();
-  cacheFechaInicioRotacion = (data?.valor as string | undefined) ?? "2026-08-31";
+  cacheFechaInicioRotacion = (data?.valor as string | undefined) ?? "2026-02-16";
   return cacheFechaInicioRotacion;
 }
 

@@ -60,10 +60,9 @@ ambigüedad `nivel_id` en `fn_otorgar_bonus_nivel`).
 
 ## Por construir (orden sugerido)
 
-1. Admin: vista de usuarios con puntos, siguiente nivel y botón
-   "otorgar nivel" (`v_admin_usuarios_gamificacion` +
-   `fn_otorgar_bonus_nivel`, ya en BD).
-2. Admin: botón "Recalcular ciclo anterior" (hoy por SQL Editor).
+1. Admin: botón "Recalcular ciclo anterior" (hoy por SQL Editor;
+   la vista de usuarios con puntos/nivel/botón "otorgar nivel" ya
+   está construida, ver `04`/`09`).
 3. Admin: fusión de modelos/marcas/productos/lotes duplicados (Edge
    Function con `service_role`).
 4. `personaje_stats_nivel` para los 4 responsables migrados de v2

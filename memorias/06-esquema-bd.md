@@ -105,8 +105,9 @@ unique (línea, turno, ítem).
 estrellas, efecto_aura, prompt_base, prompt_imagen, orden, +
 `umbral_min_responsable`/`umbral_max_responsable` generadas (×1,5).
 
-**logros_definicion** — 19 filas sembradas (operario). Columnas
-`rol` (default 'operario'), `formato_nombre`, `condicion_tipo`,
+**logros_definicion** — 37 filas sembradas: 19 de operario
+(23/08/2026) + 18 de responsable (25/08/2026). Columnas `rol`
+(default 'operario'), `formato_nombre`, `condicion_tipo`,
 `condicion_valor` (nullable). `operario_logro` (progreso guardado) se
 eliminó el 22/08/2026: todo se calcula por consulta (`04`).
 
@@ -151,8 +152,12 @@ Dashboard (`08`): `v_produccion_turno`, `v_calidad_turno`,
 `v_calidad_modelo`, `v_calidad_lote`.
 
 Puntos operario (`04`): `operario_ledger` (partes vigentes y
-completados, operario = `parte.operario_id`),
-`v_rendimiento_operario_por_turno`, `v_puntos_rendimiento_operario_ciclo`,
+completados, operario = `parte.operario_id`) para Historial;
+`v_rendimiento_linea_turno` → `v_puntos_rendimiento_linea_turno` →
+`v_operarios_linea_turno` → `v_puntos_rendimiento_operario_por_turno` →
+`v_puntos_rendimiento_operario_ciclo` (reparto igualitario entre
+operarios de la misma línea+turno, sesión 19/08/2026 — sustituye a la
+antigua `v_rendimiento_operario_por_turno`, eliminada),
 `v_piezas_formato_linea_turno` → `v_puntos_piezas_linea_turno` →
 `v_puntos_piezas_operario_por_linea_turno`,
 `v_puntos_limpieza_operario_por_turno`, `v_puntos_operario_total_vida`,
@@ -204,7 +209,7 @@ Personaje/admin: `v_niveles_disponibles_generar`,
 | `fn_buscar_modelo_similar`, `fn_buscar_marca_similar` | pg_trgm, top 5 |
 | `fn_notificar_telegram()`, `fn_disparar_resumen_turno(uuid)`, `fn_disparar_resumen_calidad()` | security definer, leen app_secrets, `net.http_post` |
 | `fn_encolar_resumenes_turno_pendientes()` | cierre automático + reintento |
-| `fn_cerrar_ciclos_pendientes()` | security definer, idempotente; escribe en `historial_ciclos` (operario) y `historial_ciclo_responsable` (responsable, tabla separada desde 25/08/2026), cada bloque con su propio `not exists` (`04`) |
+| `fn_cerrar_ciclos_pendientes()` | security definer, idempotente (`on conflict do update`); escribe en `historial_ciclos` (operario) y `historial_ciclo_responsable` (responsable, tabla separada desde 25/08/2026). **Sin `not exists` desde las reescrituras del 25/08**: recorre TODO `cycle_id` anterior al actual con datos en las vistas en vivo y sobrescribe cualquier fila que ya exista — ya no distingue "cerrar por primera vez" de "recalcular a propósito". Detalle y por qué no es un riesgo hoy en `04` |
 | `fn_nivel_actual(uuid)` | security definer, stable |
 | `fn_guardar_personaje_generado(uuid, uuid, text, text)` | security definer, atómico; la llama `generar-personaje` |
 | `fn_consumir_generacion_nivel(p_usuario_id, p_nivel_id)`, `fn_devolver_generacion_nivel(…)` | security definer, ejecución **solo service_role** |

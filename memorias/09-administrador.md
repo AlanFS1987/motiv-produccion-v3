@@ -49,7 +49,12 @@ propias pestañas de gestión.
 - **Cambio de rol** (`admin/AjustarLetrasScreen.tsx`, mismo lib
   `admin-usuarios.ts`) — en la misma pantalla de Rotación, además de
   la letra, se puede cambiar el rol de cualquier usuario entre
-  responsable/suplente/operario/jefe/producción/calidad. Al pasar a
+  responsable/suplente/operario/jefe/producción/calidad.
+  **⚠️ Revisar**: la decisión de sesión 25/08/2026 (`01`, "Suplente y
+  refuerzo") cierra que no se creará ninguna cuenta `suplente`; esta
+  pantalla sigue ofreciéndolo como opción de rol asignable, lo que
+  permitiría crear justo lo que se descartó. Pendiente decidir si se
+  quita de la UI o se deja a criterio del admin. Al pasar a
   un rol sin letra se limpia `letra` en el mismo UPDATE. `suplente`
   sigue siendo fila única (índice parcial existente) — el error de
   Postgres se muestra tal cual si se intenta duplicar. Ascender a
@@ -81,10 +86,8 @@ propias pestañas de gestión.
 
 ## Por construir (detalle y orden en `07`)
 
-- Vista de usuarios con puntos, siguiente nivel y botón "otorgar
-  nivel" (BD lista: `v_admin_usuarios_gamificacion`,
-  `fn_otorgar_bonus_nivel`).
-- Botón "Recalcular ciclo anterior" en la UI.
+- Botón "Recalcular ciclo anterior" en la UI (vista de usuarios con
+  puntos/nivel/botón "otorgar nivel" ya construida, ver más arriba).
 - Fusión de modelos/marcas/productos/lotes duplicados (el OCR crea
   registros nuevos por typos). Hoy por SQL a mano. Necesita Edge
   Function con `service_role`.
