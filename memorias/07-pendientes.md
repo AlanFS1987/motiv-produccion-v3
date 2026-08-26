@@ -76,8 +76,6 @@ ambigüedad `nivel_id` en `fn_otorgar_bonus_nivel`).
    `fn_otorgar_bonus_nivel`, ver `06`).
 2. Admin: fusión de modelos/marcas/productos/lotes duplicados (Edge
    Function con `service_role`).
-3. `personaje_stats_nivel` para los 4 responsables migrados de v2
-   (mismo efecto retroactivo que tienen los operarios).
 4. Pantalla de fábrica: diapositivas 4 (Ranking) y 5 (Reyes del
    formato) — la mecánica y las vistas ya existen (`10`); ahora
    incluiría también el ranking de responsables (`04`).

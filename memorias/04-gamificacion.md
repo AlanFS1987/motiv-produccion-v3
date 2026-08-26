@@ -629,8 +629,16 @@ backfills puntuales de responsable de la sesión 25/08/2026.
   recuperar de v2 (quedan a 0/false en los ciclos 1-6, correcto):
   `verificaciones_codbar`, `puntos_equipo_ciclo`, `operario_gano_ciclo`
   — v2 no tenía `lote`/`parte` a nivel de fila equivalente a v3.
-  `personaje_stats_nivel` sigue sin reconstruir para los responsables
-  (`07`).
+  `personaje_stats_nivel` reconstruido para los 4 responsables reales
+  (`hectorn`, `radu`, `valentina`, `joaquina`) — sesión 26/08/2026,
+  mismo criterio que los operarios: se recorren los ciclos 1-6 ya
+  migrados de `historial_ciclo_responsable` en orden, y por cada nivel
+  cuyo umbral (`umbral_min_responsable`) queda cruzado por el
+  acumulado tras un ciclo, se inserta el snapshot con los totales
+  acumulados HASTA ESE CICLO (no los de hoy) — fuerza/resistencia/
+  velocidad recalculadas desde los acumulados, vida = puntos
+  acumulados, 3/3 generaciones. Verificado en real: los 4 ya
+  disponían de sus generaciones por nivel desde su propio perfil.
 - **Renumeración**: con el ancla en 31/08 los ciclos de v2 salían
   negativos (y `fn_ciclo_id(hoy)` también). Se hizo
   `update historial_ciclos set cycle_id = cycle_id + 7 where cycle_id < 0`
@@ -647,9 +655,8 @@ backfills puntuales de responsable de la sesión 25/08/2026.
 
 - Pantalla del admin para otorgar niveles (`fn_otorgar_bonus_nivel` y
   `v_admin_usuarios_gamificacion` ya listos en BD).
-- `personaje_stats_nivel` sin reconstruir para los 4 responsables
-  migrados de v2 (mismo efecto retroactivo que ya tienen los
-  operarios).
+- `personaje_stats_nivel` reconstruido para los 4 responsables
+  migrados de v2
 - Limpiar la columna `rol` de `historial_ciclos` (queda redundante,
   siempre `'operario'` desde que el responsable se separó a su propia
   tabla) — no urgente.
