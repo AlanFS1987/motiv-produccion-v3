@@ -416,33 +416,7 @@
 
 </div>
 
-<script>
-  var botones = document.querySelectorAll('#pestanas button');
-  var paneles = document.querySelectorAll('.panel');
-
-  botones.forEach(function (boton) {
-    boton.addEventListener('click', function () {
-      botones.forEach(function (b) { b.classList.remove('activa'); });
-      paneles.forEach(function (p) { p.classList.remove('activo'); });
-      boton.classList.add('activa');
-      document.getElementById('panel-' + boton.dataset.panel).classList.add('activo');
-    });
-  });
-
-  var ua = navigator.userAgent || '';
-  var detectado = null;
-  if (/iPhone|iPad|iPod/i.test(ua)) {
-    detectado = 'ios';
-  } else if (/Windows/i.test(ua) && !/Mobi/i.test(ua)) {
-    detectado = 'windows';
-  } else if (/Android/i.test(ua)) {
-    detectado = 'android';
-  }
-  if (detectado) {
-    var objetivo = document.querySelector('#pestanas button[data-panel="' + detectado + '"]');
-    if (objetivo) objetivo.click();
-  }
-</script>
+<script src="/instalar.js"></script>
 
 </body>
 </html>
