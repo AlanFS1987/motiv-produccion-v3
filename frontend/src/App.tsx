@@ -8,6 +8,8 @@ import { useAuth } from "./context/AuthContext";
 import { cerrarSesion } from "./lib/auth";
 import { OperarioApp } from "./components/operario/OperarioApp";
 import { JefeApp } from "./components/jefe/JefeApp";
+import { RectificadoApp } from "./components/rectificado/RectificadoApp";
+import { CalidadApp } from "./components/calidad/CalidadApp";
 import { AdminApp } from "./components/admin/AdminApp";
 import { PantallaCarrusel } from "./components/pantalla/PantallaCarrusel";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
@@ -63,6 +65,14 @@ function AppAutenticada({ username }: { username: string }) {
   
   if (usuario?.rol === "jefe") {
     return <JefeApp username={username} />;
+  }
+
+  if (usuario?.rol === "jefe_rectificado") {
+    return <RectificadoApp username={username} />;
+  }
+
+  if (usuario?.rol === "calidad") {
+    return <CalidadApp username={username} />;
   }
   if (usuario?.rol !== "responsable" && usuario?.rol !== "suplente") {
     return <RolSinInterfaz rol={usuario?.rol ?? "desconocido"} />;

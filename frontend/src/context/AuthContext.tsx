@@ -79,11 +79,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 const { data: suscripcion } = supabase.auth.onAuthStateChange((evento, nuevaSesion) => {
   if (!activo) return;
 
-  // TEMPORAL — quitar este console.log en cuanto se confirme en
-  // consola remota que el evento al volver de la cámara es
-  // TOKEN_REFRESHED.
-  console.log("[Auth] evento:", evento, "usuarioRef.current:", usuarioRef.current?.username);
-
   setSesion(nuevaSesion);
 
   // TOKEN_REFRESHED se dispara solo, sin que el usuario haga nada,

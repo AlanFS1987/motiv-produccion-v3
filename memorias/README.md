@@ -21,6 +21,8 @@ solo remite a él con el número (`ver 04`).
 | `10-pantalla.md` | Pantalla de fábrica: carrusel, rol `pantalla`, las 5 diapositivas |
 | `11-ceria.md` | Ceria: herramientas, proveedor, reglas producción/calidad |
 | `12-temas.md` | Sistema de temas: los 5 temas, qué pantallas están migradas |
+| `13-rectificado.md` | App de `jefe_rectificado`: Vista Rápida, Vista Detallada, vistas SQL propias |
+| `14-calidad.md` | App de `calidad`: últimos 15 lotes, desglose por tono, incidencias |
 
 Marcas usadas:
 - `[VERIFICAR]` — descrito a partir de migraciones/código, no contrastado con la BD real.

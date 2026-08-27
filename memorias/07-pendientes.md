@@ -94,8 +94,6 @@ ambigüedad `nivel_id` en `fn_otorgar_bonus_nivel`).
    dependía de ellas. Listo para ejecutar en cuanto se confirme el
    punto 11 de arriba (mejor squashear con el esquema de seguridad ya
    verificado en real, no a medias).
-10. Shell para `jefe_rectificado` (como jefe, solo lectura) — previsto,
-    sin prisa.
 11. Base de conocimiento de averías — no empezado.
 12. Limpieza menor: columna `rol` de `historial_ciclos` (redundante,
     siempre `'operario'` desde que el responsable tiene tabla propia).

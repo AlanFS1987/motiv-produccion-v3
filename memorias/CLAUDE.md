@@ -29,8 +29,12 @@ credenciales del titular (`01`). El rol se queda en el enum, sin uso.
 Roles del enum: `responsable`,
 `suplente`, `operario`, `jefe`, `produccion`, `calidad`,
 `administrador`, `pantalla`, `jefe_rectificado`. Solo responsables y
-operarios llevan letra de rotación; el resto no. `jefe_rectificado`
-está previsto (como `jefe`, solo lectura) pero sin shell propio todavía.
+operarios llevan letra de rotación; el resto no. `jefe_rectificado` es
+la sección de rectificado (anterior a clasificación, no una variante
+de `jefe`) — shell propio, ver `13-rectificado.md`. `calidad` tiene
+shell propio de solo lectura (últimos 15 lotes + incidencias), ver
+`14-calidad.md`. `produccion` sigue sin shell — solo tiene permisos
+RLS de lectura sobre `incidencia_produccion`, sin pantalla que los use.
 
 ## Stack
 
@@ -73,6 +77,8 @@ está previsto (como `jefe`, solo lectura) pero sin shell propio todavía.
 | Pantalla de fábrica (carrusel, rol `pantalla`) | Construido parcialmente: 3 de 5 diapositivas reales (`10`) |
 | Ceria | Construido (`11`) |
 | Sistema de temas (5 temas) | Construido en arquitectura y marcos; interior de la mayoría de pantallas sin migrar (`12`) |
+| App de `jefe_rectificado` (Vista Rápida, Detallada) | Construido (`13`), sin verificar con datos reales |
+| App de `calidad` (últimos 15 lotes, incidencias, tonos) | Construido (`14`), sin verificar con datos reales |
 | Base de conocimiento de averías | No construido |
 
 ## Fechas clave
