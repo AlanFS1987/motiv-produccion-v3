@@ -1,8 +1,8 @@
 // frontend/src/components/admin/AdminApp.tsx
 // Shell del administrador. Ve todo lo que ve el jefe (Vista Rápida,
-// Vista Detallada, Incidencias, Ceria) MÁS sus propias pestañas de
-// gestión (Rotación, y las que se añadan después: fusión de
-// catálogo, corrección sin límite, cierre de fábrica/checklist).
+// Vista Detallada, Incidencias, Calidad, Ceria) MÁS sus propias
+// pestañas de gestión (Rotación, y las que se añadan después: fusión
+// de catálogo, corrección sin límite, cierre de fábrica/checklist).
 
 import { useState } from "react";
 import { LogOut } from "lucide-react";
@@ -12,6 +12,7 @@ import { CeriaScreen } from "../ceria/CeriaScreen";
 import { VistaRapidaScreen } from "../jefe/VistaRapidaScreen";
 import { VistaDetalladaScreen } from "../jefe/VistaDetalladaScreen";
 import { IncidenciasScreen } from "../jefe/IncidenciasScreen";
+import { CalidadLotesScreen } from "../calidad/CalidadLotesScreen";
 import { AjustarLetrasScreen } from "./AjustarLetrasScreen";
 import { CorreccionPartesScreen } from "./CorreccionPartesScreen";
 import { PruebaCamaraScreen } from "./PruebaCamaraScreen";
@@ -19,7 +20,7 @@ import { CierreFabricaScreen } from "./CierreFabricaScreen";
 import { ChecklistScreen } from "./ChecklistScreen";
 import { GamificacionScreen } from "./GamificacionScreen";
 
-type PestanaAdmin = "vista-rapida" | "vista-detallada" | "incidencias" | "ceria" | "rotacion" | "partes" | "prueba-camara" | "cierre-fabrica" | "checklist" | "gamificacion";
+type PestanaAdmin = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "ceria" | "rotacion" | "partes" | "prueba-camara" | "cierre-fabrica" | "checklist" | "gamificacion";
 function BotonPestana({
   activa,
   onClick,
@@ -73,6 +74,9 @@ export function AdminApp({ username }: { username: string }) {
           <BotonPestana activa={pestana === "incidencias"} onClick={() => setPestana("incidencias")}>
             Incidencias
           </BotonPestana>
+          <BotonPestana activa={pestana === "calidad"} onClick={() => setPestana("calidad")}>
+            Calidad
+          </BotonPestana>
           <BotonPestana activa={pestana === "ceria"} onClick={() => setPestana("ceria")}>
             Ceria
           </BotonPestana>
@@ -101,6 +105,7 @@ export function AdminApp({ username }: { username: string }) {
         {pestana === "vista-rapida" && <VistaRapidaScreen />}
         {pestana === "vista-detallada" && <VistaDetalladaScreen />}
         {pestana === "incidencias" && <IncidenciasScreen />}
+        {pestana === "calidad" && <CalidadLotesScreen />}
         {pestana === "ceria" && <CeriaScreen />}
         {pestana === "rotacion" && <AjustarLetrasScreen />}
         {pestana === "partes" && <CorreccionPartesScreen />}

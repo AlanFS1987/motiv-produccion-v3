@@ -72,7 +72,7 @@ RLS de lectura sobre `incidencia_produccion`, sin pantalla que los use.
 | Operario: Inicio (Inicio / Ranking / Stats+Avatar / Logros), Mi línea, Historial, Limpieza | Construido y probado en real |
 | Gamificación operario: puntos (rendimiento+piezas+limpieza), niveles, cierre de ciclo, stats, 19 logros sembrados, personaje RPG, datos de v2 migrados | **Construido** (`04`) |
 | Gamificación responsable: puntos (metros+rendimiento), niveles, cierre de ciclo (tabla propia `historial_ciclo_responsable`), pestaña "Progreso" (Ranking, Ranking resp., Stats, Equipo, Logros), 18 logros propios, historial de partes propio | **Construido** (`04`) |
-| Dashboard del jefe (Vista Rápida, Detallada, Incidencias) | Construido (`08`) |
+| Dashboard del jefe (Vista Rápida, Detallada, Incidencias, Calidad) | Construido (`08`) |
 | Panel de administrador | Construido (`09`); faltan fusión de catálogo, vista de usuarios con bonus de nivel y botón "recalcular ciclo" |
 | Pantalla de fábrica (carrusel, rol `pantalla`) | Construido parcialmente: 3 de 5 diapositivas reales (`10`) |
 | Ceria | Construido (`11`) |

@@ -1,10 +1,10 @@
 # 08 — Dashboard del jefe
 
 Shell propio (`jefe/JefeApp.tsx`), se muestra cuando `usuario.rol =
-'jefe'`. Cuatro pestañas: **Vista Rápida**, **Vista Detallada**,
-**Incidencias**, **Ceria** (ver `11-ceria.md`). Sin gamificación —
-el jefe no quiere ver puntos/ranking/niveles, esa parte no aparece
-aquí bajo ningún concepto.
+'jefe'`. Cinco pestañas: **Vista Rápida**, **Vista Detallada**,
+**Incidencias**, **Calidad**, **Ceria** (ver `11-ceria.md`). Sin
+gamificación — el jefe no quiere ver puntos/ranking/niveles, esa
+parte no aparece aquí bajo ningún concepto.
 
 ## Regla que atraviesa todo el dashboard
 
@@ -73,8 +73,19 @@ de color distinto para que no se puedan confundir ni visualmente:
 producción (rojo) y calidad (ámbar). Mismo filtro de fechas para
 ambos, consultas independientes.
 
+## Calidad (`calidad/CalidadLotesScreen.tsx`)
+
+Decisión de sesión 27/08/2026: **exactamente la misma pantalla** que
+usa el rol `calidad` (últimos 15 lotes, 2 donuts por tarjeta,
+desglose por tono al expandir, incidencias de calidad), importada tal
+cual desde `components/calidad/` — sin ningún prop ni variante nueva.
+Ver `14-calidad.md` para el detalle completo (fórmulas, buscador,
+limitación del filtro de fecha). No hizo falta tocar RLS: el jefe ya
+tenía SELECT sobre `parte`/`incidencia_calidad`/`modelo` desde el
+diseño original.
+
 ## Panel de administrador
 
-Ve las mismas 4 pestañas del jefe (`admin/AdminApp.tsx` reutiliza los
-componentes de `jefe/`, no los duplica) más sus propias pestañas de
-gestión — ver `09-administrador.md`.
+Ve las mismas 5 pestañas del jefe (`admin/AdminApp.tsx` reutiliza los
+componentes de `jefe/` y `calidad/`, no los duplica) más sus propias
+pestañas de gestión — ver `09-administrador.md`.

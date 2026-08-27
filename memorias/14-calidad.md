@@ -57,6 +57,14 @@ nueva que una por `turno.fecha`.
 - Bifurcación en `App.tsx`: `usuario.rol === "calidad"` →
   `<CalidadApp />`.
 
+## Reutilización
+
+`CalidadLotesScreen.tsx` se reutiliza tal cual (sin props nuevos) como
+5ª pestaña de `jefe/JefeApp.tsx` y `admin/AdminApp.tsx` — decisión de
+sesión 27/08/2026: "exactamente igual" a como lo ve `calidad`. Ver
+`08-dashboard-jefe.md`. No hizo falta ampliar RLS: jefe/admin ya
+tenían SELECT sobre `parte`/`incidencia_calidad`/`modelo`.
+
 ## Pendiente
 
 Sin verificar con datos reales de calidad todavía.

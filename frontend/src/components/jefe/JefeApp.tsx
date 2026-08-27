@@ -3,9 +3,12 @@
 // se monta en vez del shell de responsable (Turno/Resumen/Lotes) en
 // cuanto usuario.rol === 'jefe'.
 //
-// Cuatro pestañas: Vista Rápida, Vista Detallada, Incidencias y
-// Ceria — dashboard del jefe completo por ahora (ver
+// Cinco pestañas: Vista Rápida, Vista Detallada, Incidencias, Calidad
+// y Ceria — dashboard del jefe completo por ahora (ver
 // memorias/07-pendientes.md punto 6 para lo que quede fuera).
+// "Calidad" reutiliza CalidadLotesScreen.tsx tal cual (mismo
+// componente que usa el rol calidad, sin ningún cambio ni prop
+// nueva) — decisión de sesión 27/08/2026: exactamente igual.
 
 import { useState } from "react";
 import { LogOut } from "lucide-react";
@@ -15,8 +18,9 @@ import { CeriaScreen } from "../ceria/CeriaScreen";
 import { VistaRapidaScreen } from "./VistaRapidaScreen";
 import { VistaDetalladaScreen } from "./VistaDetalladaScreen";
 import { IncidenciasScreen } from "./IncidenciasScreen";
+import { CalidadLotesScreen } from "../calidad/CalidadLotesScreen";
 
-type PestanaJefe = "vista-rapida" | "vista-detallada" | "incidencias" | "ceria";
+type PestanaJefe = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "ceria";
 
 function BotonPestana({
   activa,
@@ -71,6 +75,9 @@ export function JefeApp({ username }: { username: string }) {
           <BotonPestana activa={pestana === "incidencias"} onClick={() => setPestana("incidencias")}>
             Incidencias
           </BotonPestana>
+          <BotonPestana activa={pestana === "calidad"} onClick={() => setPestana("calidad")}>
+            Calidad
+          </BotonPestana>
           <BotonPestana activa={pestana === "ceria"} onClick={() => setPestana("ceria")}>
             Ceria
           </BotonPestana>
@@ -81,6 +88,7 @@ export function JefeApp({ username }: { username: string }) {
         {pestana === "vista-rapida" && <VistaRapidaScreen />}
         {pestana === "vista-detallada" && <VistaDetalladaScreen />}
         {pestana === "incidencias" && <IncidenciasScreen />}
+        {pestana === "calidad" && <CalidadLotesScreen />}
         {pestana === "ceria" && <CeriaScreen />}
       </div>
     </div>
