@@ -116,6 +116,7 @@ export function AdminApp({ username }: { username: string }) {
         {pestana === "prueba-camara" && <PruebaCamaraScreen />}
         {pestana === "cierre-fabrica" && <CierreFabricaScreen />}
         {pestana === "checklist" && <ChecklistScreen />}
+        {pestana === "gamificacion" && <GamificacionScreen />}
         {pestana === "gestion-usuarios" && <GestionUsuariosScreen />}
       </div>
     </div>
