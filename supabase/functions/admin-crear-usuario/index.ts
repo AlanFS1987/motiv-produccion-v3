@@ -43,8 +43,8 @@ function emailSinteticoDeUsername(username: string): string {
 
 // Igual que ROLES_CON_LETRA en frontend/src/lib/admin-usuarios.ts —
 // duplicado por el mismo motivo de runtime separado.
-type RolAsignable = "responsable" | "suplente" | "operario" | "jefe" | "produccion" | "calidad";
-const ROLES_ASIGNABLES: RolAsignable[] = ["responsable", "suplente", "operario", "jefe", "produccion", "calidad"];
+type RolAsignable = "responsable" | "suplente" | "operario" | "jefe" | "produccion" | "calidad" | "jefe_rectificado";
+const ROLES_ASIGNABLES: RolAsignable[] = ["responsable", "suplente", "operario", "jefe", "produccion", "calidad", "jefe_rectificado"];
 const ROLES_CON_LETRA: RolAsignable[] = ["responsable", "operario"];
 
 interface RequestBody {

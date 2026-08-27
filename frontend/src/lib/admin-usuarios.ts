@@ -15,7 +15,7 @@ export type Letra = "A" | "B" | "C" | "D";
 
 export type RolAsignable =
   | "responsable" | "suplente" | "operario"
-  | "jefe" | "produccion" | "calidad";
+  | "jefe" | "produccion" | "calidad" | "jefe_rectificado";
 
 const ROLES_CON_LETRA: RolAsignable[] = ["responsable", "operario"];
 
