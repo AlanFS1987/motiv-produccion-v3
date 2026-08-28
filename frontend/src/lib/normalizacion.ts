@@ -142,7 +142,8 @@ export function limpiarEntradaTonoCalibre(valor: string): string {
  * del paréntesis es el nombre real del modelo — el resto es un código
  * técnico interno. Corte determinista, no delegado al OCR.
  */
-export function extraerModeloVisible(modeloCompleto: string): string {
+export function extraerModeloVisible(modeloCompleto: string | null): string {
+  if (!modeloCompleto) return "";
   const indiceParentesis = modeloCompleto.indexOf("(");
   if (indiceParentesis === -1) return modeloCompleto.trim();
   return modeloCompleto.slice(0, indiceParentesis).trim();

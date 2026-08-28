@@ -40,18 +40,28 @@ RLS de lectura sobre `incidencia_produccion`, sin pantalla que los use.
 
 - **Backend**: Supabase — Postgres + Auth + Edge Functions (Deno/TS) +
   `pg_cron` + `pg_net`. Proyecto `boyphawxerstehngbhfe`.
-- **OCR**: GPT (`gpt-4o-mini`) como extractor principal, con fallback
-  automático a Anthropic Haiku (`claude-haiku-4-5-20251001`) si falla —
-  constantes `MODEL` en `supabase/functions/_shared/openai.ts` y
-  `_shared/anthropic.ts`. Ambas llamadas (y la validación de sesión)
-  tienen timeout. Cuál queda en firme: decisión abierta (`07`).
+- **OCR**: Anthropic Haiku (`claude-haiku-4-5-20251001`) como
+  extractor principal, con fallback automático a GPT (`gpt-4o-mini`)
+  si falla — constantes `MODEL` en `supabase/functions/_shared/anthropic.ts`
+  y `_shared/openai.ts`. Ambas llamadas (y la validación de sesión)
+  tienen timeout. Decisión cerrada 28/08/2026: Haiku cumple mejor el
+  formato del prompt que GPT-4o-mini en prueba real (`07`).
 - **Generación de imagen (personaje RPG)**: GPT Image 2 (`gpt-image-2`)
   vía `images/edits`; historia del personaje con DeepSeek. Ver `04`.
 - **Imágenes**: Cloudinary, cloud `dugiquak1`, 5 presets unsigned con
   carpeta fija cada uno. Ver `05`.
 - **Notificaciones**: un bot de Telegram, 5 grupos. Ver `05`.
 - **Frontend**: React 19 + TypeScript + Vite + Tailwind v4 +
-  lucide-react + @zxing (códigos de barras). Sin framework de tests.
+  lucide-react. Captura de fotos con reparto híbrido de cámara
+  (decisión 28/08/2026): hoja/pantalla/limpieza usan cámara NATIVA
+  (`<input capture>`, sin recorte forzado — `procesarFotoLibre`);
+  verificación de caja usa cámara EN VIVO (`useCamaraLive`, con
+  recorte guiado por recuadro-guía en pantalla — `procesarFoto`), por
+  precisión de encuadre en el formato estrecho `caja_lateral`.
+  Códigos de barras: `BarcodeDetector` nativo del navegador
+  (Chrome/Android) con fallback automático a @zxing (imprescindible
+  para iOS/Safari, que no lo implementa en ningún navegador). Sin
+  framework de tests.
 - **Ceria** (asistente del jefe/admin): GPT-5-mini. Ver `11`.
 
 ## Qué está construido (resumen de un vistazo)

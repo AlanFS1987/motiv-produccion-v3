@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { CheckCircle2, XCircle, HelpCircle, RotateCcw, UserCheck } from "lucide-react";
-import { SelectorFoto } from "../SelectorFoto";
+import { useRef, useState, type ChangeEvent } from "react";
+import { CheckCircle2, XCircle, HelpCircle, RotateCcw, UserCheck, Camera, ImageUp } from "lucide-react";
 import { AvisoGirarMovil } from "../AvisoGirarMovil";
+import { useCamaraLive } from "../useCamaraLive";
 import {
   cargarImagenDesdeArchivo,
   procesarFoto,
@@ -26,29 +26,33 @@ interface FotoCajaVerificacionProps {
   onCancelar: () => void;
 }
 
+/**
+ * Verificación de caja — CÁMARA EN VIVO (a diferencia de hoja/
+ * pantalla, que usan cámara nativa desde el 28/08/2026). Decisión de
+ * sesión: aquí sí importa el encuadre exacto en tiempo real, sobre
+ * todo en "caja_lateral" (franja muy estrecha 1600x300) — el
+ * recuadro-guía en pantalla solo funciona con vídeo en vivo. El
+ * propio <video> hace de previsualización, no hace falta un estado
+ * aparte para eso.
+ */
 export function FotoCajaVerificacion({ parteId, lote, onVerificado, onCancelar }: FotoCajaVerificacionProps) {
   const dosFotos = requiereDosFotosCaja(lote.formatoNombre);
   const [paso, setPaso] = useState<Paso>("elegir");
   const [mensaje, setMensaje] = useState("");
-  const [previsualizacion, setPrevisualizacion] = useState<string | null>(null);
   const [urlSuperior, setUrlSuperior] = useState<string | null>(null);
   const [fotosSubidas, setFotosSubidas] = useState<string[]>([]);
   const [resultado, setResultado] = useState<ResultadoVerificacionCaja | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const inputGaleriaRef = useRef<HTMLInputElement>(null);
 
   const forma: FormaFoto = paso === "foto_superior" ? "caja_superior" : "caja_lateral";
+  const camaraActiva = paso === "foto_superior" || paso === "foto_lateral";
+  const camara = useCamaraLive(forma, camaraActiva);
 
   async function subirBlob(blob: Blob): Promise<string> {
-    setPrevisualizacion(URL.createObjectURL(blob));
     const publicId = construirPublicId(lote.tono, "caja");
     const subida = await subirACloudinary(blob, publicId, "partes");
     return subida.url;
-  }
-
-  async function subirFotoArchivo(archivo: File, forma: FormaFoto): Promise<string> {
-    const img = await cargarImagenDesdeArchivo(archivo);
-    const procesada = await procesarFoto(img, forma);
-    return subirBlob(procesada.blob);
   }
 
   async function manejarFotoSuperior(url: string) {
@@ -56,7 +60,6 @@ export function FotoCajaVerificacion({ parteId, lote, onVerificado, onCancelar }
     if (dosFotos) {
       setFotosSubidas([url]);
       setPaso("foto_lateral");
-      setPrevisualizacion(null);
       setMensaje("");
     } else {
       setFotosSubidas([url]);
@@ -70,22 +73,36 @@ export function FotoCajaVerificacion({ parteId, lote, onVerificado, onCancelar }
     await leerYEvaluar([{ url: urlSuperior }, { url }]);
   }
 
-  async function manejarArchivoSuperior(archivo: File) {
-    setMensaje("Subiendo foto...");
+  async function manejarDisparo() {
     try {
-      const url = await subirFotoArchivo(archivo, "caja_superior");
-      await manejarFotoSuperior(url);
+      const procesada = await camara.disparar();
+      const url = await subirBlob(procesada.blob);
+      if (paso === "foto_superior") {
+        await manejarFotoSuperior(url);
+      } else {
+        await manejarFotoLateral(url);
+      }
     } catch (err) {
       setPaso("error");
       setMensaje(err instanceof Error ? err.message : String(err));
     }
   }
 
-  async function manejarArchivoLateral(archivo: File) {
+  async function manejarArchivoGaleria(evento: ChangeEvent<HTMLInputElement>) {
+    const archivo = evento.target.files?.[0];
+    evento.target.value = "";
+    if (!archivo) return;
+
     setMensaje("Subiendo foto...");
     try {
-      const url = await subirFotoArchivo(archivo, "caja_lateral");
-      await manejarFotoLateral(url);
+      const img = await cargarImagenDesdeArchivo(archivo);
+      const procesada = await procesarFoto(img, forma);
+      const url = await subirBlob(procesada.blob);
+      if (paso === "foto_superior") {
+        await manejarFotoSuperior(url);
+      } else {
+        await manejarFotoLateral(url);
+      }
     } catch (err) {
       setPaso("error");
       setMensaje(err instanceof Error ? err.message : String(err));
@@ -138,7 +155,6 @@ export function FotoCajaVerificacion({ parteId, lote, onVerificado, onCancelar }
     setUrlSuperior(null);
     setFotosSubidas([]);
     setResultado(null);
-    setPrevisualizacion(null);
     setPaso("elegir");
     setMensaje("");
   }
@@ -147,18 +163,10 @@ export function FotoCajaVerificacion({ parteId, lote, onVerificado, onCancelar }
     return (
       <div className="mx-auto max-w-md">
         <p className="mb-4 text-sm font-medium text-slate-600">Foto 2 — Verificación de caja</p>
-        <button
-          type="button"
-          onClick={() => setPaso("foto_superior")}
-          className="mb-3 w-full rounded-xl bg-slate-900 px-4 py-4 text-base font-medium text-white"
-        >
+        <button type="button" onClick={() => setPaso("foto_superior")} className="mb-3 w-full rounded-xl bg-slate-900 px-4 py-4 text-base font-medium text-white">
           Verificar con foto (OCR)
         </button>
-        <button
-          type="button"
-          onClick={() => setPaso("manual")}
-          className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-slate-900 px-4 py-4 text-base font-medium text-slate-900"
-        >
+        <button type="button" onClick={() => setPaso("manual")} className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-slate-900 px-4 py-4 text-base font-medium text-slate-900">
           <UserCheck size={20} aria-hidden />
           Confirmar a mano, sin foto
         </button>
@@ -175,17 +183,10 @@ export function FotoCajaVerificacion({ parteId, lote, onVerificado, onCancelar }
         <UserCheck size={40} className="mx-auto mb-3 text-slate-400" aria-hidden />
         <p className="mb-1 text-base font-medium text-slate-900">Confirmación manual</p>
         <p className="mb-6 text-sm text-slate-500">
-          Confirmas que has comprobado a simple vista que la caja impresa coincide con {lote.marcaTextoNormalizado} —{" "}
-          {lote.modeloTextoNormalizado}, tono {lote.tono}
-          {lote.calibre ? `, calibre ${lote.calibre}` : ""}. Queda registrado como verificación manual, distinta de la
-          verificación por foto.
+          Confirmas que has comprobado a simple vista que la caja impresa coincide con {lote.marcaTextoNormalizado} — {lote.modeloTextoNormalizado}, tono {lote.tono}
+          {lote.calibre ? `, calibre ${lote.calibre}` : ""}. Queda registrado como verificación manual, distinta de la verificación por foto.
         </p>
-        <button
-          type="button"
-          disabled={guardando}
-          onClick={confirmarManual}
-          className="mb-3 w-full rounded-xl bg-slate-900 px-4 py-4 text-base font-medium text-white disabled:opacity-40"
-        >
+        <button type="button" disabled={guardando} onClick={confirmarManual} className="mb-3 w-full rounded-xl bg-slate-900 px-4 py-4 text-base font-medium text-white disabled:opacity-40">
           {guardando ? "Guardando..." : "Confirmo que es correcto"}
         </button>
         <button type="button" onClick={() => setPaso("elegir")} className="text-sm text-slate-400 underline">
@@ -196,36 +197,44 @@ export function FotoCajaVerificacion({ parteId, lote, onVerificado, onCancelar }
   }
 
   if (paso === "foto_superior" || paso === "foto_lateral") {
-    const etiqueta =
-      paso === "foto_superior"
-        ? dosFotos
-          ? "Foto 2 — Caja (parte superior: marca + especificaciones)"
-          : "Foto 2 — Caja impresa"
-        : "Foto 2b — Caja (lateral: modelo, tono, calibre)";
+    const etiqueta = paso === "foto_superior" ? (dosFotos ? "Foto 2 — Caja (parte superior: marca + especificaciones)" : "Foto 2 — Caja impresa") : "Foto 2b — Caja (lateral: modelo, tono, calibre)";
 
     return (
       <div className="mx-auto max-w-md">
         <p className="mb-3 text-sm font-medium text-slate-600">{etiqueta}</p>
         <AvisoGirarMovil />
-        <div
-          className="w-full overflow-hidden rounded-lg border-4 border-dashed border-amber-500 bg-slate-200"
-          style={{ aspectRatio: cssAspectRatio(forma) }}
-        >
-          {previsualizacion ? (
-            <img src={previsualizacion} alt="Previsualización" className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full items-center justify-center text-sm text-slate-400">
-              Encuadra las primeras ~10 cajas
+        <div className="w-full overflow-hidden rounded-lg border-4 border-dashed border-amber-500 bg-slate-200" style={{ aspectRatio: cssAspectRatio(forma) }}>
+          {camara.error ? (
+            <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
+              <p className="text-sm text-red-600">{camara.error}</p>
+              <p className="text-xs text-slate-400">Puedes elegir una foto de la galería en su lugar.</p>
             </div>
+          ) : (
+            <video ref={camara.videoRef} autoPlay muted playsInline className="h-full w-full bg-black object-cover" />
           )}
         </div>
-        <div className="mt-4">
-          <SelectorFoto
-            onArchivoSeleccionado={paso === "foto_superior" ? manejarArchivoSuperior : manejarArchivoLateral}
-            disabledCamara={false}
-            disabledGaleria={false}
-          />
+
+        <input ref={inputGaleriaRef} type="file" accept="image/*" className="hidden" onChange={manejarArchivoGaleria} />
+        <div className="mt-4 flex gap-3">
+          <button
+            type="button"
+            disabled={camara.cargando || !!camara.error}
+            onClick={manejarDisparo}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-4 text-base font-medium text-white disabled:opacity-40"
+          >
+            <Camera size={20} aria-hidden />
+            Hacer foto
+          </button>
+          <button
+            type="button"
+            onClick={() => inputGaleriaRef.current?.click()}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-slate-900 px-4 py-4 text-base font-medium text-slate-900"
+          >
+            <ImageUp size={20} aria-hidden />
+            Elegir de galería
+          </button>
         </div>
+
         {mensaje && <p className="mt-3 text-sm text-slate-600">{mensaje}</p>}
         <button type="button" onClick={() => setPaso("elegir")} className="mt-4 w-full text-center text-sm text-slate-400 underline">
           Volver
@@ -264,12 +273,7 @@ export function FotoCajaVerificacion({ parteId, lote, onVerificado, onCancelar }
         <RotateCcw size={14} aria-hidden />
         Repetir fotos
       </button>
-      <button
-        type="button"
-        disabled={guardando}
-        onClick={confirmarResultadoOcr}
-        className="mt-3 w-full rounded-xl bg-slate-900 px-4 py-4 text-base font-medium text-white disabled:opacity-40"
-      >
+      <button type="button" disabled={guardando} onClick={confirmarResultadoOcr} className="mt-3 w-full rounded-xl bg-slate-900 px-4 py-4 text-base font-medium text-white disabled:opacity-40">
         {guardando ? "Guardando..." : "Continuar"}
       </button>
     </div>
@@ -308,9 +312,7 @@ function FilaCampo({ campo }: { campo: ResultadoVerificacionCaja["campos"][numbe
     <div className="flex items-center justify-between p-3">
       <div>
         <p className="text-sm font-medium text-slate-900">{campo.etiqueta}</p>
-        <p className="text-xs text-slate-400">
-          Esperado: {campo.valorEsperado || "—"} · Leído: {campo.valorLeido || "—"}
-        </p>
+        <p className="text-xs text-slate-400">Esperado: {campo.valorEsperado || "—"} · Leído: {campo.valorLeido || "—"}</p>
       </div>
       <Icono size={20} className={color} aria-hidden />
     </div>

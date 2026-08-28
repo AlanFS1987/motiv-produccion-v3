@@ -4,7 +4,7 @@ import { SelectorFoto } from "../SelectorFoto";
 import { AvisoGirarMovil } from "../AvisoGirarMovil";
 import {
   cargarImagenDesdeArchivo,
-  procesarFoto,
+  procesarFotoLibre,
   cssAspectRatio,
   type ImagenProcesada,
 } from "../../lib/captura-imagen";
@@ -125,10 +125,10 @@ export function FotoPantallaMaquina(props: FotoPantallaMaquinaProps) {
 
   async function manejarArchivo(archivo: File) {
     setFase("procesando");
-    setMensaje("Recortando y convirtiendo a WebP...");
+    setMensaje("Redimensionando y convirtiendo a WebP...");
     try {
       const img = await cargarImagenDesdeArchivo(archivo);
-      const procesada = await procesarFoto(img, "pantalla");
+      const procesada = await procesarFotoLibre(img);
       await manejarFotoCapturada(procesada);
     } catch (err) {
       setFase("error");

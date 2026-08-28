@@ -5,7 +5,7 @@ import { SelectorFoto } from "../SelectorFoto";
 import { AvisoGirarMovil } from "../AvisoGirarMovil";
 import {
   cargarImagenDesdeArchivo,
-  procesarFoto,
+  procesarFotoLibre,
   cssAspectRatio,
   type ImagenProcesada,
 } from "../../lib/captura-imagen";
@@ -44,10 +44,10 @@ export function FotoHojaPartida({ turnoId, lineaId, onResuelto, onCancelar }: Fo
 
   async function manejarArchivo(archivo: File) {
     setFase("procesando");
-    setMensaje("Recortando y convirtiendo a WebP...");
+    setMensaje("Redimensionando y convirtiendo a WebP...");
     try {
       const img = await cargarImagenDesdeArchivo(archivo);
-      const procesada = await procesarFoto(img, "hoja_partida");
+      const procesada = await procesarFotoLibre(img);
       await manejarFotoCapturada(procesada);
     } catch (err) {
       setFase("error");
@@ -166,25 +166,16 @@ export function FotoHojaPartida({ turnoId, lineaId, onResuelto, onCancelar }: Fo
         <p className="mb-3 text-sm font-medium text-slate-600">Foto 1 — Hoja de partida</p>
         <AvisoGirarMovil />
 
-        <div
-          className="w-full overflow-hidden rounded-lg border-4 border-dashed border-amber-500 bg-slate-200"
-          style={{ aspectRatio: cssAspectRatio("hoja_partida") }}
-        >
+        <div className="w-full overflow-hidden rounded-lg border-4 border-dashed border-amber-500 bg-slate-200" style={{ aspectRatio: cssAspectRatio("hoja_partida") }}>
           {previsualizacion ? (
             <img src={previsualizacion} alt="Previsualización" className="h-full w-full object-cover" />
           ) : (
-            <div className="flex h-full items-center justify-center text-sm text-slate-400">
-              Encuadra la hoja completa
-            </div>
+            <div className="flex h-full items-center justify-center text-sm text-slate-400">Encuadra la hoja completa</div>
           )}
         </div>
 
         <div className="mt-4">
-          <SelectorFoto
-            onArchivoSeleccionado={manejarArchivo}
-            disabledCamara={fase === "procesando"}
-            disabledGaleria={fase === "procesando"}
-          />
+          <SelectorFoto onArchivoSeleccionado={manejarArchivo} disabledCamara={fase === "procesando"} disabledGaleria={fase === "procesando"} />
         </div>
 
         {mensaje && <p className="mt-3 text-sm text-slate-600">{mensaje}</p>}
@@ -199,11 +190,7 @@ export function FotoHojaPartida({ turnoId, lineaId, onResuelto, onCancelar }: Fo
     return (
       <div className="mx-auto max-w-md text-center">
         <p className="mb-4 text-sm text-red-600">{mensaje}</p>
-        <button
-          type="button"
-          onClick={reintentarFoto}
-          className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-        >
+        <button type="button" onClick={reintentarFoto} className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white">
           <RotateCcw size={16} aria-hidden />
           Repetir foto
         </button>
@@ -219,11 +206,7 @@ export function FotoHojaPartida({ turnoId, lineaId, onResuelto, onCancelar }: Fo
         <p className="text-sm font-medium text-slate-600">Revisa los datos leídos</p>
         <span
           className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-            datos.confianza === "alta"
-              ? "bg-emerald-100 text-emerald-700"
-              : datos.confianza === "media"
-                ? "bg-amber-100 text-amber-700"
-                : "bg-red-100 text-red-700"
+            datos.confianza === "alta" ? "bg-emerald-100 text-emerald-700" : datos.confianza === "media" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
           }`}
         >
           Confianza {datos.confianza}
@@ -258,12 +241,7 @@ export function FotoHojaPartida({ turnoId, lineaId, onResuelto, onCancelar }: Fo
 
       <div className="mb-3">
         <label className="mb-1 block text-sm font-medium text-slate-600">Calibre</label>
-        <input
-          value={calibre}
-          onChange={(e) => setCalibre(limpiarEntradaTonoCalibre(e.target.value))}
-          className={`w-full rounded-lg border p-2 text-sm ${calibreValido ? "border-slate-300" : "border-red-400"}`}
-          placeholder="opcional"
-        />
+        <input value={calibre} onChange={(e) => setCalibre(limpiarEntradaTonoCalibre(e.target.value))} className={`w-full rounded-lg border p-2 text-sm ${calibreValido ? "border-slate-300" : "border-red-400"}`} placeholder="opcional" />
       </div>
 
       <CampoTexto etiqueta="Acabado — código" valor={datos.acabado_codigo ?? ""} onChange={(v) => actualizarCampo("acabado_codigo", v || null)} />
@@ -282,12 +260,7 @@ export function FotoHojaPartida({ turnoId, lineaId, onResuelto, onCancelar }: Fo
 
       {mensaje && <p className="mt-2 text-sm text-red-600">{mensaje}</p>}
 
-      <button
-        type="button"
-        disabled={!formularioValido || fase === "resolviendo"}
-        onClick={confirmarYResolver}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-4 text-base font-medium text-white disabled:opacity-40"
-      >
+      <button type="button" disabled={!formularioValido || fase === "resolviendo"} onClick={confirmarYResolver} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-4 text-base font-medium text-white disabled:opacity-40">
         <FileCheck2 size={20} aria-hidden />
         {fase === "resolviendo" ? "Creando parte..." : "Confirmar y crear parte"}
       </button>
@@ -295,19 +268,7 @@ export function FotoHojaPartida({ turnoId, lineaId, onResuelto, onCancelar }: Fo
   );
 }
 
-function CampoTexto({
-  etiqueta,
-  valor,
-  onChange,
-  requerido = false,
-  multilinea = false,
-}: {
-  etiqueta: string;
-  valor: string;
-  onChange: (v: string) => void;
-  requerido?: boolean;
-  multilinea?: boolean;
-}) {
+function CampoTexto({ etiqueta, valor, onChange, requerido = false, multilinea = false }: { etiqueta: string; valor: string; onChange: (v: string) => void; requerido?: boolean; multilinea?: boolean }) {
   const vacio = requerido && valor.trim() === "";
   return (
     <div className="mb-3">
@@ -325,12 +286,7 @@ function CampoNumerico({ etiqueta, valor, onChange }: { etiqueta: string; valor:
   return (
     <div className="mb-3">
       <label className="mb-1 block text-sm font-medium text-slate-600">{etiqueta}</label>
-      <input
-        type="number"
-        value={valor ?? ""}
-        onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
-        className="w-full rounded-lg border border-slate-300 p-2 text-sm"
-      />
+      <input type="number" value={valor ?? ""} onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))} className="w-full rounded-lg border border-slate-300 p-2 text-sm" />
     </div>
   );
 }

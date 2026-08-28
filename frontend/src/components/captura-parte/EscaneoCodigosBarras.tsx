@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircle2, ScanLine, UserCheck, RotateCcw } from "lucide-react";
-import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
-import { DecodeHintType, BarcodeFormat } from "@zxing/library";
+import { useEscanerCodigosBarras } from "../useEscanerCodigosBarras";
 import {
   construirListaCampos,
   encontrarCampoCoincidente,
@@ -19,21 +18,33 @@ interface EscaneoCodigosBarrasProps {
 }
 
 /**
- * Solo EAN-13 y Code128 (>90% de las cajas reales son EAN-13, el
- * resto casi todo Code128 — decisión de sesión 18/08, sin necesidad
- * de cubrir QR ni otros formatos de barras).
+ * Verificación de códigos de barras (01-rol-responsable.md 3.8) —
+ * BarcodeDetector nativo con fallback a ZXing y recorte de área, ver
+ * useEscanerCodigosBarras.ts para el detalle.
  */
-const HINTS = new Map();
-HINTS.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.CODE_128]);
-
 export function EscaneoCodigosBarras({ parteId, onVerificado, onCancelar }: EscaneoCodigosBarrasProps) {
   const [paso, setPaso] = useState<Paso>("elegir");
   const [campos, setCampos] = useState<CampoEscaneado[] | null>(null);
   const [codigoLeido, setCodigoLeido] = useState<string>("—");
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState("");
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const controlsRef = useRef<IScannerControls | null>(null);
+
+  const { videoRef, error: errorCamara } = useEscanerCodigosBarras(paso === "escaneando", (texto) => {
+    setCodigoLeido(texto);
+    setCampos((prev) => {
+      if (!prev) return prev;
+      const campoCoincidente = encontrarCampoCoincidente(texto, prev);
+      if (!campoCoincidente) return prev;
+      return prev.map((c) => (c.campo === campoCoincidente ? { ...c, verificado: true } : c));
+    });
+  });
+
+  useEffect(() => {
+    if (errorCamara) {
+      setPaso("error");
+      setMensaje(errorCamara);
+    }
+  }, [errorCamara]);
 
   // Carga los códigos esperados del lote en cuanto se monta, sin
   // esperar a que el responsable elija "Escanear" — así "Confirmar a
@@ -72,40 +83,6 @@ export function EscaneoCodigosBarras({ parteId, onVerificado, onCancelar }: Esca
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parteId]);
-
-  // Cámara en vivo — solo activa mientras paso === "escaneando".
-  useEffect(() => {
-    if (paso !== "escaneando" || !videoRef.current) return;
-    const reader = new BrowserMultiFormatReader(HINTS);
-    let activo = true;
-
-    reader
-      .decodeFromConstraints({ video: { facingMode: "environment" } }, videoRef.current, (resultado) => {
-        if (!activo || !resultado) return;
-        const texto = resultado.getText();
-        setCodigoLeido(texto);
-        setCampos((prev) => {
-          if (!prev) return prev;
-          const campoCoincidente = encontrarCampoCoincidente(texto, prev);
-          if (!campoCoincidente) return prev;
-          return prev.map((c) => (c.campo === campoCoincidente ? { ...c, verificado: true } : c));
-        });
-      })
-      .then((controls) => {
-        if (activo) controlsRef.current = controls;
-        else controls.stop();
-      })
-      .catch((err) => {
-        setPaso("error");
-        setMensaje(err instanceof Error ? err.message : String(err));
-      });
-
-    return () => {
-      activo = false;
-      controlsRef.current?.stop();
-      controlsRef.current = null;
-    };
-  }, [paso]);
 
   async function guardarResultadoEscaneo() {
     if (!campos) return;
@@ -211,7 +188,9 @@ export function EscaneoCodigosBarras({ parteId, onVerificado, onCancelar }: Esca
       <p className="mb-3 text-sm font-medium text-slate-600">Escaneando códigos de barras</p>
       <div className="relative mb-3 w-full overflow-hidden rounded-lg bg-black" style={{ aspectRatio: "4 / 3" }}>
         <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
-        <div className="pointer-events-none absolute inset-x-6 top-1/2 h-0.5 -translate-y-1/2 bg-red-500" />
+        {/* Franjas oscurecidas arriba/abajo — marcan visualmente la misma zona (32% central) que analiza useEscanerCodigosBarras. */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[34%] bg-black/50" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[34%] bg-black/50" />
       </div>
       <p className="mb-4 text-center text-sm text-slate-500">
         Código leído: <span className="font-mono text-slate-900">{codigoLeido}</span>
@@ -236,11 +215,7 @@ export function EscaneoCodigosBarras({ parteId, onVerificado, onCancelar }: Esca
       >
         {guardando ? "Guardando..." : todosVerificados ? "Continuar" : "Continuar de todas formas"}
       </button>
-      <button
-        type="button"
-        onClick={() => setPaso("elegir")}
-        className="mt-3 w-full text-center text-sm text-slate-400 underline"
-      >
+      <button type="button" onClick={() => setPaso("elegir")} className="mt-3 w-full text-center text-sm text-slate-400 underline">
         Volver
       </button>
     </div>

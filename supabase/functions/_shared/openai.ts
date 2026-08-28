@@ -3,9 +3,12 @@
 // ocr-parte/index.ts pueda usar uno como principal y el otro como
 // fallback sin cambiar el resto del flujo.
 //
-// EN PRUEBA (20/08/2026): GPT como principal, Haiku (anthropic.ts)
-// como fallback — objetivo: comparar coste y calidad de lectura antes
-// de decidir cuál queda como principal en firme. Ver memorias/07-pendientes.md.
+// GPT es el FALLBACK (decisión 28/08/2026, cerrada — ver
+// memorias/07-pendientes.md). Estuvo EN PRUEBA como principal del
+// 20/08 al 28/08/2026, comparando coste y calidad de lectura contra
+// Haiku (anthropic.ts); Haiku cumplía mejor el formato/esquema del
+// prompt en prueba real, así que quedó como principal y GPT pasó a
+// fallback.
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
