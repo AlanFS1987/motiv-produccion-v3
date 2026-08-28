@@ -12,7 +12,7 @@
 //
 // Sube este número cada vez que cambies este archivo, para forzar a
 // los dispositivos ya instalados a limpiar la caché vieja.
-const VERSION = "v4";
+const VERSION = "v5";
 const CACHE_NAME = `motiv-shell-${VERSION}`;
 
 // Dominios que NUNCA se interceptan ni se cachean — todo lo que no sea
