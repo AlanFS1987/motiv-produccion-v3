@@ -186,11 +186,11 @@ export function EscaneoCodigosBarras({ parteId, onVerificado, onCancelar }: Esca
   return (
     <div className="mx-auto max-w-md">
       <p className="mb-3 text-sm font-medium text-slate-600">Escaneando códigos de barras</p>
-      <div className="relative mb-3 w-full overflow-hidden rounded-lg bg-black" style={{ aspectRatio: "4 / 3" }}>
+      <div className="relative mb-3 w-full overflow-hidden rounded-lg bg-black" style={{ aspectRatio: "16 / 5" }}>
         <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
-        {/* Franjas oscurecidas arriba/abajo — marcan visualmente la misma zona (32% central) que analiza useEscanerCodigosBarras. */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[34%] bg-black/50" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[34%] bg-black/50" />
+        {/* Franjas oscurecidas arriba/abajo — marcan visualmente la misma zona (20% central) que analiza useEscanerCodigosBarras. */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[40%] bg-black/50" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[40%] bg-black/50" />
       </div>
       <p className="mb-4 text-center text-sm text-slate-500">
         Código leído: <span className="font-mono text-slate-900">{codigoLeido}</span>
