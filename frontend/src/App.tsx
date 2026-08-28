@@ -47,6 +47,10 @@ export default function App() {
 function AppAutenticada({ username }: { username: string }) {
   const { usuario } = useAuth();
   const [pestana, setPestana] = useState<Pestana>("turno");
+  // Estado del panel "Progreso" subido aquí (antes vivía dentro de
+  // ProgresoFlotante) para poder cerrarlo desde fuera cuando se toca
+  // cualquier pestaña de trabajo — ver irAPestana más abajo.
+  const [progresoAbierto, setProgresoAbierto] = useState(false);
 
   // El operario tiene su propia app (navegación e header propios,
   // sin pestañas de Turno/Resumen/Lotes) — se bifurca aquí, antes de
@@ -77,6 +81,16 @@ function AppAutenticada({ username }: { username: string }) {
   if (usuario?.rol !== "responsable" && usuario?.rol !== "suplente") {
     return <RolSinInterfaz rol={usuario?.rol ?? "desconocido"} />;
   }
+
+  // Cambia de pestaña y cierra el panel Progreso si estaba abierto —
+  // así tocar Turno/Resumen/Lotes/Historial con Progreso abierto
+  // lleva a esa pestaña en el mismo gesto, en vez de dejar el panel
+  // flotando encima.
+  function irAPestana(p: Pestana) {
+    setProgresoAbierto(false);
+    setPestana(p);
+  }
+
   return (
   <div className="flex min-h-screen flex-col bg-[var(--fondo)]">
       {/* Cabecero de ancho completo */}
@@ -101,16 +115,16 @@ function AppAutenticada({ username }: { username: string }) {
       {/* Pestañas */}
       <div className="border-b border-[var(--borde)] bg-[var(--superficie)]">
         <div className="mx-auto flex max-w-6xl gap-1 px-4">
-          <BotonPestana activa={pestana === "turno"} onClick={() => setPestana("turno")}>
+          <BotonPestana activa={pestana === "turno"} onClick={() => irAPestana("turno")}>
             Turno
           </BotonPestana>
-          <BotonPestana activa={pestana === "resumen"} onClick={() => setPestana("resumen")}>
+          <BotonPestana activa={pestana === "resumen"} onClick={() => irAPestana("resumen")}>
             Resumen
           </BotonPestana>
-          <BotonPestana activa={pestana === "lotes"} onClick={() => setPestana("lotes")}>
+          <BotonPestana activa={pestana === "lotes"} onClick={() => irAPestana("lotes")}>
             Lotes
           </BotonPestana>
-          <BotonPestana activa={pestana === "historial"} onClick={() => setPestana("historial")}>
+          <BotonPestana activa={pestana === "historial"} onClick={() => irAPestana("historial")}>
             Historial
           </BotonPestana>
         </div>
@@ -132,7 +146,7 @@ function AppAutenticada({ username }: { username: string }) {
           )}
         </div>
 
-        <ProgresoFlotante />
+        <ProgresoFlotante abierto={progresoAbierto} onAbrirCambio={setProgresoAbierto} />
       </main>
     </div>
   );

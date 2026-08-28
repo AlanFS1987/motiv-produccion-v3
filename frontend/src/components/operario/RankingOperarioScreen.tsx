@@ -46,30 +46,39 @@ export function RankingOperarioScreen() {
     cargar();
   }, [cargar]);
 
-  if (cargando) return <div className="rounded-2xl bg-white p-6 text-center text-sm text-slate-500 shadow-sm">Cargando ranking...</div>;
+  if (cargando)
+    return (
+      <div className="rounded-2xl bg-[var(--superficie)] p-6 text-center text-sm text-[var(--texto-tenue)] shadow-sm">
+        Cargando ranking...
+      </div>
+    );
   if (error) return <div className="rounded-2xl bg-red-50 p-6 text-center text-sm text-red-700 shadow-sm">{error}</div>;
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex gap-1 rounded-xl bg-white p-1 shadow-sm">
+      <div className="flex gap-1 rounded-xl bg-[var(--superficie)] p-1 shadow-sm">
         <button
           onClick={() => setToggle("actual")}
-          className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${toggle === "actual" ? "bg-slate-900 text-white" : "text-slate-500"}`}
+          className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${
+            toggle === "actual" ? "bg-[var(--acento)] text-[var(--acento-texto)]" : "text-[var(--texto-secundario)]"
+          }`}
         >
           Ciclo actual
         </button>
         <button
           onClick={() => setToggle("anterior")}
-          className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${toggle === "anterior" ? "bg-slate-900 text-white" : "text-slate-500"}`}
+          className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${
+            toggle === "anterior" ? "bg-[var(--acento)] text-[var(--acento-texto)]" : "text-[var(--texto-secundario)]"
+          }`}
         >
           Ciclo anterior
         </button>
       </div>
 
       {podio && (
-        <div className="rounded-2xl bg-white p-4 shadow-sm">
+        <div className="rounded-2xl bg-[var(--superficie)] p-4 shadow-sm">
           {podio.top5.length === 0 ? (
-            <p className="py-6 text-center text-sm text-slate-500">Todavía no hay puntos en este ciclo.</p>
+            <p className="py-6 text-center text-sm text-[var(--texto-tenue)]">Todavía no hay puntos en este ciclo.</p>
           ) : (
             <>
               <div className="mb-4 flex items-end justify-center gap-2">
@@ -79,7 +88,7 @@ export function RankingOperarioScreen() {
                     entrada ? (
                       <div key={entrada.operarioId} className="flex flex-col items-center">
                         <div
-                          className="mb-1 flex items-center justify-center overflow-hidden rounded-xl bg-slate-100"
+                          className="mb-1 flex items-center justify-center overflow-hidden rounded-xl bg-[var(--superficie-alt)]"
                           style={{
                             width: entrada.posicion === 1 ? 56 : 46,
                             height: entrada.posicion === 1 ? 84 : 69,
@@ -93,13 +102,20 @@ export function RankingOperarioScreen() {
                               className="h-full w-full object-cover"
                             />
                           ) : (
-                            <User size={entrada.posicion === 1 ? 24 : 20} className="text-slate-400" aria-hidden />
+                            <User
+                              size={entrada.posicion === 1 ? 24 : 20}
+                              className="text-[var(--texto-tenue)]"
+                              aria-hidden
+                            />
                           )}
                         </div>
-                        <p className="text-center text-xs font-medium text-slate-900">{entrada.username}</p>
-                        <p className="text-[11px] text-slate-500">{entrada.puntos.toLocaleString("es-ES")} pts</p>
-                        <p className="mb-1 text-[10px] text-slate-400">
-                          {entrada.cantidad} partes{entrada.ptsPromedio !== null ? ` · ${entrada.ptsPromedio.toFixed(1)} pts/p` : ""}
+                        <p className="text-center text-xs font-medium text-[var(--texto)]">{entrada.username}</p>
+                        <p className="text-[11px] text-[var(--texto-secundario)]">
+                          {entrada.puntos.toLocaleString("es-ES")} pts
+                        </p>
+                        <p className="mb-1 text-[10px] text-[var(--texto-tenue)]">
+                          {entrada.cantidad} partes
+                          {entrada.ptsPromedio !== null ? ` · ${entrada.ptsPromedio.toFixed(1)} pts/p` : ""}
                         </p>
                         <div
                           className="flex items-center justify-center rounded-t-md text-sm font-medium"
@@ -119,18 +135,20 @@ export function RankingOperarioScreen() {
                   )}
               </div>
 
-              <div className="border-t border-slate-100 pt-2">
+              <div className="border-t border-[var(--borde)] pt-2">
                 {podio.top5
                   .filter((e) => e.posicion > 3)
                   .map((e) => (
                     <div key={e.operarioId} className="flex flex-col gap-0.5 px-1 py-1.5">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-slate-600">
+                        <span className="text-[var(--texto-secundario)]">
                           {e.posicion}º {e.username}
                         </span>
-                        <span className="font-medium text-slate-900">{e.puntos.toLocaleString("es-ES")} pts</span>
+                        <span className="font-medium text-[var(--texto)]">
+                          {e.puntos.toLocaleString("es-ES")} pts
+                        </span>
                       </div>
-                      <p className="text-right text-[11px] text-slate-400">
+                      <p className="text-right text-[11px] text-[var(--texto-tenue)]">
                         {e.cantidad} partes{e.ptsPromedio !== null ? ` · ${e.ptsPromedio.toFixed(1)} pts/p` : ""}
                       </p>
                     </div>
@@ -138,13 +156,16 @@ export function RankingOperarioScreen() {
               </div>
 
               {podio.tuEntrada && !podio.tuEntradaEnTop5 && (
-                <div className="mt-2 flex flex-col gap-0.5 rounded-lg bg-blue-50 p-2">
+                <div className="mt-2 flex flex-col gap-0.5 rounded-lg bg-[var(--superficie-alt)] p-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-blue-700">Tú · {podio.tuEntrada.posicion}º</span>
-                    <span className="font-medium text-blue-700">{podio.tuEntrada.puntos.toLocaleString("es-ES")} pts</span>
+                    <span className="font-medium text-[var(--acento)]">Tú · {podio.tuEntrada.posicion}º</span>
+                    <span className="font-medium text-[var(--acento)]">
+                      {podio.tuEntrada.puntos.toLocaleString("es-ES")} pts
+                    </span>
                   </div>
-                  <p className="text-right text-[11px] text-blue-500">
-                    {podio.tuEntrada.cantidad} partes{podio.tuEntrada.ptsPromedio !== null ? ` · ${podio.tuEntrada.ptsPromedio.toFixed(1)} pts/p` : ""}
+                  <p className="text-right text-[11px] text-[var(--acento)] opacity-80">
+                    {podio.tuEntrada.cantidad} partes
+                    {podio.tuEntrada.ptsPromedio !== null ? ` · ${podio.tuEntrada.ptsPromedio.toFixed(1)} pts/p` : ""}
                   </p>
                 </div>
               )}
@@ -153,16 +174,24 @@ export function RankingOperarioScreen() {
         </div>
       )}
 
-      <div className="rounded-2xl bg-white p-4 shadow-sm">
-        <p className="mb-1 text-sm font-medium text-slate-900">Reyes del formato</p>
-        <p className="mb-3 text-xs text-slate-400">Actual = piezas en este ciclo. Histórico = récord de un solo parte.</p>
+      <div className="rounded-2xl bg-[var(--superficie)] p-4 shadow-sm">
+        <p className="mb-1 text-sm font-medium text-[var(--texto)]">Reyes del formato</p>
+        <p className="mb-3 text-xs text-[var(--texto-tenue)]">
+          Actual = piezas en este ciclo. Histórico = récord de un solo parte.
+        </p>
 
         {formatos.map((f) => (
-          <div key={f.formato} className="border-b border-slate-100 py-2.5 last:border-b-0">
-            <p className="mb-1.5 text-xs font-medium text-slate-500">{f.formato}</p>
+          <div key={f.formato} className="border-b border-[var(--borde)] py-2.5 last:border-b-0">
+            <p className="mb-1.5 text-xs font-medium text-[var(--texto-secundario)]">{f.formato}</p>
 
             {f.reyesActual.map((r, i) => (
-              <FilaRey key={`actual-${i}`} nombre={r.username} etiqueta="actual" piezas={r.piezas} color="text-slate-400" />
+              <FilaRey
+                key={`actual-${i}`}
+                nombre={r.username}
+                etiqueta="actual"
+                piezas={r.piezas}
+                color="text-[var(--texto-tenue)]"
+              />
             ))}
             {f.reyesHistorico.map((r, i) => (
               <FilaRey
@@ -174,10 +203,10 @@ export function RankingOperarioScreen() {
               />
             ))}
 
-            <div className="mt-1 flex items-center gap-2 rounded-md bg-blue-50 px-2 py-1.5 text-sm">
-              <User size={14} className="shrink-0 text-blue-600" aria-hidden />
-              <span className="flex-1 text-blue-700">Tú</span>
-              <span className="font-medium text-blue-700">
+            <div className="mt-1 flex items-center gap-2 rounded-md bg-[var(--superficie-alt)] px-2 py-1.5 text-sm">
+              <User size={14} className="shrink-0 text-[var(--acento)]" aria-hidden />
+              <span className="flex-1 text-[var(--acento)]">Tú</span>
+              <span className="font-medium text-[var(--acento)]">
                 {f.tuPiezasActual ?? 0} actual{f.tuMejorParte ? ` · ${f.tuMejorParte} mejor parte` : " · sin partes de este formato"}
               </span>
             </div>
@@ -188,14 +217,24 @@ export function RankingOperarioScreen() {
   );
 }
 
-function FilaRey({ nombre, etiqueta, piezas, color }: { nombre: string; etiqueta: string; piezas: number; color: string }) {
+function FilaRey({
+  nombre,
+  etiqueta,
+  piezas,
+  color,
+}: {
+  nombre: string;
+  etiqueta: string;
+  piezas: number;
+  color: string;
+}) {
   return (
     <div className="mb-1.5 flex items-center gap-2 text-sm">
       <Crown size={16} className={`shrink-0 ${color}`} aria-hidden />
-      <span className="flex-1 text-slate-700">
-        {nombre} <span className="text-slate-400">{etiqueta}</span>
+      <span className="flex-1 text-[var(--texto-secundario)]">
+        {nombre} <span className="text-[var(--texto-tenue)]">{etiqueta}</span>
       </span>
-      <span className="font-medium text-slate-900">{piezas}</span>
+      <span className="font-medium text-[var(--texto)]">{piezas}</span>
     </div>
   );
 }

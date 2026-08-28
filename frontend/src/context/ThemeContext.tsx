@@ -15,7 +15,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
-export type TemaId = "oscuro" | "claro" | "naturaleza" | "cielo" | "sistema";
+export type TemaId = "oscuro" | "claro" | "naturaleza" | "cyberpunk" | "sistema";
 
 export interface DefinicionTema {
   id: TemaId;
@@ -27,7 +27,7 @@ export const TEMAS: DefinicionTema[] = [
   { id: "oscuro", nombre: "Oscuro", colorPunto: "#1e293b" },
   { id: "claro", nombre: "Claro", colorPunto: "#fbbf24" },
   { id: "naturaleza", nombre: "Naturaleza", colorPunto: "#22c55e" },
-  { id: "cielo", nombre: "Cielo", colorPunto: "#38bdf8" },
+  { id: "cyberpunk", nombre: "Cyberpunk", colorPunto: "#f0abfc" },
   { id: "sistema", nombre: "Sistema", colorPunto: "#94a3b8" },
 ];
 

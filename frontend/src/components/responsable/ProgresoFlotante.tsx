@@ -5,6 +5,13 @@
 // Un toque lo abre (aparece el panel con las 5 sub-vistas justo
 // encima del botón), puedes cambiar de sub-vista sin que se cierre,
 // y otro toque en el propio botón lo colapsa.
+//
+// "abierto" pasó a ser prop controlada por App.tsx (sesión
+// 28/08/2026) — antes vivía como useState local aquí, pero eso
+// impedía que tocar una pestaña de trabajo (Turno/Resumen/Lotes/
+// Historial) cerrara el panel: App.tsx no tenía forma de tocar este
+// estado interno. Ahora App.tsx cierra el panel en el mismo gesto
+// que cambia de pestaña (ver irAPestana en App.tsx).
 
 import { useState } from "react";
 import { Sparkles, X, Trophy, Crown, BarChart3, Users, Award } from "lucide-react";
@@ -24,8 +31,13 @@ const SUBVISTAS: { id: SubVista; etiqueta: string; icono: React.ReactNode }[] = 
   { id: "logros", etiqueta: "Logros", icono: <Award size={16} aria-hidden /> },
 ];
 
-export function ProgresoFlotante() {
-  const [abierto, setAbierto] = useState(false);
+export function ProgresoFlotante({
+  abierto,
+  onAbrirCambio,
+}: {
+  abierto: boolean;
+  onAbrirCambio: (v: boolean) => void;
+}) {
   const [subVista, setSubVista] = useState<SubVista>("ranking-operarios");
 
   return (
@@ -59,7 +71,7 @@ export function ProgresoFlotante() {
       )}
 
       <button
-        onClick={() => setAbierto((v) => !v)}
+        onClick={() => onAbrirCambio(!abierto)}
         className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-[var(--acento)] px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:brightness-110"
       >
         {abierto ? <X size={18} aria-hidden /> : <Sparkles size={18} aria-hidden />}

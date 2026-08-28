@@ -39,7 +39,7 @@ function BarraTramos({ valor, color }: { valor: number; color: string }) {
         if (valor >= limite) pct = 100;
         else if (valor > anterior) pct = ((valor - anterior) / (limite - anterior)) * 100;
         return (
-          <div key={limite} className="h-2 flex-1 overflow-hidden rounded-sm bg-slate-100">
+          <div key={limite} className="h-2 flex-1 overflow-hidden rounded-sm bg-[var(--superficie-alt)]">
             <div className="h-full rounded-sm" style={{ width: `${pct}%`, backgroundColor: color }} />
           </div>
         );
@@ -51,7 +51,7 @@ function BarraTramos({ valor, color }: { valor: number; color: string }) {
 function BarraSimple({ valor, min, max, color }: { valor: number; min: number; max: number; color: string }) {
   const pct = Math.max(0, Math.min(100, ((valor - min) / (max - min)) * 100));
   return (
-    <div className="h-2 overflow-hidden rounded-sm bg-slate-100">
+    <div className="h-2 overflow-hidden rounded-sm bg-[var(--superficie-alt)]">
       <div className="h-full rounded-sm" style={{ width: `${pct}%`, backgroundColor: color }} />
     </div>
   );
@@ -95,60 +95,67 @@ export function StatsAvatarOperarioScreen() {
     cargar();
   }, [cargar]);
 
-  if (cargando) return <div className="rounded-2xl bg-white p-6 text-center text-sm text-slate-500 shadow-sm">Cargando...</div>;
+  if (cargando)
+    return (
+      <div className="rounded-2xl bg-[var(--superficie)] p-6 text-center text-sm text-[var(--texto-tenue)] shadow-sm">
+        Cargando...
+      </div>
+    );
   if (error) return <div className="rounded-2xl bg-red-50 p-6 text-center text-sm text-red-700 shadow-sm">{error}</div>;
   if (!stats) return null;
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="rounded-2xl bg-white p-5 shadow-sm">
+      <div className="rounded-2xl bg-[var(--superficie)] p-5 shadow-sm">
         <div className="mb-4">
           <div className="mb-1 flex items-baseline justify-between">
-            <span className="text-sm text-slate-500">Fuerza</span>
-            <span className="text-sm font-medium text-slate-900">{stats.fuerza.toLocaleString("es-ES")}</span>
+            <span className="text-sm text-[var(--texto-secundario)]">Fuerza</span>
+            <span className="text-sm font-medium text-[var(--texto)]">{stats.fuerza.toLocaleString("es-ES")}</span>
           </div>
           <BarraTramos valor={stats.fuerza} color={COLOR.fuerza} />
         </div>
         <div className="mb-4">
           <div className="mb-1 flex items-baseline justify-between">
-            <span className="text-sm text-slate-500">Resistencia</span>
-            <span className="text-sm font-medium text-slate-900">{stats.resistencia.toLocaleString("es-ES")}</span>
+            <span className="text-sm text-[var(--texto-secundario)]">Resistencia</span>
+            <span className="text-sm font-medium text-[var(--texto)]">{stats.resistencia.toLocaleString("es-ES")}</span>
           </div>
           <BarraTramos valor={stats.resistencia} color={COLOR.resistencia} />
         </div>
         <div className="mb-4">
           <div className="mb-1 flex items-baseline justify-between">
-            <span className="text-sm text-slate-500">Velocidad</span>
-            <span className="text-sm font-medium text-slate-900">{stats.velocidad === null ? "—" : stats.velocidad.toLocaleString("es-ES")}</span>
+            <span className="text-sm text-[var(--texto-secundario)]">Velocidad</span>
+            <span className="text-sm font-medium text-[var(--texto)]">
+              {stats.velocidad === null ? "—" : stats.velocidad.toLocaleString("es-ES")}
+            </span>
           </div>
           <BarraSimple valor={stats.velocidad ?? 0} min={6} max={11} color={COLOR.velocidad} />
         </div>
         <div>
           <div className="mb-1 flex items-baseline justify-between">
-            <span className="text-sm text-slate-500">Vida</span>
-            <span className="text-sm font-medium text-slate-900">{stats.vida.toLocaleString("es-ES")}</span>
+            <span className="text-sm text-[var(--texto-secundario)]">Vida</span>
+            <span className="text-sm font-medium text-[var(--texto)]">{stats.vida.toLocaleString("es-ES")}</span>
           </div>
           <BarraTramos valor={stats.vida} color={COLOR.vida} />
         </div>
       </div>
 
-      <div className="rounded-2xl bg-white p-4 shadow-sm">
-        <div className="mb-3 flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+      <div className="rounded-2xl bg-[var(--superficie)] p-4 shadow-sm">
+        <div className="mb-3 flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg bg-[var(--superficie-alt)]">
           {activo ? (
             <img src={activo.imagen_url} alt="Tu avatar" className="h-full w-full object-contain" />
           ) : (
             // Placeholder — el operario definirá una imagen graciosa propia más adelante.
-            <span className="text-sm text-slate-400">Aún no tienes avatar</span>
+            <span className="text-sm text-[var(--texto-tenue)]">Aún no tienes avatar</span>
           )}
         </div>
 
         {activo && (
           <div className="mb-4">
-            <p className="mb-1 text-xs font-medium text-slate-500">Su historia</p>
+            <p className="mb-1 text-xs font-medium text-[var(--texto-secundario)]">Su historia</p>
             {activo.historia ? (
-              <p className="text-sm leading-relaxed text-slate-900">{activo.historia}</p>
+              <p className="text-sm leading-relaxed text-[var(--texto)]">{activo.historia}</p>
             ) : (
-              <p className="text-sm italic text-slate-400">Tu historia se está preparando — vuelve más tarde.</p>
+              <p className="text-sm italic text-[var(--texto-tenue)]">Tu historia se está preparando — vuelve más tarde.</p>
             )}
           </div>
         )}
@@ -157,7 +164,7 @@ export function StatsAvatarOperarioScreen() {
           {activo && (
             <button
               onClick={() => setMostrarPicker(true)}
-              className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="flex-1 rounded-lg border border-[var(--borde)] py-2 text-sm font-medium text-[var(--texto-secundario)] hover:bg-[var(--superficie-alt)]"
             >
               Elegir avatar
             </button>
@@ -165,7 +172,7 @@ export function StatsAvatarOperarioScreen() {
           <button
             onClick={() => setMostrarGenerador(true)}
             disabled={nivelesDisponibles.length === 0}
-            className="flex-1 rounded-lg bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex-1 rounded-lg bg-[var(--acento)] py-2 text-sm font-medium text-[var(--acento-texto)] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {nivelesDisponibles.length === 0 ? "Sin generaciones" : "Generar avatar"}
           </button>
@@ -223,17 +230,17 @@ function PickerAvatares({ usuarioId, onCerrar, onElegido }: { usuarioId: string;
   }
 
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm">
+    <div className="rounded-2xl bg-[var(--superficie)] p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm font-medium text-slate-900">Elegir avatar</p>
+        <p className="text-sm font-medium text-[var(--texto)]">Elegir avatar</p>
         <button onClick={onCerrar} aria-label="Cerrar">
-          <X size={18} className="text-slate-400" />
+          <X size={18} className="text-[var(--texto-tenue)]" />
         </button>
       </div>
       {cargando ? (
-        <p className="py-4 text-center text-sm text-slate-500">Cargando...</p>
+        <p className="py-4 text-center text-sm text-[var(--texto-secundario)]">Cargando...</p>
       ) : personajes.length === 0 ? (
-        <p className="py-4 text-center text-sm text-slate-500">Todavía no has generado ningún avatar.</p>
+        <p className="py-4 text-center text-sm text-[var(--texto-secundario)]">Todavía no has generado ningún avatar.</p>
       ) : (
         <div className="grid grid-cols-3 gap-2">
           {personajes.map((p) => (
@@ -241,12 +248,12 @@ function PickerAvatares({ usuarioId, onCerrar, onElegido }: { usuarioId: string;
               key={p.id}
               onClick={() => elegir(p.id)}
               disabled={eligiendo !== null}
-              className={`relative aspect-[3/4] overflow-hidden rounded-lg ${p.seleccionada ? "ring-2 ring-slate-900" : ""}`}
+              className={`relative aspect-[3/4] overflow-hidden rounded-lg ${p.seleccionada ? "ring-2 ring-[var(--acento)]" : ""}`}
             >
               <img src={p.imagen_url} alt="" className="h-full w-full object-cover" />
               {eligiendo === p.id && (
-                <div className="absolute inset-0 flex items-center justify-center bg-white/70">
-                  <RefreshCw size={16} className="animate-spin text-slate-600" />
+                <div className="absolute inset-0 flex items-center justify-center bg-[var(--superficie)]/70">
+                  <RefreshCw size={16} className="animate-spin text-[var(--texto-secundario)]" />
                 </div>
               )}
             </button>
@@ -320,26 +327,28 @@ function GeneradorAvatar({
   }
 
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm">
+    <div className="rounded-2xl bg-[var(--superficie)] p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm font-medium text-slate-900">Generar avatar</p>
+        <p className="text-sm font-medium text-[var(--texto)]">Generar avatar</p>
         <button onClick={onCerrar} aria-label="Cerrar">
-          <X size={18} className="text-slate-400" />
+          <X size={18} className="text-[var(--texto-tenue)]" />
         </button>
       </div>
 
-      <p className="mb-1.5 text-xs font-medium text-slate-500">¿Para qué nivel?</p>
+      <p className="mb-1.5 text-xs font-medium text-[var(--texto-secundario)]">¿Para qué nivel?</p>
       <div className="mb-3 flex flex-col gap-1.5">
         {nivelesDisponibles.map((n) => (
           <button
             key={n.nivelId}
             onClick={() => setNivelId(n.nivelId)}
             className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm ${
-              nivelId === n.nivelId ? "border-slate-900 bg-slate-50" : "border-slate-200"
+              nivelId === n.nivelId
+                ? "border-[var(--acento)] bg-[var(--superficie-alt)]"
+                : "border-[var(--borde)]"
             }`}
           >
-            <span className="font-medium text-slate-900">{n.nivelNombre}</span>
-            <span className="text-xs text-slate-500">
+            <span className="font-medium text-[var(--texto)]">{n.nivelNombre}</span>
+            <span className="text-xs text-[var(--texto-secundario)]">
               {n.generacionesRestantes}/3{n.yaGenerado ? " · regenerar" : ""}
             </span>
           </button>
@@ -360,12 +369,12 @@ function GeneradorAvatar({
       <button
         onClick={() => inputArchivoRef.current?.click()}
         disabled={subiendoImagen || !nivelId}
-        className="mb-3 flex h-40 w-full items-center justify-center overflow-hidden rounded-lg border border-dashed border-slate-300 bg-slate-50 disabled:opacity-50"
+        className="mb-3 flex h-40 w-full items-center justify-center overflow-hidden rounded-lg border border-dashed border-[var(--borde)] bg-[var(--superficie-alt)] disabled:opacity-50"
       >
         {previsualizacion ? (
           <img src={previsualizacion} alt="" className="h-full w-full object-cover" />
         ) : (
-          <div className="flex flex-col items-center gap-1 text-slate-400">
+          <div className="flex flex-col items-center gap-1 text-[var(--texto-tenue)]">
             <ImagePlus size={24} aria-hidden />
             <span className="text-xs">{subiendoImagen ? "Subiendo..." : "Elige una foto de tu galería"}</span>
           </div>
@@ -376,14 +385,14 @@ function GeneradorAvatar({
         value={promptOperario}
         onChange={(e) => setPromptOperario(e.target.value)}
         placeholder="Algo que quieras añadir (opcional)"
-        className="mb-3 w-full rounded-lg border border-slate-200 p-2 text-sm"
+        className="mb-3 w-full rounded-lg border border-[var(--borde)] bg-[var(--superficie)] p-2 text-sm text-[var(--texto)]"
         rows={2}
       />
 
       <button
         onClick={manejarGenerar}
         disabled={generando || !imagenReferenciaUrl || !nivelId}
-        className="w-full rounded-lg bg-slate-900 py-2 text-sm font-medium text-white disabled:opacity-50"
+        className="w-full rounded-lg bg-[var(--acento)] py-2 text-sm font-medium text-[var(--acento-texto)] disabled:opacity-50"
       >
         {generando ? "Generando..." : "Generar mi avatar"}
       </button>

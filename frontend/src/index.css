@@ -37,9 +37,9 @@
 }
 
 [data-tema="naturaleza"] {
-  --fondo: #f0fdf4;
-  --superficie: #ffffff;
-  --superficie-alt: #ecfdf5;
+  --fondo: rgba(240, 253, 244, 0.45);
+  --superficie: rgba(255, 255, 255, 0.92);
+  --superficie-alt: rgba(236, 253, 245, 0.92);
   --texto: #14532d;
   --texto-secundario: #4d7c0f;
   --texto-tenue: #86a06a;
@@ -48,14 +48,97 @@
   --acento-texto: #ffffff;
 }
 
-[data-tema="cielo"] {
-  --fondo: #f0f9ff;
-  --superficie: #ffffff;
-  --superficie-alt: #e0f2fe;
-  --texto: #0c4a6e;
-  --texto-secundario: #0369a1;
-  --texto-tenue: #7dd3fc;
-  --borde: #bae6fd;
-  --acento: #0284c7;
-  --acento-texto: #ffffff;
+html[data-tema="naturaleza"] {
+  background-color: #f0fdf4;
+  background-image:
+    radial-gradient(circle at 12% 15%, rgba(202, 28, 28, 0.548) 0, transparent 42%),
+    radial-gradient(circle at 88% 8%, rgba(204, 22, 180, 0.589) 0, transparent 38%),
+    radial-gradient(circle at 50% 95%, rgba(208, 230, 17, 0.753) 0, transparent 48%),
+    radial-gradient(circle at 90% 80%, rgba(58, 22, 219, 0.603) 0, transparent 40%);
+  background-attachment: fixed;
+}
+
+[data-tema="cyberpunk"] {
+  --fondo: rgba(10, 6, 26, 0.82);
+  --superficie: rgba(24, 12, 46, 0.9);
+  --superficie-alt: rgba(35, 18, 63, 0.9);
+  --texto: #f5d0fe;
+  --texto-secundario: #d8b4fe;
+  --texto-tenue: #a855f7;
+  --borde: #86198f;
+  --acento: #f0abfc;
+  --acento-texto: #1a0533;
+  --sombra-neon: 0 0 10px rgba(240, 171, 252, 0.55), 0 0 22px rgba(34, 211, 238, 0.3);
+}
+
+/* Fondo: rejilla + glows + scanlines estáticas, con pulso lento de brillo */
+html[data-tema="cyberpunk"] {
+  background-color: #05010f;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.025) 0px,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    linear-gradient(rgba(217, 70, 239, 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.18) 1px, transparent 1px),
+    radial-gradient(circle at 15% 85%, rgba(217, 70, 239, 0.32) 0, transparent 45%),
+    radial-gradient(circle at 85% 15%, rgba(34, 211, 238, 0.32) 0, transparent 45%),
+    radial-gradient(circle at 50% 50%, rgba(168, 85, 247, 0.14) 0, transparent 60%);
+  background-size: auto, 40px 40px, 40px 40px, auto, auto, auto;
+  background-attachment: fixed;
+  animation: cyberpunk-pulso 6s ease-in-out infinite;
+}
+
+@keyframes cyberpunk-pulso {
+  0%, 100% { filter: brightness(1) saturate(1); }
+  50% { filter: brightness(1.15) saturate(1.25); }
+}
+
+/* Barrido de escaneo horizontal en movimiento (overlay independiente,
+   no interfiere con clics ni con el contenido) */
+html[data-tema="cyberpunk"]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(34, 211, 238, 0.06) 45%,
+    rgba(217, 70, 239, 0.1) 50%,
+    rgba(34, 211, 238, 0.06) 55%,
+    transparent 100%
+  );
+  background-size: 100% 220px;
+  animation: cyberpunk-escaneo 20s linear infinite;
+  mix-blend-mode: screen;
+}
+
+@keyframes cyberpunk-escaneo {
+  0%   { background-position: 0 -220px; }
+  100% { background-position: 0 100vh; }
+}
+
+/* Glow automático en cualquier superficie/borde con las variables de
+   tema — no requiere tocar ningún componente, engancha directamente
+   a la clase arbitraria de Tailwind que ya usan todos los shells */
+[data-tema="cyberpunk"] [class*="border-[var(--borde)]"] {
+  box-shadow: var(--sombra-neon);
+}
+
+[data-tema="cyberpunk"] [class*="bg-[var(--superficie)]"] {
+  box-shadow: inset 0 0 0 1px rgba(217, 70, 239, 0.2);
+}
+
+/* Texto y botones de acento con resplandor neón */
+[data-tema="cyberpunk"] [class*="text-[var(--acento)]"] {
+  text-shadow: 0 0 8px rgba(240, 171, 252, 0.7);
+}
+
+[data-tema="cyberpunk"] [class*="bg-[var(--acento)]"] {
+  box-shadow: var(--sombra-neon);
 }
