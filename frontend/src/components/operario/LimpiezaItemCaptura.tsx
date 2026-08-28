@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { ArrowLeft, Camera, RotateCcw } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import { useCamaraLive } from "../useCamaraLive";
 import { subirACloudinary, construirPublicId } from "../../lib/cloudinary";
 import { marcarItemChecklist, ItemYaMarcadoError, type ChecklistItemEstado } from "../../lib/operario";
-import { cssAspectRatio, type FormaFoto, type ImagenProcesada } from "../../lib/captura-imagen";
+import { cargarImagenDesdeArchivo, procesarFoto, cssAspectRatio, type FormaFoto } from "../../lib/captura-imagen";
 
 type Paso = "antes" | "subiendo_antes" | "despues" | "guardando" | "error" | "ya_marcado";
 
@@ -23,14 +22,13 @@ interface LimpiezaItemCapturaProps {
  *
  * Sin selector de galería a propósito (5.9a: "las fotos se toman con
  * la cámara integrada de la propia app, sin selector de elegir
- * archivo") — a diferencia del resto de fotos de la app (hoja de
- * partida, caja), aquí NO se usa <SelectorFoto> (que sí ofrece
- * galería), solo el disparador de cámara en vivo.
+ * archivo") — a diferencia del resto de fotos de la app, aquí NO se
+ * usa <SelectorFoto> (que sí ofrece galería).
  *
- * NOTA DE INTEGRACIÓN: usa la forma de foto "limpieza" en
- * lib/captura-imagen.ts — hay que añadirla a FormaFoto y a
- * ESPECIFICACIONES_FOTO (ver README de este entregable) antes de que
- * esto compile.
+ * VUELTA A CÁMARA NATIVA (sesión 28/08/2026): sustituye la cámara en
+ * vivo (useCamaraLive) por <input type="file" capture="environment">
+ * — sigue forzando la cámara trasera y sigue sin ofrecer galería,
+ * solo cambia el mecanismo de disparo.
  */
 export function LimpiezaItemCaptura({ turnoId, lineaId, item, onGuardado, onYaMarcado, onCancelar }: LimpiezaItemCapturaProps) {
   const { usuario } = useAuth();
@@ -39,16 +37,20 @@ export function LimpiezaItemCaptura({ turnoId, lineaId, item, onGuardado, onYaMa
   const [previsualizacionAntes, setPrevisualizacionAntes] = useState<string | null>(null);
   const [previsualizacionDespues, setPrevisualizacionDespues] = useState<string | null>(null);
   const [urlAntes, setUrlAntes] = useState<string | null>(null);
+  const inputCamaraRef = useRef<HTMLInputElement>(null);
 
-  // "limpieza" — ver nota de integración arriba.
+  // "limpieza" — ver nota de integración en lib/captura-imagen.ts.
   const forma: FormaFoto = "limpieza";
-  const camaraActiva = paso === "antes" || paso === "despues";
-  const camara = useCamaraLive(forma, camaraActiva);
 
-  async function disparar() {
+  async function manejarArchivo(evento: ChangeEvent<HTMLInputElement>) {
+    const archivo = evento.target.files?.[0];
+    evento.target.value = "";
+    if (!archivo) return;
+
     setMensaje("Subiendo foto...");
     try {
-      const procesada: ImagenProcesada = await camara.disparar();
+      const img = await cargarImagenDesdeArchivo(archivo);
+      const procesada = await procesarFoto(img, forma);
       const previsualizacion = URL.createObjectURL(procesada.blob);
 
       if (paso === "antes") {
@@ -134,25 +136,25 @@ export function LimpiezaItemCaptura({ turnoId, lineaId, item, onGuardado, onYaMa
       <p className="mb-3 text-sm font-medium text-slate-700">{etiqueta}</p>
 
       <div className="w-full overflow-hidden rounded-lg border-4 border-dashed border-amber-500 bg-slate-200" style={{ aspectRatio: cssAspectRatio(forma) }}>
-        {camaraActiva && !subiendo ? (
-          camara.error ? (
-            <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
-              <p className="text-sm text-red-600">{camara.error}</p>
-            </div>
-          ) : (
-            <video ref={camara.videoRef} autoPlay muted playsInline className="h-full w-full bg-black object-cover" />
-          )
-        ) : previsualizacion ? (
+        {previsualizacion ? (
           <img src={previsualizacion} alt="Previsualización" className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-slate-400">Encuadra la línea</div>
         )}
       </div>
 
+      <input
+        ref={inputCamaraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={manejarArchivo}
+      />
       <button
         type="button"
-        disabled={subiendo || camara.cargando || !!camara.error}
-        onClick={disparar}
+        disabled={subiendo}
+        onClick={() => inputCamaraRef.current?.click()}
         className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-4 text-base font-medium text-white disabled:opacity-40"
       >
         <Camera size={20} aria-hidden />

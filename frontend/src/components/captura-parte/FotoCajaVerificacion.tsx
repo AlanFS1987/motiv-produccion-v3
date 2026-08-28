@@ -2,13 +2,11 @@ import { useState } from "react";
 import { CheckCircle2, XCircle, HelpCircle, RotateCcw, UserCheck } from "lucide-react";
 import { SelectorFoto } from "../SelectorFoto";
 import { AvisoGirarMovil } from "../AvisoGirarMovil";
-import { useCamaraLive } from "../useCamaraLive";
 import {
   cargarImagenDesdeArchivo,
   procesarFoto,
   cssAspectRatio,
   type FormaFoto,
-  type ImagenProcesada,
 } from "../../lib/captura-imagen";
 import { subirACloudinary, construirPublicId } from "../../lib/cloudinary";
 import { ocrParte } from "../../lib/supabase-functions";
@@ -39,8 +37,6 @@ export function FotoCajaVerificacion({ parteId, lote, onVerificado, onCancelar }
   const [guardando, setGuardando] = useState(false);
 
   const forma: FormaFoto = paso === "foto_superior" ? "caja_superior" : "caja_lateral";
-  const camaraActiva = paso === "foto_superior" || paso === "foto_lateral";
-  const camara = useCamaraLive(forma, camaraActiva);
 
   async function subirBlob(blob: Blob): Promise<string> {
     setPrevisualizacion(URL.createObjectURL(blob));
@@ -90,22 +86,6 @@ export function FotoCajaVerificacion({ parteId, lote, onVerificado, onCancelar }
     try {
       const url = await subirFotoArchivo(archivo, "caja_lateral");
       await manejarFotoLateral(url);
-    } catch (err) {
-      setPaso("error");
-      setMensaje(err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  async function manejarDisparo() {
-    setMensaje("Subiendo foto...");
-    try {
-      const procesada: ImagenProcesada = await camara.disparar();
-      const url = await subirBlob(procesada.blob);
-      if (paso === "foto_superior") {
-        await manejarFotoSuperior(url);
-      } else {
-        await manejarFotoLateral(url);
-      }
     } catch (err) {
       setPaso("error");
       setMensaje(err instanceof Error ? err.message : String(err));
@@ -226,26 +206,12 @@ export function FotoCajaVerificacion({ parteId, lote, onVerificado, onCancelar }
     return (
       <div className="mx-auto max-w-md">
         <p className="mb-3 text-sm font-medium text-slate-600">{etiqueta}</p>
-        {!camaraActiva && <AvisoGirarMovil />}
+        <AvisoGirarMovil />
         <div
           className="w-full overflow-hidden rounded-lg border-4 border-dashed border-amber-500 bg-slate-200"
           style={{ aspectRatio: cssAspectRatio(forma) }}
         >
-          {camaraActiva ? (
-            camara.error ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
-                <p className="text-sm text-red-600">{camara.error}</p>
-              </div>
-            ) : (
-              <video
-                ref={camara.videoRef}
-                autoPlay
-                muted
-                playsInline
-                className="h-full w-full bg-black object-cover"
-              />
-            )
-          ) : previsualizacion ? (
+          {previsualizacion ? (
             <img src={previsualizacion} alt="Previsualización" className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-slate-400">
@@ -254,12 +220,11 @@ export function FotoCajaVerificacion({ parteId, lote, onVerificado, onCancelar }
           )}
         </div>
         <div className="mt-4">
-        <SelectorFoto
-          onArchivoSeleccionado={paso === "foto_superior" ? manejarArchivoSuperior : manejarArchivoLateral}
-          onDisparar={manejarDisparo}
-          disabledCamara={camara.cargando || !!camara.error}
-          disabledGaleria={false}
-        />
+          <SelectorFoto
+            onArchivoSeleccionado={paso === "foto_superior" ? manejarArchivoSuperior : manejarArchivoLateral}
+            disabledCamara={false}
+            disabledGaleria={false}
+          />
         </div>
         {mensaje && <p className="mt-3 text-sm text-slate-600">{mensaje}</p>}
         <button type="button" onClick={() => setPaso("elegir")} className="mt-4 w-full text-center text-sm text-slate-400 underline">

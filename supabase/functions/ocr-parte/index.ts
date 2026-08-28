@@ -7,9 +7,10 @@
 // revisión del responsable (nunca se guardan solos aquí — el
 // responsable siempre revisa antes de que se persista nada).
 //
-// EN PRUEBA (20/08/2026): GPT como extractor principal, Haiku como
-// fallback si GPT falla — objetivo: comparar coste/calidad antes de
-// decidir cuál queda en firme. Ver memorias/07-pendientes.md.
+// Haiku es el extractor principal (decisión 28/08/2026, tras prueba
+// real: cumple mejor el formato/esquema del prompt que GPT-4o-mini),
+// GPT como fallback si Haiku falla. Antes era al revés (EN PRUEBA
+// 20/08/2026, ver memorias/07-pendientes.md — pendiente ya cerrado).
 //
 // No escribe en la base de datos — solo llama al modelo y devuelve el
 // resultado. La escritura ocurre cuando la app llama después a
@@ -59,8 +60,8 @@ Deno.serve(async (req: Request) => {
   const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // Timeout también aquí: si esta llamada a Supabase Auth se cuelga,
-  // el código nunca llega a extraerConGPT/extraerConClaude, así que
-  // el timeout de openai.ts/anthropic.ts no sirve de nada — visto en
+  // el código nunca llega a extraerConClaude/extraerConGPT, así que
+  // el timeout de anthropic.ts/openai.ts no sirve de nada — visto en
   // real 20/08/2026 (546 / wall clock time limit tras ~150s, con
   // "boot" y "shutdown" en logs pero sin invocación real completada).
   let userData: Awaited<ReturnType<typeof supabaseAuth.auth.getUser>>["data"];
@@ -113,25 +114,24 @@ Deno.serve(async (req: Request) => {
 
   const prompt = PROMPTS[foto_tipo];
 
-  // GPT primero. Si falla por lo que sea (caída, error de red, JSON
-  // inválido...), se reintenta con Claude/Haiku sin que el responsable
-  // note nada — mismo comportamiento, solo cambia extraido_con.
-  // Reactivado 20/08/2026 tras confirmar que el colgado real estaba
-  // en la validación de sesión (ver Promise.race arriba), no en GPT.
+  // Claude/Haiku primero. Si falla por lo que sea (caída, error de
+  // red, JSON inválido...), se reintenta con GPT sin que el
+  // responsable note nada — mismo comportamiento, solo cambia
+  // extraido_con.
   try {
-    const datos = await extraerConGPT(prompt, imagenes);
-    return jsonOk({ foto_tipo, datos, extraido_con: "gpt" });
-  } catch (errGPT) {
-    console.error("Error en ocr-parte (GPT, se reintenta con Claude):", errGPT);
+    const datos = await extraerConClaude(prompt, imagenes);
+    return jsonOk({ foto_tipo, datos, extraido_con: "claude" });
+  } catch (errClaude) {
+    console.error("Error en ocr-parte (Claude, se reintenta con GPT):", errClaude);
     try {
-      const datos = await extraerConClaude(prompt, imagenes);
-      return jsonOk({ foto_tipo, datos, extraido_con: "claude" });
-    } catch (errClaude) {
-      console.error("Error en ocr-parte (Claude, fallback también falló):", errClaude);
+      const datos = await extraerConGPT(prompt, imagenes);
+      return jsonOk({ foto_tipo, datos, extraido_con: "gpt" });
+    } catch (errGPT) {
+      console.error("Error en ocr-parte (GPT, fallback también falló):", errGPT);
       return jsonError(
-        errClaude instanceof Error
-          ? errClaude.message
-          : "Error desconocido procesando el OCR (fallaron GPT y Claude)",
+        errGPT instanceof Error
+          ? errGPT.message
+          : "Error desconocido procesando el OCR (fallaron Claude y GPT)",
         500,
       );
     }

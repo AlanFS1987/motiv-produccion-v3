@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { Save, RotateCcw, AlertTriangle } from "lucide-react";
 import { SelectorFoto } from "../SelectorFoto";
 import { AvisoGirarMovil } from "../AvisoGirarMovil";
-import { useCamaraLive } from "../useCamaraLive";
 import {
   cargarImagenDesdeArchivo,
   procesarFoto,
@@ -124,9 +123,6 @@ export function FotoPantallaMaquina(props: FotoPantallaMaquinaProps) {
   const [tonoEditado, setTonoEditado] = useState(esCorreccion ? props.valoresIniciales.tono : "");
   const [calibreEditado, setCalibreEditado] = useState(esCorreccion ? (props.valoresIniciales.calibre ?? "") : "");
 
-  const camaraActiva = fase === "capturando";
-  const camara = useCamaraLive("pantalla", camaraActiva);
-
   async function manejarArchivo(archivo: File) {
     setFase("procesando");
     setMensaje("Recortando y convirtiendo a WebP...");
@@ -161,16 +157,6 @@ export function FotoPantallaMaquina(props: FotoPantallaMaquinaProps) {
 
       setFase("revisando");
       setMensaje("");
-    } catch (err) {
-      setFase("error");
-      setMensaje(err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  async function manejarDisparo() {
-    try {
-      const procesada = await camara.disparar();
-      await manejarFotoCapturada(procesada);
     } catch (err) {
       setFase("error");
       setMensaje(err instanceof Error ? err.message : String(err));
@@ -265,26 +251,12 @@ export function FotoPantallaMaquina(props: FotoPantallaMaquinaProps) {
     return (
       <div className="mx-auto max-w-md">
         <p className="mb-3 text-sm font-medium text-slate-600">Foto — Pantalla de la máquina</p>
-        {!camaraActiva && <AvisoGirarMovil />}
+        <AvisoGirarMovil />
         <div
           className="w-full overflow-hidden rounded-lg border-4 border-dashed border-amber-500 bg-slate-200"
           style={{ aspectRatio: cssAspectRatio("pantalla") }}
         >
-          {camaraActiva ? (
-            camara.error ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
-                <p className="text-sm text-red-600">{camara.error}</p>
-              </div>
-            ) : (
-              <video
-                ref={camara.videoRef}
-                autoPlay
-                muted
-                playsInline
-                className="h-full w-full bg-black object-cover"
-              />
-            )
-          ) : previsualizacion ? (
+          {previsualizacion ? (
             <img src={previsualizacion} alt="Previsualización" className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-slate-400">
@@ -293,12 +265,11 @@ export function FotoPantallaMaquina(props: FotoPantallaMaquinaProps) {
           )}
         </div>
         <div className="mt-4">
-        <SelectorFoto
-          onArchivoSeleccionado={manejarArchivo}
-          onDisparar={manejarDisparo}
-          disabledCamara={fase === "procesando" || camara.cargando || !!camara.error}
-          disabledGaleria={fase === "procesando"}
-        />
+          <SelectorFoto
+            onArchivoSeleccionado={manejarArchivo}
+            disabledCamara={fase === "procesando"}
+            disabledGaleria={fase === "procesando"}
+          />
         </div>
         {mensaje && <p className="mt-3 text-sm text-slate-600">{mensaje}</p>}
         <button type="button" onClick={props.onCancelar} className="mt-4 w-full text-center text-sm text-slate-400 underline">

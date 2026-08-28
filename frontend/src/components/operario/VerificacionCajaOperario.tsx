@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { ArrowLeft, CheckCircle2, XCircle, HelpCircle, RotateCcw, Camera } from "lucide-react";
 import { AvisoGirarMovil } from "../AvisoGirarMovil";
-import { useCamaraLive } from "../useCamaraLive";
-import { cssAspectRatio, type FormaFoto, type ImagenProcesada } from "../../lib/captura-imagen";
+import { cargarImagenDesdeArchivo, procesarFoto, cssAspectRatio, type FormaFoto } from "../../lib/captura-imagen";
 import { subirACloudinary, construirPublicId } from "../../lib/cloudinary";
 import { ocrParte } from "../../lib/supabase-functions";
 import { requiereDosFotosCaja, evaluarVerificacionCaja, type ResultadoVerificacionCaja } from "../../lib/verificacion-caja";
@@ -23,18 +22,13 @@ interface VerificacionCajaOperarioProps {
  * (lib/verificacion-caja.ts), pero:
  * - escribe en las columnas *_operario (lib/operario.ts), nunca en
  *   las del responsable;
- * - SOLO cámara en vivo, sin "confirmar a mano" NI "elegir de
- *   galería" (a diferencia del resto de fotos de la app) — mismo
- *   criterio que Limpieza (5.9a): el operario está delante de la
- *   caja en el momento, así que no hace falta ni tiene sentido subir
- *   una foto ya existente. Corregido en sesión 19/08/2026 — la
- *   primera versión de este archivo usaba <SelectorFoto>, que sí
- *   ofrece galería, coló la opción por error.
+ * - SOLO cámara (nativa, capture="environment"), sin "confirmar a
+ *   mano" NI "elegir de galería" — mismo criterio que Limpieza
+ *   (5.9a): el operario está delante de la caja en el momento.
  *
- * Bloqueante si el dispositivo no tiene cámara (camara.error) — es el
- * comportamiento correcto aquí, a diferencia del responsable (ver fix
- * de SelectorFoto.tsx): sin cámara, esta verificación simplemente no
- * se puede hacer.
+ * VUELTA A CÁMARA NATIVA (sesión 28/08/2026): reemplaza la cámara en
+ * vivo (useCamaraLive) por <input capture="environment">, igual que
+ * el resto de la app.
  */
 export function VerificacionCajaOperario({ parte, onVerificado, onCancelar }: VerificacionCajaOperarioProps) {
   const lote = construirDatosComparacion(parte);
@@ -48,10 +42,9 @@ export function VerificacionCajaOperario({ parte, onVerificado, onCancelar }: Ve
   const [resultado, setResultado] = useState<ResultadoVerificacionCaja | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
+  const inputCamaraRef = useRef<HTMLInputElement>(null);
 
   const forma: FormaFoto = paso === "foto_superior" ? "caja_superior" : "caja_lateral";
-  const camaraActiva = paso === "foto_superior" || paso === "foto_lateral";
-  const camara = useCamaraLive(forma, camaraActiva);
 
   async function subirBlob(blob: Blob): Promise<string> {
     setPrevisualizacion(URL.createObjectURL(blob));
@@ -79,11 +72,16 @@ export function VerificacionCajaOperario({ parte, onVerificado, onCancelar }: Ve
     await leerYEvaluar([{ url: urlSuperior }, { url }]);
   }
 
-  async function disparar() {
+  async function manejarArchivo(evento: ChangeEvent<HTMLInputElement>) {
+    const archivo = evento.target.files?.[0];
+    evento.target.value = "";
+    if (!archivo) return;
+
     setSubiendo(true);
     setMensaje("Subiendo foto...");
     try {
-      const procesada: ImagenProcesada = await camara.disparar();
+      const img = await cargarImagenDesdeArchivo(archivo);
+      const procesada = await procesarFoto(img, forma);
       const url = await subirBlob(procesada.blob);
       if (paso === "foto_superior") {
         await manejarFotoSuperior(url);
@@ -148,31 +146,31 @@ export function VerificacionCajaOperario({ parte, onVerificado, onCancelar }: Ve
           </p>
         </div>
 
-        {!camaraActiva && <AvisoGirarMovil />}
+        <AvisoGirarMovil />
 
         <div
           className="w-full overflow-hidden rounded-lg border-4 border-dashed border-amber-500 bg-slate-200"
           style={{ aspectRatio: cssAspectRatio(forma) }}
         >
-          {camaraActiva ? (
-            camara.error ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
-                <p className="text-sm text-red-600">{camara.error}</p>
-              </div>
-            ) : (
-              <video ref={camara.videoRef} autoPlay muted playsInline className="h-full w-full bg-black object-cover" />
-            )
-          ) : previsualizacion ? (
+          {previsualizacion ? (
             <img src={previsualizacion} alt="Previsualización" className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-slate-400">Encuadra la caja</div>
           )}
         </div>
 
+        <input
+          ref={inputCamaraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={manejarArchivo}
+        />
         <button
           type="button"
-          disabled={subiendo || camara.cargando || !!camara.error}
-          onClick={disparar}
+          disabled={subiendo}
+          onClick={() => inputCamaraRef.current?.click()}
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-4 text-base font-medium text-white disabled:opacity-40"
         >
           <Camera size={20} aria-hidden />
