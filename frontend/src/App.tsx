@@ -15,8 +15,9 @@ import { PantallaCarrusel } from "./components/pantalla/PantallaCarrusel";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { RolSinInterfaz } from "./components/RolSinInterfaz";
 import { HistorialResponsableScreen } from "./components/responsable/HistorialResponsableScreen";
+import { RelevoScreen } from "./components/responsable/RelevoScreen";
 import { ProgresoFlotante } from "./components/responsable/ProgresoFlotante";
-type Pestana = "turno" | "resumen" | "lotes" | "historial";
+type Pestana = "turno" | "resumen" | "lotes" | "historial" | "relevo";
 
 export default function App() {
   const { sesion, usuario, cargando, errorPerfil } = useAuth();
@@ -83,9 +84,9 @@ function AppAutenticada({ username }: { username: string }) {
   }
 
   // Cambia de pestaña y cierra el panel Progreso si estaba abierto —
-  // así tocar Turno/Resumen/Lotes/Historial con Progreso abierto
-  // lleva a esa pestaña en el mismo gesto, en vez de dejar el panel
-  // flotando encima.
+  // así tocar Turno/Resumen/Lotes/Historial/Relevo con Progreso
+  // abierto lleva a esa pestaña en el mismo gesto, en vez de dejar el
+  // panel flotando encima.
   function irAPestana(p: Pestana) {
     setProgresoAbierto(false);
     setPestana(p);
@@ -127,6 +128,9 @@ function AppAutenticada({ username }: { username: string }) {
           <BotonPestana activa={pestana === "historial"} onClick={() => irAPestana("historial")}>
             Historial
           </BotonPestana>
+          <BotonPestana activa={pestana === "relevo"} onClick={() => irAPestana("relevo")}>
+            Relevo
+          </BotonPestana>
         </div>
       </div>
 
@@ -141,8 +145,10 @@ function AppAutenticada({ username }: { username: string }) {
             <ResumenScreen />
           ) : pestana === "lotes" ? (
             <GestionLotes />
-          ) : (
+          ) : pestana === "historial" ? (
             <HistorialResponsableScreen />
+          ) : (
+            <RelevoScreen />
           )}
         </div>
 

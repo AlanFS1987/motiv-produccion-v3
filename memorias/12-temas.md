@@ -8,7 +8,7 @@ sistema para todos a la vez.
 
 ## Diseño
 
-5 temas (`TemaId`): **Oscuro**, **Claro**, **Naturaleza** (verde, con
+5 temas (`TemaId`): **Oscuro**, **Claro**, **Naturaleza** (multicolor, con
 fondo de blobs orgánicos), **Cyberpunk** (neón magenta/cian sobre
 fondo oscuro con rejilla + scanline), **Sistema** (sigue
 `prefers-color-scheme` del SO en vivo, con listener a cambios).
