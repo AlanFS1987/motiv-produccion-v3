@@ -79,10 +79,10 @@ function tiemposVacios(): TiemposAgregados {
 export async function obtenerTurnoPorFechaTipo(
   fecha: string,
   tipo: TipoTurno,
-): Promise<{ id: string; cerrado_at: string | null } | null> {
+): Promise<{ id: string; cerrado_at: string | null; informe_pdf_url: string | null } | null> {
   const { data, error } = await supabase
     .from("turno")
-    .select("id, cerrado_at")
+    .select("id, cerrado_at, informe_pdf_url")
     .eq("fecha", fecha)
     .eq("tipo", tipo)
     .maybeSingle();
@@ -288,24 +288,24 @@ function formatearFecha(fechaISO: string): string {
  * Compartir nativo porque WhatsApp trunca textos largos al
  * compartir directamente", así que se pega a mano).
  */
-export function formatearResumenTurnoTexto(r: ResumenTurno): string {
+export function formatearResumenTurnoTexto(r: ResumenTurno, informePdfUrl?: string | null): string {
   const lineas: string[] = [];
-
+ 
   lineas.push(`*RESUMEN DE TURNO — ${NOMBRE_TIPO[r.tipo]}, ${formatearFecha(r.fecha)}*`);
   lineas.push(`Responsable: ${r.responsableUsername}`);
   lineas.push(`m² totales: ${formatearM2(r.m2Total)}`);
   lineas.push(formatearTiempos(r.tiempos));
   lineas.push("");
-
+ 
   for (const linea of r.lineas) {
     lineas.push(`*${linea.lineaNombre}*`);
     lineas.push(`Operario: ${linea.operarioUsername ?? "Sin asignar"}`);
     lineas.push(`m²: ${formatearM2(linea.m2Total)} · ${formatearTiempos(linea.tiempos)}`);
-
+ 
     for (const ip of linea.incidenciasProduccion) {
       lineas.push(`⚠️ Incidencia de producción: "${ip.descripcion}"`);
     }
-
+ 
     if (linea.partes.length === 0) {
       lineas.push("Sin producción real registrada este turno.");
     }
@@ -320,12 +320,17 @@ export function formatearResumenTurnoTexto(r: ResumenTurno): string {
     }
     lineas.push("");
   }
-
+ 
   if (r.incidenciasGenerales.length > 0) {
     lineas.push("*Incidencias generales del turno*");
     for (const ig of r.incidenciasGenerales) {
       lineas.push(`- "${ig.descripcion}"`);
     }
+    lineas.push("");
+  }
+
+  if (informePdfUrl) {
+    lineas.push(`📄 Informe completo: ${informePdfUrl}`);
   }
 
   return lineas.join("\n").trimEnd();

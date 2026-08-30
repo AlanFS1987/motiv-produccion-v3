@@ -27,10 +27,20 @@
 // Marca `turno.resumen_enviado_at` tras un envío con éxito — es lo
 // que evita que el cron reenvíe el mismo informe si el trigger ya lo
 // mandó a tiempo.
+//
+// PDF (30/08/2026): al cerrar el turno, además de mandar el resumen a
+// Telegram, se genera un PDF con el mismo informe (incluyendo fotos
+// de las incidencias) y se sube a Cloudinary. La URL se guarda en
+// turno.informe_pdf_url y se añade como último bloque del mensaje de
+// Telegram. Si la generación/subida del PDF falla, NO se aborta el
+// envío del resumen — se registra el error y el turno se queda con
+// informe_pdf_url = null (ver paso 7b).
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, jsonError, jsonOk } from "../_shared/cors.ts";
 import { m2DePiezas } from "../_shared/formato.ts";
+import { generarPdfInformeTurno, type DatosInformeTurnoPdf } from "../_shared/pdf-informe-turno.ts";
+import { subirInformePdfACloudinary, construirPublicIdInformeTurno } from "../_shared/cloudinary.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -79,6 +89,12 @@ function formatearFecha(fechaISO: string): string {
 /** Telegram con parse_mode HTML: escapar &, <, > en cualquier texto libre (descripciones de incidencias, nombres). */
 function escapeHtml(texto: string): string {
   return texto.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Una incidencia con sus fotos (antes solo se guardaba la descripción). */
+interface IncidenciaConFotos {
+  descripcion: string;
+  fotos: string[];
 }
 
 interface RequestBody {
@@ -160,36 +176,40 @@ Deno.serve(async (req: Request) => {
     // deno-lint-ignore no-explicit-any
     const parteIds = (partesRows ?? []).map((p: any) => p.id as string);
 
-    // 5) Incidencias de calidad colgadas de esos partes.
-    const incidenciasCalidadPorParte = new Map<string, string[]>();
+    // 5) Incidencias de calidad colgadas de esos partes. Se pide
+    // también "fotos" (antes solo "descripcion") para poder
+    // incrustarlas en el PDF — ver paso 7b.
+    const incidenciasCalidadPorParte = new Map<string, IncidenciaConFotos[]>();
     if (parteIds.length > 0) {
       const { data: icRows, error: icErr } = await supabase
         .from("incidencia_calidad")
-        .select("parte_id, descripcion")
+        .select("parte_id, descripcion, fotos")
         .in("parte_id", parteIds);
       if (icErr) throw icErr;
       for (const ic of icRows ?? []) {
         const lista = incidenciasCalidadPorParte.get(ic.parte_id) ?? [];
-        lista.push(ic.descripcion);
+        lista.push({ descripcion: ic.descripcion, fotos: ic.fotos ?? [] });
         incidenciasCalidadPorParte.set(ic.parte_id, lista);
       }
     }
 
     // 6) Incidencias de producción del turno — por línea, y generales.
+    // Mismo cambio que el paso 5: ahora se pide también "fotos".
     const { data: ipRows, error: ipErr } = await supabase
       .from("incidencia_produccion")
-      .select("linea_id, descripcion")
+      .select("linea_id, descripcion, fotos")
       .eq("turno_id", turnoId);
     if (ipErr) throw ipErr;
-    const incidenciasProduccionPorLinea = new Map<string, string[]>();
-    const incidenciasGenerales: string[] = [];
+    const incidenciasProduccionPorLinea = new Map<string, IncidenciaConFotos[]>();
+    const incidenciasGenerales: IncidenciaConFotos[] = [];
     for (const ip of ipRows ?? []) {
+      const item: IncidenciaConFotos = { descripcion: ip.descripcion, fotos: ip.fotos ?? [] };
       if (ip.linea_id) {
         const lista = incidenciasProduccionPorLinea.get(ip.linea_id) ?? [];
-        lista.push(ip.descripcion);
+        lista.push(item);
         incidenciasProduccionPorLinea.set(ip.linea_id, lista);
       } else {
-        incidenciasGenerales.push(ip.descripcion);
+        incidenciasGenerales.push(item);
       }
     }
 
@@ -201,7 +221,7 @@ Deno.serve(async (req: Request) => {
       m2_1a: number;
       m2Comercial: number;
       m2Contenedor: number;
-      incidenciasCalidad: string[];
+      incidenciasCalidad: IncidenciaConFotos[];
     }
     interface AcumuladorLinea {
       m2: number;
@@ -262,6 +282,44 @@ Deno.serve(async (req: Request) => {
       tiemposTotales.maquina += p.minutos_maquina;
     }
 
+    // 7b) Generar el PDF con estos mismos datos y subirlo a
+    // Cloudinary, ANTES de construir el texto de Telegram — así el
+    // enlace ya está listo para meterlo en el último bloque. No es
+    // fatal si falla: el aviso a Telegram no depende de que el PDF
+    // exista (mismo criterio que la marca resumen_enviado_at del
+    // paso 11 — un fallo aislado no debe tirar abajo todo el envío).
+    // El responsable simplemente verá el resumen de texto sin
+    // enlace esa vez, y turno.informe_pdf_url se queda en null.
+    let pdfUrl: string | null = null;
+    try {
+      const datosPdf: DatosInformeTurnoPdf = {
+        fecha: turnoRow.fecha,
+        tipoNombre: NOMBRE_TIPO[turnoRow.tipo] ?? turnoRow.tipo,
+        responsableUsername: responsable?.username ?? "—",
+        m2Total: m2TotalTurno,
+        tiempos: tiemposTotales,
+        lineas: (lineasRows ?? []).map((linea: { id: string; nombre: string }) => {
+          const acum = acumPorLinea.get(linea.id);
+          return {
+            nombre: linea.nombre,
+            operario: operarioPorLinea.get(linea.id) ?? "",
+            m2Total: acum?.m2 ?? 0,
+            tiempos: acum?.tiempos ?? tiemposVacios(),
+            incidenciasProduccion: incidenciasProduccionPorLinea.get(linea.id) ?? [],
+            partes: acum?.partes ?? [],
+          };
+        }),
+        incidenciasGenerales,
+      };
+
+      const pdfBytes = await generarPdfInformeTurno(datosPdf);
+      const publicId = construirPublicIdInformeTurno(turnoRow.fecha, turnoRow.tipo);
+      const subida = await subirInformePdfACloudinary(pdfBytes, publicId);
+      pdfUrl = subida.url;
+    } catch (err) {
+      console.error("No se pudo generar/subir el PDF del informe de turno:", err);
+    }
+
     // 8) Construir el texto en bloques (HTML, mismo parse_mode que
     // notificar-telegram) — un bloque por nivel del informe, para
     // poder partir en varios mensajes sin cortar a mitad de un <b>.
@@ -286,8 +344,8 @@ Deno.serve(async (req: Request) => {
         `m²: ${formatearM2(acum?.m2 ?? 0)} · ${formatearTiempos(acum?.tiempos ?? tiemposVacios())}`,
       ];
 
-      for (const desc of incidenciasProduccionPorLinea.get(linea.id) ?? []) {
-        lineasTexto.push(`⚠️ Incidencia de producción: "${escapeHtml(desc)}"`);
+      for (const inc of incidenciasProduccionPorLinea.get(linea.id) ?? []) {
+        lineasTexto.push(`⚠️ Incidencia de producción: "${escapeHtml(inc.descripcion)}"`);
       }
 
       if (partes.length === 0) {
@@ -298,8 +356,8 @@ Deno.serve(async (req: Request) => {
           lineasTexto.push(
             `    1ª: ${formatearM2(p.m2_1a)} · Comercial: ${formatearM2(p.m2Comercial)} · Contenedor: ${formatearM2(p.m2Contenedor)}`,
           );
-          for (const desc of p.incidenciasCalidad) {
-            lineasTexto.push(`    🔴 Incidencia de calidad: "${escapeHtml(desc)}"`);
+          for (const inc of p.incidenciasCalidad) {
+            lineasTexto.push(`    🔴 Incidencia de calidad: "${escapeHtml(inc.descripcion)}"`);
           }
         }
       }
@@ -309,10 +367,14 @@ Deno.serve(async (req: Request) => {
 
     if (incidenciasGenerales.length > 0) {
       bloques.push(
-        [`<b>Incidencias generales del turno</b>`, ...incidenciasGenerales.map((d) => `- "${escapeHtml(d)}"`)].join(
+        [`<b>Incidencias generales del turno</b>`, ...incidenciasGenerales.map((inc) => `- "${escapeHtml(inc.descripcion)}"`)].join(
           "\n",
         ),
       );
+    }
+
+    if (pdfUrl) {
+      bloques.push(`📄 <a href="${pdfUrl}">Informe completo en PDF</a>`);
     }
 
     const textoCompleto = bloques.join("\n\n");
@@ -364,9 +426,13 @@ Deno.serve(async (req: Request) => {
     // vuelva a mandar duplicado, y también sirve de "ya está hecho"
     // si esta misma función se llama dos veces para el mismo turno
     // (botón manual + cron casi a la vez, caso raro pero posible).
+    // También guarda la URL del PDF (null si el paso 7b falló).
     const { error: marcarErr } = await supabase
       .from("turno")
-      .update({ resumen_enviado_at: new Date().toISOString() })
+      .update({
+        resumen_enviado_at: new Date().toISOString(),
+        informe_pdf_url: pdfUrl,
+      })
       .eq("id", turnoId);
     if (marcarErr) {
       // El envío a Telegram ya salió bien — no se revierte nada por
@@ -375,7 +441,7 @@ Deno.serve(async (req: Request) => {
       console.error("Resumen enviado, pero no se pudo marcar resumen_enviado_at:", marcarErr);
     }
 
-    return jsonOk({ texto: textoCompleto, mensajes_enviados: mensajes.length });
+    return jsonOk({ texto: textoCompleto, mensajes_enviados: mensajes.length, informe_pdf_url: pdfUrl });
   } catch (err) {
     console.error("Error en generar-resumen-turno:", err);
     return jsonError(

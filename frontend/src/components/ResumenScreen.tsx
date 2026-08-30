@@ -21,7 +21,13 @@ const NOMBRE_TIPO: Record<TipoTurno, string> = {
  * TurnoScreen) — si todavía está abierto o en revisión, se avisa de
  * que es una vista provisional; el envío automático a Telegram
  * cuando se cierra vive aparte, en la Edge Function
- * `generar-resumen-turno` (pendiente).
+ * `generar-resumen-turno`.
+ *
+ * PDF (30/08/2026): generar-resumen-turno genera el PDF SOLO al
+ * cerrar el turno, y guarda su URL en turno.informe_pdf_url. Por eso
+ * informePdfUrl se queda en null mientras el turno sigue abierto —
+ * el texto a copiar simplemente no lleva enlace en ese caso, en vez
+ * de mostrar un enlace roto o inventado.
  */
 export function ResumenScreen() {
   const { usuario } = useAuth();
@@ -30,6 +36,7 @@ export function ResumenScreen() {
   const [resumen, setResumen] = useState<ResumenTurno | null>(null);
   const [esProvisional, setEsProvisional] = useState(false);
   const [copiado, setCopiado] = useState(false);
+  const [informePdfUrl, setInformePdfUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!usuario) return;
@@ -50,6 +57,7 @@ export function ResumenScreen() {
           if (!cancelado) {
             setResumen(null);
             setEsProvisional(false);
+            setInformePdfUrl(null);
           }
           return;
         }
@@ -59,6 +67,7 @@ export function ResumenScreen() {
           if (!cancelado) {
             setResumen(null);
             setEsProvisional(false);
+            setInformePdfUrl(null);
           }
           return;
         }
@@ -71,6 +80,9 @@ export function ResumenScreen() {
           // recalcula cada vez que se entra a esta pestaña, no es una
           // foto fija hasta el cierre.
           setEsProvisional(!turno.cerrado_at && (info.estado === "abierto" || info.estado === "en_revision"));
+          // null mientras el turno sigue abierto, o si el PDF falló
+          // al generarse en el cierre (ver comentario en cabecera).
+          setInformePdfUrl(turno.informe_pdf_url);
         }
       } catch (err) {
         if (!cancelado) setError(err instanceof Error ? err.message : String(err));
@@ -88,7 +100,7 @@ export function ResumenScreen() {
   async function copiar() {
     if (!resumen) return;
     try {
-      await navigator.clipboard.writeText(formatearResumenTurnoTexto(resumen));
+      await navigator.clipboard.writeText(formatearResumenTurnoTexto(resumen, informePdfUrl));
       setCopiado(true);
       setTimeout(() => setCopiado(false), 2000);
     } catch (err) {
@@ -116,7 +128,7 @@ export function ResumenScreen() {
     );
   }
 
-  const texto = formatearResumenTurnoTexto(resumen);
+  const texto = formatearResumenTurnoTexto(resumen, informePdfUrl);
 
   return (
     <div className="mx-auto max-w-md pb-8">
