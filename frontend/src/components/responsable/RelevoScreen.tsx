@@ -31,6 +31,15 @@ function formatearHora(iso: string | null): string {
   return new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
 
+/** null cuando el lote no tiene objetivo_m2 capturado — no se pinta nada en vez de un "0" engañoso. */
+function formatearPendiente(pendiente: { m2Pendiente: number | null; piezasPendiente: number | null }): string | null {
+  if (pendiente.m2Pendiente === null || pendiente.piezasPendiente === null) return null;
+  if (pendiente.m2Pendiente === 0) return "Objetivo completado";
+  const m2 = pendiente.m2Pendiente.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const piezas = Math.round(pendiente.piezasPendiente).toLocaleString("es-ES");
+  return `Pendiente: ${m2} m² · ${piezas} piezas`;
+}
+
 export function RelevoScreen() {
   const { usuario } = useAuth();
   const [cargando, setCargando] = useState(true);
@@ -162,6 +171,9 @@ function TarjetaLineaRelevo({ linea }: { linea: RelevoLinea }) {
             {linea.parteAbierto.calibre ? ` · Cal. ${linea.parteAbierto.calibre}` : ""} · Nº orden{" "}
             {linea.parteAbierto.numeroOrden}
           </p>
+          {formatearPendiente(linea.parteAbierto.pendiente) && (
+            <p className="mt-1 text-xs font-medium text-amber-800">{formatearPendiente(linea.parteAbierto.pendiente)}</p>
+          )}
         </div>
       )}
 
@@ -179,6 +191,9 @@ function TarjetaLineaRelevo({ linea }: { linea: RelevoLinea }) {
             {linea.ultimoCerrado.calibre ? ` · Cal. ${linea.ultimoCerrado.calibre}` : ""} ·{" "}
             {linea.ultimoCerrado.piezasEntradas} piezas · cerrado a las {formatearHora(linea.ultimoCerrado.completadoAt)}
           </p>
+          {formatearPendiente(linea.ultimoCerrado.pendiente) && (
+            <p className="mt-1 text-xs font-medium text-slate-600">{formatearPendiente(linea.ultimoCerrado.pendiente)}</p>
+          )}
         </div>
       )}
 

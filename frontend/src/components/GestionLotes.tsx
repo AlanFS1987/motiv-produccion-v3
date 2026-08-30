@@ -6,6 +6,11 @@
 // 7.1) — es puramente una etiqueta de gestión, decisión siempre
 // humana. Visible para cualquier responsable, no filtrado por turno
 // (un lote puede producirse en varias líneas a la vez).
+//
+// Cada tarjeta muestra también el pendiente (m² y piezas que faltan
+// por producir, ver lib/lote.ts / v_lote_pendiente) — null cuando el
+// lote no tiene objetivo_m2 capturado, en cuyo caso no se pinta nada
+// en vez de mostrar un "0" engañoso.
 
 import { useEffect, useState } from "react";
 import { Package, RotateCcw, Lock } from "lucide-react";
@@ -100,6 +105,13 @@ function formatFecha(iso: string): string {
   });
 }
 
+/** m² con 1 decimal, piezas como entero — mismo criterio que el resto de pantallas de producción. */
+function formatPendiente(m2: number, piezas: number): string {
+  const m2Fmt = m2.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const piezasFmt = Math.round(piezas).toLocaleString("es-ES");
+  return `${m2Fmt} m² · ${piezasFmt} piezas`;
+}
+
 function FilaLote({
   lote,
   procesando,
@@ -112,6 +124,8 @@ function FilaLote({
   onReabrir: () => void;
 }) {
   const finalizado = lote.estado === "finalizado";
+  const tienePendiente = lote.m2Pendiente !== null && lote.piezasPendiente !== null;
+  const completado = tienePendiente && lote.m2Pendiente === 0;
 
   return (
     <div className="rounded-xl bg-white p-4 shadow-sm">
@@ -132,6 +146,14 @@ function FilaLote({
           {finalizado ? "Finalizado" : "Iniciado"}
         </span>
       </div>
+
+      {tienePendiente && (
+        <p className={`mt-2 text-xs font-medium ${completado ? "text-emerald-600" : "text-amber-700"}`}>
+          {completado
+            ? "Objetivo completado"
+            : `Pendiente: ${formatPendiente(lote.m2Pendiente as number, lote.piezasPendiente as number)}`}
+        </p>
+      )}
 
       <button
         type="button"

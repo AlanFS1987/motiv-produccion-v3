@@ -2,10 +2,11 @@
 //
 // Datos para la pestaña "Relevo" del responsable (02-responsable.md):
 // qué dejó el turno INMEDIATAMENTE anterior para quien entra ahora —
-// lotes abiertos sin cerrar, incidencias, y el último lote cerrado en
-// cada línea. Mismo criterio de "solo el turno justo antes, no
-// rebuscar lo último que sea" que ya usa obtenerSugerenciasContinuarPorLinea
-// (lib/parte.ts) para "Continuar mismo lote+tono".
+// lotes abiertos sin cerrar (con su pendiente de producir), el último
+// lote cerrado por línea, e incidencias. Mismo criterio de "solo el
+// turno justo antes, no rebuscar lo último que sea" que ya usa
+// obtenerSugerenciasContinuarPorLinea (lib/parte.ts) para "Continuar
+// mismo lote+tono".
 //
 // Diferencia deliberada con esa función: aquí el turno anterior se
 // busca por fecha+tipo (fn_turno_de_letra ya resuelto en TurnoActual),
@@ -14,22 +15,31 @@
 // pestaña Turno y creado la fila de hoy (ver obtenerOCrearTurno en
 // lib/turno.ts), así que no puede depender de que esa fila ya exista.
 //
-// Reutiliza obtenerPartesPendientesPorLinea (lib/parte.ts) y las
-// funciones de incidencias de producción (lib/incidencias.ts) tal
-// cual; solo añade lo que no existía: "último completado por línea"
-// de un turno_id ya conocido (no calculado a partir de otro turno) y
-// las incidencias de calidad agrupadas por línea de un turno (esa
-// tabla solo tiene parte_id, no turno_id directo).
+// Partes pendientes: consulta PROPIA (no obtenerPartesPendientesPorLinea
+// de lib/parte.ts) porque esa devuelve ParteResumen sin lote_id a
+// nivel superior — aquí hace falta el lote_id para buscar su
+// pendiente en v_lote_pendiente (lib/lote.ts). Resto de lo que no
+// existía: "último completado por línea" de un turno_id ya conocido
+// (no calculado a partir de otro turno) y las incidencias de calidad
+// agrupadas por línea de un turno (esa tabla solo tiene parte_id, no
+// turno_id directo).
 
 import { supabase } from "./supabase-client";
 import { listarLineas } from "./turno";
-import { obtenerPartesPendientesPorLinea, type ParteResumen } from "./parte";
+import { obtenerPendientePorLote } from "./lote";
+import type { EstadoVerificacionCaja, EstadoVerificacionCodbar } from "./parte";
 import {
   listarIncidenciasProduccionLinea,
   listarIncidenciasProduccionGenerales,
   type IncidenciaProduccion,
 } from "./incidencias";
 import type { TipoTurno } from "./rotacion";
+
+/** m² y piezas que faltan por producir del lote — null si no tiene objetivo_m2 capturado (ver v_lote_pendiente). */
+export interface PendienteLote {
+  m2Pendiente: number | null;
+  piezasPendiente: number | null;
+}
 
 export interface TurnoAnteriorInfo {
   id: string;
@@ -39,7 +49,22 @@ export interface TurnoAnteriorInfo {
   comoCerro: "manual" | "automatico" | null;
 }
 
-/** Último parte completado de una línea — mismos campos que SugerenciaContinuar (lib/parte.ts) + piezas/hora, para la tarjeta de relevo. */
+/** Mismos campos que ParteResumen (lib/parte.ts) + loteId (hace falta para el pendiente) + pendiente ya resuelto. */
+export interface ParteAbiertoRelevo {
+  id: string;
+  loteId: string;
+  tono: string;
+  calibre: string | null;
+  numeroOrden: string;
+  modeloNombre: string;
+  marcaNombre: string;
+  formatoNombre: string;
+  verificacionCajaEstado: EstadoVerificacionCaja | null;
+  verificacionCodbarEstado: EstadoVerificacionCodbar | null;
+  pendiente: PendienteLote;
+}
+
+/** Último parte completado de una línea — mismos campos que SugerenciaContinuar (lib/parte.ts) + piezas/hora + pendiente. */
 export interface UltimoCerrado {
   loteId: string;
   tono: string;
@@ -50,6 +75,7 @@ export interface UltimoCerrado {
   numeroOrden: string;
   piezasEntradas: number;
   completadoAt: string | null;
+  pendiente: PendienteLote;
 }
 
 export interface IncidenciaCalidadRelevo {
@@ -64,8 +90,8 @@ export interface IncidenciaCalidadRelevo {
 export interface RelevoLinea {
   lineaId: string;
   lineaNombre: string;
-  /** Parte sin completar que deja el turno anterior — lo que hay que retomar. */
-  parteAbierto: ParteResumen | null;
+  /** Parte sin completar que deja el turno anterior — lo que hay que retomar, con el pendiente de su lote. */
+  parteAbierto: ParteAbiertoRelevo | null;
   /** Último parte que el turno anterior sí cerró en esta línea (aunque no haya nada pendiente). */
   ultimoCerrado: UltimoCerrado | null;
   incidenciasProduccion: IncidenciaProduccion[];
@@ -92,6 +118,58 @@ function fechaTipoAnterior(fecha: string, tipo: TipoTurno): { fecha: string; tip
   return { fecha: `${yy}-${mm}-${dd}`, tipo: "N" };
 }
 
+const SELECT_PARTE_ABIERTO_RELEVO = `id, linea_id, lote_id, tono, calibre, verificacion_caja_estado, verificacion_codbar_estado,
+  lote:lote_id (
+    numero_orden,
+    producto:producto_id (
+      formato:formato_id ( nombre ),
+      modelo:modelo_id ( nombre ),
+      marca:marca_id ( nombre )
+    )
+  )`;
+
+/**
+ * Partes pendientes (completado=false, vigente) por línea de un
+ * turno_id ya conocido, CON lote_id — a diferencia de
+ * obtenerPartesPendientesPorLinea (lib/parte.ts), que no lo trae a
+ * nivel superior. Se necesita para buscar el pendiente de cada lote
+ * en v_lote_pendiente.
+ */
+async function obtenerPartesAbiertosPorLinea(turnoId: string): Promise<Record<string, Omit<ParteAbiertoRelevo, "pendiente">>> {
+  const { data, error } = await supabase
+    .from("parte")
+    .select(SELECT_PARTE_ABIERTO_RELEVO)
+    .eq("turno_id", turnoId)
+    .eq("vigente", true)
+    .eq("completado", false)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  const resultado: Record<string, Omit<ParteAbiertoRelevo, "pendiente">> = {};
+  for (const fila of (data ?? []) as any[]) {
+    if (resultado[fila.linea_id]) continue; // no debería haber más de uno por línea, pero por si acaso: el más reciente
+    const lote = Array.isArray(fila.lote) ? fila.lote[0] : fila.lote;
+    const producto = Array.isArray(lote?.producto) ? lote.producto[0] : lote?.producto;
+    const modelo = Array.isArray(producto?.modelo) ? producto.modelo[0] : producto?.modelo;
+    const marca = Array.isArray(producto?.marca) ? producto.marca[0] : producto?.marca;
+    const formato = Array.isArray(producto?.formato) ? producto.formato[0] : producto?.formato;
+    resultado[fila.linea_id] = {
+      id: fila.id,
+      loteId: fila.lote_id,
+      tono: fila.tono,
+      calibre: fila.calibre,
+      numeroOrden: lote?.numero_orden ?? "—",
+      modeloNombre: modelo?.nombre ?? "—",
+      marcaNombre: marca?.nombre ?? "—",
+      formatoNombre: formato?.nombre ?? "—",
+      verificacionCajaEstado: (fila.verificacion_caja_estado as EstadoVerificacionCaja | null) ?? null,
+      verificacionCodbarEstado: (fila.verificacion_codbar_estado as EstadoVerificacionCodbar | null) ?? null,
+    };
+  }
+  return resultado;
+}
+
 /**
  * Último parte completado (vigente) por línea de un turno_id ya
  * conocido. A propósito NO reutiliza obtenerSugerenciasContinuarPorLinea
@@ -100,7 +178,7 @@ function fechaTipoAnterior(fecha: string, tipo: TipoTurno): { fecha: string; tip
  * por fecha+tipo, pasar su id por ese otro camino encontraría el
  * turno DOS relevos atrás.
  */
-async function obtenerUltimosCerradosPorLinea(turnoId: string): Promise<Record<string, UltimoCerrado>> {
+async function obtenerUltimosCerradosPorLinea(turnoId: string): Promise<Record<string, Omit<UltimoCerrado, "pendiente">>> {
   const { data, error } = await supabase
     .from("parte")
     .select(
@@ -117,7 +195,7 @@ async function obtenerUltimosCerradosPorLinea(turnoId: string): Promise<Record<s
 
   if (error) throw error;
 
-  const resultado: Record<string, UltimoCerrado> = {};
+  const resultado: Record<string, Omit<UltimoCerrado, "pendiente">> = {};
   for (const fila of (data ?? []) as any[]) {
     if (resultado[fila.linea_id]) continue; // ya vienen ordenados desc: solo el más reciente por línea
     const lote = Array.isArray(fila.lote) ? fila.lote[0] : fila.lote;
@@ -187,6 +265,18 @@ async function obtenerIncidenciasCalidadPorLinea(turnoId: string): Promise<Recor
   return resultado;
 }
 
+function conPendiente<T extends { loteId: string }>(
+  mapa: Record<string, T>,
+  pendientePorLote: Record<string, { m2: number | null; piezas: number | null }>,
+): Record<string, T & { pendiente: PendienteLote }> {
+  const resultado: Record<string, T & { pendiente: PendienteLote }> = {};
+  for (const [clave, valor] of Object.entries(mapa)) {
+    const p = pendientePorLote[valor.loteId];
+    resultado[clave] = { ...valor, pendiente: { m2Pendiente: p?.m2 ?? null, piezasPendiente: p?.piezas ?? null } };
+  }
+  return resultado;
+}
+
 /**
  * Todos los datos de la Vista de Relevo, a partir de la fecha+tipo
  * del turno que le toca AHORA al responsable (fecha/tipo de
@@ -214,18 +304,32 @@ export async function obtenerDatosRelevo(fechaActual: string, tipoActual: TipoTu
   const turnoAnteriorId = turnoAnteriorRow.id as string;
   const lineas = await listarLineas();
 
-  const [partesPendientes, ultimosCerrados, incidenciasCalidadPorLinea, incidenciasGenerales] = await Promise.all([
-    obtenerPartesPendientesPorLinea(turnoAnteriorId),
+  const [partesAbiertosSinPendiente, ultimosCerradosSinPendiente, incidenciasCalidadPorLinea, incidenciasGenerales] = await Promise.all([
+    obtenerPartesAbiertosPorLinea(turnoAnteriorId),
     obtenerUltimosCerradosPorLinea(turnoAnteriorId),
     obtenerIncidenciasCalidadPorLinea(turnoAnteriorId),
     listarIncidenciasProduccionGenerales(turnoAnteriorId),
   ]);
 
+  // Un solo viaje a v_lote_pendiente para TODOS los lotes que
+  // aparecen en el relevo (abiertos + últimos cerrados), acotado por
+  // id — nunca consultar la vista entera.
+  const loteIds = Array.from(
+    new Set([
+      ...Object.values(partesAbiertosSinPendiente).map((p) => p.loteId),
+      ...Object.values(ultimosCerradosSinPendiente).map((c) => c.loteId),
+    ]),
+  );
+  const pendientePorLote = await obtenerPendientePorLote(loteIds);
+
+  const partesAbiertos = conPendiente(partesAbiertosSinPendiente, pendientePorLote);
+  const ultimosCerrados = conPendiente(ultimosCerradosSinPendiente, pendientePorLote);
+
   const lineasRelevo: RelevoLinea[] = await Promise.all(
     lineas.map(async (linea) => ({
       lineaId: linea.id,
       lineaNombre: linea.nombre,
-      parteAbierto: partesPendientes[linea.id] ?? null,
+      parteAbierto: partesAbiertos[linea.id] ?? null,
       ultimoCerrado: ultimosCerrados[linea.id] ?? null,
       incidenciasProduccion: await listarIncidenciasProduccionLinea(turnoAnteriorId, linea.id),
       incidenciasCalidad: incidenciasCalidadPorLinea[linea.id] ?? [],
