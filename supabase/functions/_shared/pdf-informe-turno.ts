@@ -2,25 +2,12 @@
 // PDF de turno" (30/08/2026) — evolución del resumen de texto que ya
 // manda generar-resumen-turno a Telegram.
 //
-// Se llama SOLO desde generar-resumen-turno, con los mismos datos que
-// esa función ya calcula para el texto de Telegram (no vuelve a
-// consultar la base de datos), más las fotos de las incidencias que
-// el texto de Telegram no necesita pero el PDF sí.
-//
-// pdf-lib no maquetea solo (no es HTML/CSS): aquí se dibuja todo por
-// coordenadas, controlando manualmente los saltos de página. Tablas
-// (una de tiempos + una de partes por línea) en vez de frases largas,
-// porque en columnas se lee de un vistazo — ver conversación previa.
-//
-// FOTOS: las fotos ya llegan desde Cloudinary en 1600×1200 WebP
-// (captura-imagen.ts). pdf-lib solo sabe incrustar JPEG o PNG, no
-// WebP, así que cada URL se pide reescrita con una transformación de
-// Cloudinary (f_jpg + w_900) ANTES de descargarla — no se toca el
-// archivo original en Cloudinary, es solo la URL de entrega la que
-// cambia. De paso, pedir un ancho más pequeño que el original aligera
-// la descarga y el PDF final. Layout: una foto debajo de otra (no en
-// fila), a un ancho de recuadro amplio pero fijo, para que el alto se
-// pueda calcular sin ambigüedad antes de decidir si cabe en la página.
+// Revisión 30/08/2026 (tras ver el primer PDF real): fotos más
+// pequeñas, piezas junto a los m² en la tabla de partes, % junto a
+// los minutos en las tablas de tiempos, y una tabla comparativa
+// nueva (una fila por línea) justo después de la cabecera, para
+// poder comparar las 6 líneas de un vistazo sin entrar en el detalle
+// de cada una.
 
 import { PDFDocument, PDFFont, PDFImage, PDFPage, StandardFonts, rgb, RGB } from "npm:pdf-lib@1.17.1";
 
@@ -44,6 +31,9 @@ export interface ParteInformePdf {
   m2_1a: number;
   m2Comercial: number;
   m2Contenedor: number;
+  piezas1a: number;
+  piezasComercial: number;
+  piezasContenedor: number;
   incidenciasCalidad: IncidenciaConFotosPdf[];
 }
 
@@ -73,7 +63,9 @@ const MARGEN_SUP = 40;
 const MARGEN_INF = 44;
 const ANCHO_CONTENIDO = ANCHO_PAGINA - MARGEN_X * 2;
 
-const ANCHO_FOTO = 320;
+// Antes 320 — bajado a 200 tras ver el primer PDF real (demasiado
+// grandes, tapaban más de media página cada una).
+const ANCHO_FOTO = 200;
 const ANCHO_DESCARGA_FOTO = 900;
 
 const COLOR_MARCA: RGB = rgb(20 / 255, 99 / 255, 110 / 255);
@@ -106,6 +98,10 @@ function asegurarEspacio(ctx: Contexto, alto: number): void {
 
 function formatearM2(valor: number): string {
   return `${valor.toLocaleString("es-ES", { maximumFractionDigits: 1, minimumFractionDigits: 1 })} m²`;
+}
+
+function formatearPiezas(valor: number): string {
+  return valor.toLocaleString("es-ES", { maximumFractionDigits: 0 });
 }
 
 function formatearFecha(fechaISO: string): string {
@@ -252,25 +248,63 @@ function dibujarTabla(ctx: Contexto, columnas: ColumnaTabla[], filas: string[][]
 }
 
 const COLUMNAS_TIEMPOS: ColumnaTabla[] = [
-  { titulo: "Plena", ancho: 70 },
-  { titulo: "No aliment.", ancho: 75 },
-  { titulo: "Saturación", ancho: 75 },
-  { titulo: "Banco", ancho: 70 },
-  { titulo: "Máquina", ancho: 75 },
+  { titulo: "Plena", ancho: 78 },
+  { titulo: "No aliment.", ancho: 83 },
+  { titulo: "Saturación", ancho: 83 },
+  { titulo: "Banco", ancho: 78 },
+  { titulo: "Máquina", ancho: 83 },
   { titulo: "m² total", ancho: 90, alinearDerecha: true },
 ];
 
 const COLUMNAS_PARTES: ColumnaTabla[] = [
-  { titulo: "Modelo", ancho: 130 },
-  { titulo: "Formato", ancho: 80 },
-  { titulo: "Tono", ancho: 45 },
-  { titulo: "1ª", ancho: 78, alinearDerecha: true },
-  { titulo: "Comercial", ancho: 78, alinearDerecha: true },
-  { titulo: "Contenedor", ancho: 78, alinearDerecha: true },
+  { titulo: "Modelo", ancho: 120 },
+  { titulo: "Formato", ancho: 75 },
+  { titulo: "Tono", ancho: 40 },
+  { titulo: "1ª", ancho: 93, alinearDerecha: true },
+  { titulo: "Comercial", ancho: 93, alinearDerecha: true },
+  { titulo: "Contenedor", ancho: 93, alinearDerecha: true },
 ];
 
+// Tabla comparativa nueva: una fila por línea, tiempos con % ya
+// incluido en la misma celda (igual criterio que COLUMNAS_TIEMPOS)
+// para no duplicar columnas — cabe justo en el ancho de contenido.
+const COLUMNAS_COMPARATIVA: ColumnaTabla[] = [
+  { titulo: "Línea", ancho: 60 },
+  { titulo: "Operario", ancho: 75 },
+  { titulo: "m²", ancho: 60, alinearDerecha: true },
+  { titulo: "Plena", ancho: 64, alinearDerecha: true },
+  { titulo: "No aliment.", ancho: 64, alinearDerecha: true },
+  { titulo: "Saturación", ancho: 64, alinearDerecha: true },
+  { titulo: "Banco", ancho: 64, alinearDerecha: true },
+  { titulo: "Máquina", ancho: 64, alinearDerecha: true },
+];
+
+/** "75m (89%)" — minutos de una categoría junto a su % sobre el total de las 5. */
+function minConPct(minutos: number, totalMinutos: number): string {
+  if (totalMinutos <= 0) return `${minutos}m`;
+  const pct = Math.round((minutos / totalMinutos) * 100);
+  return `${minutos}m (${pct}%)`;
+}
+
+function totalMinutos(t: TiemposAgregadosPdf): number {
+  return t.plena + t.noAlimentada + t.saturacion + t.banco + t.maquina;
+}
+
 function filaTiempos(t: TiemposAgregadosPdf, m2Total: number): string[] {
-  return [`${t.plena}m`, `${t.noAlimentada}m`, `${t.saturacion}m`, `${t.banco}m`, `${t.maquina}m`, formatearM2(m2Total)];
+  const total = totalMinutos(t);
+  return [
+    minConPct(t.plena, total),
+    minConPct(t.noAlimentada, total),
+    minConPct(t.saturacion, total),
+    minConPct(t.banco, total),
+    minConPct(t.maquina, total),
+    formatearM2(m2Total),
+  ];
+}
+
+/** "326,2 m² (1.234 pz)" — m² junto al número de piezas de esa categoría. */
+function m2ConPiezas(m2: number, piezas: number): string {
+  return `${formatearM2(m2)} (${formatearPiezas(piezas)} pz)`;
 }
 
 function urlFotoParaPdf(url: string): string {
@@ -346,6 +380,28 @@ export async function generarPdfInformeTurno(datos: DatosInformeTurnoPdf): Promi
   ctx.y -= 4;
   dibujarTabla(ctx, COLUMNAS_TIEMPOS, [filaTiempos(datos.tiempos, datos.m2Total)]);
 
+  // ---- Tabla comparativa: una fila por línea, para ver las 6 de
+  // un vistazo antes de entrar en el detalle de cada una ----
+  ctx.y -= 4;
+  dibujarBarra(ctx, "Comparativa por línea");
+  dibujarTabla(
+    ctx,
+    COLUMNAS_COMPARATIVA,
+    datos.lineas.map((linea) => {
+      const total = totalMinutos(linea.tiempos);
+      return [
+        linea.nombre,
+        linea.operario || "Sin asignar",
+        formatearM2(linea.m2Total),
+        minConPct(linea.tiempos.plena, total),
+        minConPct(linea.tiempos.noAlimentada, total),
+        minConPct(linea.tiempos.saturacion, total),
+        minConPct(linea.tiempos.banco, total),
+        minConPct(linea.tiempos.maquina, total),
+      ];
+    }),
+  );
+
   for (const linea of datos.lineas) {
     ctx.y -= 4;
     dibujarBarra(ctx, `${linea.nombre} — Operario: ${linea.operario || "Sin asignar"}`);
@@ -366,9 +422,9 @@ export async function generarPdfInformeTurno(datos: DatosInformeTurnoPdf): Promi
           p.modeloNombre,
           p.formatoNombre,
           p.tono,
-          formatearM2(p.m2_1a),
-          formatearM2(p.m2Comercial),
-          formatearM2(p.m2Contenedor),
+          m2ConPiezas(p.m2_1a, p.piezas1a),
+          m2ConPiezas(p.m2Comercial, p.piezasComercial),
+          m2ConPiezas(p.m2Contenedor, p.piezasContenedor),
         ]),
       );
       for (const p of linea.partes) {

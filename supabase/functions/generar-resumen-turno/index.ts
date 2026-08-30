@@ -221,6 +221,9 @@ Deno.serve(async (req: Request) => {
       m2_1a: number;
       m2Comercial: number;
       m2Contenedor: number;
+      piezas1a: number;
+      piezasComercial: number;
+      piezasContenedor: number;
       incidenciasCalidad: IncidenciaConFotos[];
     }
     interface AcumuladorLinea {
@@ -265,8 +268,12 @@ Deno.serve(async (req: Request) => {
         m2_1a,
         m2Comercial,
         m2Contenedor,
+        piezas1a: p.piezas_1a,
+        piezasComercial: p.piezas_comercial,
+        piezasContenedor: p.piezas_contenedor,
         incidenciasCalidad: incidenciasCalidadPorParte.get(p.id) ?? [],
       });
+      
       acum.m2 += m2Parte;
       acum.tiempos.plena += p.minutos_plena;
       acum.tiempos.noAlimentada += p.minutos_no_alimentada;

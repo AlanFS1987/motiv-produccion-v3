@@ -141,5 +141,6 @@ export async function subirInformePdfACloudinary(
 /** Nombre de archivo legible: informe_turno_{fecha}_{tipo}, ej. informe_turno_20260830_M. */
 export function construirPublicIdInformeTurno(fechaISO: string, tipo: string): string {
   const fechaCompacta = fechaISO.replace(/-/g, "");
-  return `informe_turno_${fechaCompacta}_${tipo}`;
+  const sufijo = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+  return `informe_turno_${fechaCompacta}_${tipo}_${sufijo}`;
 }
