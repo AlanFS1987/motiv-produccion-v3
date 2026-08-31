@@ -13,7 +13,12 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, jsonError, jsonOk } from "../_shared/cors.ts";
-import { espesorATexto, limpiarNombreModelo, normalizarTexto } from "../_shared/normalizacion.ts";
+import {
+  espesorATexto,
+  limpiarNombreModelo,
+  normalizarFormato,
+  normalizarTexto,
+} from "../_shared/normalizacion.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -31,6 +36,9 @@ interface RequestBody {
   marca_texto: string;
   formato_nombre: string;
   numero_orden: string;
+  // NUEVO — respaldo cuando DIMENSIONES no trae una medida legible
+  // (ver comentario junto a normalizarFormato en _shared/normalizacion.ts).
+  formato_alternativo_texto?: string | null;
   acabado_codigo?: string | null;
   acabado_tipo?: string | null;
   acabado_nombre?: string | null;
@@ -51,12 +59,12 @@ Deno.serve(async (req: Request) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-    const authHeader = req.headers.get("Authorization") ?? "";
+  const authHeader = req.headers.get("Authorization") ?? "";
   const jwt = authHeader.replace(/^Bearer\s+/i, "");
   if (!jwt) {
     return jsonError("Falta la sesión del usuario", 401);
   }
-  
+
   const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const { data: userData, error: userError } = await supabaseAuth.auth.getUser(jwt);
   if (userError || !userData?.user) {
@@ -76,6 +84,7 @@ Deno.serve(async (req: Request) => {
     marca_texto,
     formato_nombre,
     numero_orden,
+    formato_alternativo_texto = null,
     acabado_codigo = null,
     acabado_tipo = null,
     acabado_nombre = null,
@@ -117,20 +126,29 @@ Deno.serve(async (req: Request) => {
     // ---- Paso 2 — resolver o crear marca ----
     const marcaId = await resolverOCrear("marca", marca_texto);
 
-    // ---- formato — catálogo cerrado, coincidencia EXACTA (sin
-    // distinguir mayúsculas/minúsculas: el catálogo usa "600x1200",
-    // pero la hoja puede imprimirlo en mayúsculas "600X1200") ----
-    const formatoNormalizado = formato_nombre.trim().toLowerCase();
+    // ---- formato — catálogo cerrado, coincidencia EXACTA en mm.
+    // Normaliza tanto DIMENSIONES (formato_nombre) como, si esa no
+    // resuelve, el campo FORMATO crudo (formato_alternativo_texto) —
+    // acepta cm o mm y sufijos tipo "SL RC" (ver normalizarFormato). ----
+    const formatoResuelto =
+      normalizarFormato(formato_nombre) ?? normalizarFormato(formato_alternativo_texto);
+    if (!formatoResuelto) {
+      return jsonError(
+        `No se pudo reconocer el formato ni en DIMENSIONES ("${formato_nombre}") ` +
+          `ni en FORMATO ("${formato_alternativo_texto ?? "—"}") — formatos válidos: ` +
+          `200x1200, 300x1200, 600x1200, 1200x1200, 300x600, 600x600, 900x900`,
+        422,
+      );
+    }
     const { data: formatoRow, error: formatoErr } = await supabase
       .from("formato")
       .select("id")
-      .eq("nombre", formatoNormalizado)
+      .eq("nombre", formatoResuelto)
       .maybeSingle();
     if (formatoErr) throw formatoErr;
     if (!formatoRow) {
       return jsonError(
-        `"${formato_nombre}" no es un formato válido del catálogo cerrado ` +
-          `(200x1200, 300x1200, 600x1200, 1200x1200, 300x600, 600x600, 900x900)`,
+        `"${formatoResuelto}" se normalizó correctamente pero no existe en la tabla formato — revisar catálogo en BD`,
         422,
       );
     }

@@ -4,8 +4,6 @@
 // a tablas sí incorporaremos el cliente completo (con manejo de sesión).
 import { supabase } from "./supabase-client";
 
-
-
 export type FotoTipoOcr = "hoja_partida" | "caja" | "pantalla";
 
 export interface RespuestaOcrParte {
@@ -14,9 +12,16 @@ export interface RespuestaOcrParte {
   datos: Record<string, unknown>;
 }
 
+// NUEVO (sesión 31/08/2026): acepta también {base64, mediaType} además
+// de {url} — permite llamar a ocrParte EN PARALELO con la subida a
+// Cloudinary (Hoja y Pantalla) en vez de esperar a tener la URL antes
+// de arrancar el OCR. El backend (_shared/anthropic.ts, openai.ts) ya
+// soportaba ambos formatos; solo faltaba el tipo aquí en el cliente.
+export type ImagenEntradaOcr = { url: string } | { base64: string; mediaType: string };
+
 export async function ocrParte(
   fotoTipo: FotoTipoOcr,
-  imagenes: { url: string }[],
+  imagenes: ImagenEntradaOcr[],
 ): Promise<RespuestaOcrParte> {
   const { data, error } = await supabase.functions.invoke<RespuestaOcrParte>("ocr-parte", {
     body: { foto_tipo: fotoTipo, imagenes },
@@ -51,6 +56,9 @@ export interface DatosResolverCatalogo {
   marca_texto: string;
   formato_nombre: string;
   numero_orden: string;
+  // NUEVO — respaldo cuando DIMENSIONES no trae una medida legible
+  // (ver _shared/normalizacion.ts:normalizarFormato).
+  formato_alternativo_texto?: string | null;
   acabado_codigo?: string | null;
   acabado_tipo?: string | null;
   acabado_nombre?: string | null;
@@ -86,4 +94,3 @@ export async function resolverCatalogo(
 
   return data as RespuestaResolverCatalogo;
 }
-

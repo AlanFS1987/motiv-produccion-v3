@@ -15,6 +15,7 @@ Devuelve EXCLUSIVAMENTE un objeto JSON, sin texto antes ni después, sin backtic
   "modelo": string,
   "marca": string,
   "formato": string,
+  "formato_alternativo_texto": string | null,
   "acabado_codigo": string | null,
   "acabado_tipo": string | null,
   "acabado_nombre": string | null,
@@ -38,6 +39,7 @@ Notas de lectura importantes:
 - "modelo" es la línea de código de producto impresa justo debajo del centro (ej. "SL ORION MARFIL MT(PRC)60X120RC/CIF2_S"). Transcríbela COMPLETA, tal cual está impresa — no la recortes ni la limpies tú, eso se hace después con código.
 - "marca" es el nombre que aparece en la tabla inferior, columna "CAJA", fila "PRIMERA" (ej. "CIFRE") — NO el logo/nombre de la empresa que aparece en la cabecera de la hoja (ej. "ARGENTA" es el fabricante de la ficha, no la marca del producto).
 - "formato" se lee del campo "DIMENSIONES" de la hoja (ej. si DIMENSIONES pone "600X1200", formato = "600X1200"), NO del campo separado llamado "FORMATO" (ese trae unidades y sufijos distintos, como "60x120 SL RC", que no nos sirven).
+- "formato_alternativo_texto" es justo lo contrario: el texto literal del campo FORMATO (no DIMENSIONES), tal cual está impreso, sufijos incluidos (ej. "60x120 SL RC"). Es un respaldo — solo se usa si DIMENSIONES no trae una medida legible (a veces ese campo trae una nota de texto en vez de una medida, ej. "SIN PICOS EN 1A"). Si DIMENSIONES sí trae una medida, rellena igualmente este campo con el de FORMATO — no lo dejes en null solo porque DIMENSIONES ya esté bien.
 - "espesor_mm" es el TERCER número entre paréntesis junto a DIMENSIONES (ej. si pone "(1.200 | 600 | 9)", espesor_mm = 9). No lo deduzcas de ningún prefijo del nombre del modelo, léelo directo del número impreso.
 - "tono_ant" es el campo impreso "TONO ANT." — cópialo literal. Si hay algo escrito a mano cerca (encima, al lado, tachado), IGNÓRALO por completo — el valor es siempre el impreso. Si el campo impreso está en blanco, usa null.
 - "tipo_palet" es el texto COMPLETO del campo PALET, tal cual está impreso entero (ej. "PALET 84x122 CON PATIN CENTRAL") — no captures solo el primer número o las dimensiones, incluye toda la frase.

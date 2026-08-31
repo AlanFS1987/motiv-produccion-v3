@@ -107,7 +107,12 @@ export interface ImagenProcesada {
   mediaType: "image/webp" | "image/jpeg";
 }
 
-const CALIDAD_COMPRESION = 0.85;
+// Subida a 0.92 (antes 0.85) — sesión 31/08/2026: revisadas fotos
+// reales de hoja de partida y pantalla a 0.85/1600px sin pérdida de
+// legibilidad perceptible, pero se sube el margen para el bloque de
+// tiempos de Pantalla (dígitos pequeños, columna "Minutos" vs "Tiempo
+// %"), donde un error de lectura tiene más impacto que en el resto.
+const CALIDAD_COMPRESION = 0.92;
 
 let _soportaWebPCache: boolean | null = null;
 
@@ -253,4 +258,25 @@ export async function capturarFotogramaVideo(
   }
 
   return { blob, ancho, alto, mediaType };
+}
+
+// NUEVO (sesión 31/08/2026) — para poder llamar a ocrParte en
+// paralelo con subirACloudinary en vez de esperar la URL antes de
+// arrancar el OCR (Hoja y Pantalla). Solo lee el blob ya generado por
+// procesarFotoLibre — no vuelve a tocar el canvas.
+export function blobABase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const resultado = reader.result as string;
+      const base64 = resultado.split(",")[1];
+      if (!base64) {
+        reject(new Error("No se pudo extraer el base64 del blob"));
+        return;
+      }
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error("No se pudo convertir la imagen a base64"));
+    reader.readAsDataURL(blob);
+  });
 }

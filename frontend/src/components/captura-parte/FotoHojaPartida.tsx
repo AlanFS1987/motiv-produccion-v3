@@ -7,6 +7,7 @@ import {
   cargarImagenDesdeArchivo,
   procesarFotoLibre,
   cssAspectRatio,
+  blobABase64,
   type ImagenProcesada,
 } from "../../lib/captura-imagen";
 import { subirACloudinary, construirPublicId } from "../../lib/cloudinary";
@@ -57,17 +58,25 @@ export function FotoHojaPartida({ turnoId, lineaId, onResuelto, onCancelar }: Fo
 
   async function manejarFotoCapturada(procesada: ImagenProcesada) {
     setFase("procesando");
-    setMensaje("Subiendo a Cloudinary...");
+    setMensaje("Subiendo y leyendo en paralelo...");
     try {
       setPrevisualizacion(URL.createObjectURL(procesada.blob));
 
-      setMensaje(`Subiendo a Cloudinary (${(procesada.blob.size / 1024).toFixed(0)} KB)...`);
       const publicId = construirPublicId("HOJA", "hoja");
-      const subida = await subirACloudinary(procesada.blob, publicId, "partes");
+      const base64 = await blobABase64(procesada.blob);
+
+      // Antes: await subirACloudinary(...) y LUEGO await ocrParte(...)
+      // con la URL resultante — el OCR esperaba innecesariamente a
+      // que Cloudinary terminara. Ahora van en paralelo: el OCR usa
+      // el base64 directamente (ya lo soportaba el backend), sin
+      // depender de la URL de Cloudinary, que solo hace falta para
+      // guardar la referencia de la foto.
+      const [subida, respuesta] = await Promise.all([
+        subirACloudinary(procesada.blob, publicId, "partes"),
+        ocrParte("hoja_partida", [{ base64, mediaType: procesada.mediaType }]),
+      ]);
       setUrlCloudinary(subida.url);
 
-      setMensaje("Leyendo con Claude...");
-      const respuesta = await ocrParte("hoja_partida", [{ url: subida.url }]);
       const leido = respuesta.datos as unknown as DatosOcrHojaPartida;
       leido.modelo = extraerModeloVisible(leido.modelo);
       setDatos(leido);
@@ -118,6 +127,7 @@ export function FotoHojaPartida({ turnoId, lineaId, onResuelto, onCancelar }: Fo
         modelo_texto: datos.modelo.trim(),
         marca_texto: datos.marca.trim(),
         formato_nombre: datos.formato.trim(),
+        formato_alternativo_texto: datos.formato_alternativo_texto ?? null,
         numero_orden: datos.numero_orden.trim(),
         acabado_codigo: datos.acabado_codigo,
         acabado_tipo: datos.acabado_tipo,

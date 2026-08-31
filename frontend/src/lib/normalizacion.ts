@@ -163,3 +163,24 @@ export function parsearNumeroEspanol(texto: string | null): number | null {
   const numero = parseFloat(conPuntoDecimal);
   return isNaN(numero) ? null : numero;
 }
+const MAPA_FORMATO_A_MM: Record<string, string> = {
+  "30x60": "300x600", "60x60": "600x600", "20x120": "200x1200",
+  "30x120": "300x1200", "60x120": "600x1200", "90x90": "900x900",
+  "120x120": "1200x1200",
+  "300x600": "300x600", "600x600": "600x600", "200x1200": "200x1200",
+  "300x1200": "300x1200", "600x1200": "600x1200",
+  "900x900": "900x900", "1200x1200": "1200x1200",
+};
+
+function extraerParNumerico(texto: string): string | null {
+  const match = /(\d+)\s*x\s*(\d+)/i.exec(texto.trim());
+  return match ? `${match[1]}x${match[2]}` : null;
+}
+
+/** Normaliza DIMENSIONES o FORMATO (cm o mm, con posibles sufijos como "SL RC") al nombre exacto del catálogo cerrado. null si no reconoce nada. */
+export function normalizarFormato(textoBruto: string | null): string | null {
+  if (!textoBruto) return null;
+  const par = extraerParNumerico(textoBruto.toLowerCase());
+  if (!par) return null;
+  return MAPA_FORMATO_A_MM[par] ?? null;
+}

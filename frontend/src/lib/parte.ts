@@ -15,6 +15,7 @@ export interface DatosOcrHojaPartida {
   modelo: string;
   marca: string;
   formato: string;
+  formato_alternativo_texto: string | null;
   acabado_codigo: string | null;
   acabado_tipo: string | null;
   acabado_nombre: string | null;
@@ -24,7 +25,6 @@ export interface DatosOcrHojaPartida {
   numero_orden: string;
   tipo_palet: string | null;
   pza_caja: number | null;
-  /** Texto tal cual impreso en CTDAD — se parsea en el cliente, ver parsearNumeroEspanol. */
   objetivo_m2_texto: string | null;
   codbar_caja: string | null;
   codbar_pieza: string | null;
@@ -34,7 +34,6 @@ export interface DatosOcrHojaPartida {
   observaciones_orden: string | null;
   confianza: "alta" | "media" | "baja";
 }
-
 /** Lo que necesitan Foto 2/3 para seguir el wizard sin volver a Supabase. */
 export interface LoteResuelto {
   loteId: string;

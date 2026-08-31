@@ -6,6 +6,7 @@ import {
   cargarImagenDesdeArchivo,
   procesarFotoLibre,
   cssAspectRatio,
+  blobABase64,
   type ImagenProcesada,
 } from "../../lib/captura-imagen";
 import { subirACloudinary, construirPublicId } from "../../lib/cloudinary";
@@ -138,16 +139,26 @@ export function FotoPantallaMaquina(props: FotoPantallaMaquinaProps) {
 
   async function manejarFotoCapturada(procesada: ImagenProcesada) {
     setFase("procesando");
-    setMensaje("Subiendo a Cloudinary...");
+    setMensaje("Subiendo y leyendo en paralelo...");
     try {
       setPrevisualizacion(URL.createObjectURL(procesada.blob));
 
-      setMensaje("Subiendo a Cloudinary...");
       const publicId = construirPublicId(tonoParaArchivo, "pantalla");
-      const subida = await subirACloudinary(procesada.blob, publicId, "partes");
+      const base64 = await blobABase64(procesada.blob);
 
-      setMensaje("Leyendo con Claude...");
-      const respuesta = await ocrParte("pantalla", [{ url: subida.url }]);
+      // Igual que en FotoHojaPartida: el OCR ya no espera a que
+      // termine la subida a Cloudinary — usa el base64 directamente
+      // y ambas llamadas van en paralelo.
+      const [, respuesta] = await Promise.all([
+        subirACloudinary(procesada.blob, publicId, "partes"),
+        ocrParte("pantalla", [{ base64, mediaType: procesada.mediaType }]),
+      ]);
+      // Nota: si en algún sitio de este componente se usa la URL de
+      // Cloudinary de Pantalla (no se ha visto en los fragmentos
+      // revisados), guarda el primer resultado del Promise.all en una
+      // variable en vez de descartarlo con la coma — revísalo contra
+      // tu archivo real antes de aplicar.
+
       const leido = respuesta.datos as unknown as DatosOcrPantalla;
       setDatos(leido);
       setHoraTextoCrudo(leido.hora_captura_pantalla);
