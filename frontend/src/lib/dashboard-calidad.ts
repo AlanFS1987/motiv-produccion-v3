@@ -22,6 +22,9 @@ export interface LoteCalidad {
   formatoNombre: string;
   piezasEntradas: number;
   m2Total: number;
+  m21a: number;
+  m2Comercial: number;
+  m2Contenedor: number;
   pct1aCompleta: number | null;
   pctComercialCompleta: number | null;
   pctContenedorCompleta: number | null;
@@ -48,6 +51,9 @@ function mapLote(row: any): LoteCalidad {
     formatoNombre: row.formato_nombre,
     piezasEntradas: row.piezas_entradas ?? 0,
     m2Total: row.m2_total ?? 0,
+    m21a: row.m2_1a ?? 0,
+    m2Comercial: row.m2_comercial ?? 0,
+    m2Contenedor: row.m2_contenedor ?? 0,
     pct1aCompleta: row.pct_1a_completa,
     pctComercialCompleta: row.pct_comercial_completa,
     pctContenedorCompleta: row.pct_contenedor_completa,
@@ -152,6 +158,9 @@ export interface TonoCalidad {
   tono: string;
   piezasEntradas: number;
   m2Total: number;
+  m21a: number;
+  m2Comercial: number;
+  m2Contenedor: number;
   pct1aCompleta: number | null;
   pctComercialCompleta: number | null;
   pctContenedorCompleta: number | null;
@@ -210,6 +219,9 @@ export async function obtenerTonosPorLote(loteId: string): Promise<TonoCalidad[]
         tono,
         piezasEntradas: v.entradas,
         m2Total: Math.round(v.entradas * areaM2 * 100) / 100,
+        m21a: Math.round(v.a1 * areaM2 * 100) / 100,
+        m2Comercial: Math.round(v.com * areaM2 * 100) / 100,
+        m2Contenedor: Math.round(v.cont * areaM2 * 100) / 100,
         pct1aCompleta: v.entradas > 0 ? Math.round((v.a1 / v.entradas) * 10000) / 100 : null,
         pctComercialCompleta: v.entradas > 0 ? Math.round((v.com / v.entradas) * 10000) / 100 : null,
         pctContenedorCompleta: v.entradas > 0 ? Math.round((v.cont / v.entradas) * 10000) / 100 : null,

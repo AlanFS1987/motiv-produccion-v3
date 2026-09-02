@@ -20,6 +20,7 @@ import {
   type IncidenciaLote,
   type ModoFiltroCalidad,
 } from "../../lib/dashboard-calidad";
+import { VisorFotoOverlay } from "../VisorFoto";
 
 // ── Donut SVG propio (mismo patrón que pantalla/PantallaCarrusel.tsx,
 // sin librería externa; no se importa de allí para no acoplar shells) ──
@@ -54,10 +55,22 @@ function Donut({ segmentos, size = 70 }: { segmentos: { valor: number; color: st
   );
 }
 
+function FilaLeyenda({ color, etiqueta, pct, m2 }: { color: string; etiqueta: string; pct: number | null; m2: number }) {
+  return (
+    <div className="flex items-center gap-1 text-[10px] text-[var(--texto-secundario)]">
+      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+      <span>
+        {etiqueta} {pct ?? "—"}% · {Math.round(m2).toLocaleString("es-ES")} m²
+      </span>
+    </div>
+  );
+}
+
 function DosDonuts({ lote }: { lote: LoteCalidad }) {
   return (
-    <div className="flex items-center justify-around gap-4">
+    <div className="flex items-start justify-around gap-4">
       <div className="flex flex-col items-center gap-1">
+        <span className="text-[10px] font-semibold text-[var(--texto-secundario)]">Completa</span>
         <Donut
           segmentos={[
             { valor: lote.pct1aCompleta ?? 0, color: "#22c55e" },
@@ -65,16 +78,24 @@ function DosDonuts({ lote }: { lote: LoteCalidad }) {
             { valor: lote.pctContenedorCompleta ?? 0, color: "#64748b" },
           ]}
         />
-        <span className="text-[10px] text-[var(--texto-secundario)]">Completa {lote.pct1aCompleta ?? "—"}%</span>
+        <div className="mt-1 space-y-0.5">
+          <FilaLeyenda color="#22c55e" etiqueta="1ª" pct={lote.pct1aCompleta} m2={lote.m21a} />
+          <FilaLeyenda color="#f97316" etiqueta="Comercial" pct={lote.pctComercialCompleta} m2={lote.m2Comercial} />
+          <FilaLeyenda color="#64748b" etiqueta="Descarte" pct={lote.pctContenedorCompleta} m2={lote.m2Contenedor} />
+        </div>
       </div>
       <div className="flex flex-col items-center gap-1">
+        <span className="text-[10px] font-semibold text-[var(--texto-secundario)]">Oficial</span>
         <Donut
           segmentos={[
             { valor: lote.pct1aOficial ?? 0, color: "#22c55e" },
             { valor: lote.pctComercialOficial ?? 0, color: "#f97316" },
           ]}
         />
-        <span className="text-[10px] text-[var(--texto-secundario)]">Oficial {lote.pct1aOficial ?? "—"}%</span>
+        <div className="mt-1 space-y-0.5">
+          <FilaLeyenda color="#22c55e" etiqueta="1ª" pct={lote.pct1aOficial} m2={lote.m21a} />
+          <FilaLeyenda color="#f97316" etiqueta="Comercial" pct={lote.pctComercialOficial} m2={lote.m2Comercial} />
+        </div>
       </div>
     </div>
   );
@@ -82,8 +103,9 @@ function DosDonuts({ lote }: { lote: LoteCalidad }) {
 
 function DosDonutsTono({ tono }: { tono: TonoCalidad }) {
   return (
-    <div className="flex items-center justify-around gap-3">
+    <div className="flex items-start justify-around gap-3">
       <div className="flex flex-col items-center gap-1">
+        <span className="text-[10px] font-semibold text-[var(--texto-secundario)]">Completa</span>
         <Donut
           size={54}
           segmentos={[
@@ -92,8 +114,14 @@ function DosDonutsTono({ tono }: { tono: TonoCalidad }) {
             { valor: tono.pctContenedorCompleta ?? 0, color: "#64748b" },
           ]}
         />
+        <div className="mt-1 space-y-0.5">
+          <FilaLeyenda color="#22c55e" etiqueta="1ª" pct={tono.pct1aCompleta} m2={tono.m21a} />
+          <FilaLeyenda color="#f97316" etiqueta="Comercial" pct={tono.pctComercialCompleta} m2={tono.m2Comercial} />
+          <FilaLeyenda color="#64748b" etiqueta="Descarte" pct={tono.pctContenedorCompleta} m2={tono.m2Contenedor} />
+        </div>
       </div>
       <div className="flex flex-col items-center gap-1">
+        <span className="text-[10px] font-semibold text-[var(--texto-secundario)]">Oficial</span>
         <Donut
           size={54}
           segmentos={[
@@ -101,6 +129,10 @@ function DosDonutsTono({ tono }: { tono: TonoCalidad }) {
             { valor: tono.pctComercialOficial ?? 0, color: "#f97316" },
           ]}
         />
+        <div className="mt-1 space-y-0.5">
+          <FilaLeyenda color="#22c55e" etiqueta="1ª" pct={tono.pct1aOficial} m2={tono.m21a} />
+          <FilaLeyenda color="#f97316" etiqueta="Comercial" pct={tono.pctComercialOficial} m2={tono.m2Comercial} />
+        </div>
       </div>
     </div>
   );
@@ -153,6 +185,7 @@ function TarjetaTonos({ loteId }: { loteId: string }) {
 function PanelIncidencias({ loteId }: { loteId: string }) {
   const [incidencias, setIncidencias] = useState<IncidenciaLote[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fotoAmpliada, setFotoAmpliada] = useState<string | null>(null);
 
   useEffect(() => {
     let activo = true;
@@ -185,12 +218,15 @@ function PanelIncidencias({ loteId }: { loteId: string }) {
           {inc.fotos && inc.fotos.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {inc.fotos.map((url) => (
-                <img key={url} src={url} alt="" className="h-20 w-20 rounded-md object-cover" />
+                <button key={url} type="button" onClick={() => setFotoAmpliada(url)}>
+                  <img src={url} alt="" className="h-20 w-20 rounded-md object-cover" />
+                </button>
               ))}
             </div>
           )}
         </div>
       ))}
+      {fotoAmpliada && <VisorFotoOverlay url={fotoAmpliada} onCerrar={() => setFotoAmpliada(null)} />}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { listarIncidenciasCalidad, type IncidenciaCalidad } from "../../lib/incidencias";
+import { VisorFotoOverlay } from "../VisorFoto";
 
 interface ListaIncidenciasCalidadProps {
   parteId: string;
@@ -11,6 +12,7 @@ interface ListaIncidenciasCalidadProps {
 export function ListaIncidenciasCalidad({ parteId, refrescarTrigger }: ListaIncidenciasCalidadProps) {
   const [incidencias, setIncidencias] = useState<IncidenciaCalidad[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [fotoAmpliada, setFotoAmpliada] = useState<string | null>(null);
 
   useEffect(() => {
     setCargando(true);
@@ -36,14 +38,15 @@ export function ListaIncidenciasCalidad({ parteId, refrescarTrigger }: ListaInci
           {inc.fotos && inc.fotos.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {inc.fotos.map((url) => (
-                <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+                <button key={url} type="button" onClick={() => setFotoAmpliada(url)}>
                   <img src={url} alt="Foto de incidencia" className="h-16 w-16 rounded-md object-cover" />
-                </a>
+                </button>
               ))}
             </div>
           )}
         </div>
       ))}
+      {fotoAmpliada && <VisorFotoOverlay url={fotoAmpliada} onCerrar={() => setFotoAmpliada(null)} />}
     </div>
   );
 }

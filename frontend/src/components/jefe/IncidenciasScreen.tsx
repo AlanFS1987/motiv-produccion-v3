@@ -12,6 +12,7 @@ import {
   type IncidenciaCalidadItem,
   type IncidenciaProduccionItem,
 } from "../../lib/dashboard-incidencias";
+import { VisorFotoOverlay } from "../VisorFoto";
 
 const NOMBRE_TURNO: Record<string, string> = { M: "Mañana", T: "Tarde", N: "Noche" };
 
@@ -30,7 +31,7 @@ function formatearFechaHora(iso: string): string {
   });
 }
 
-function TarjetaIncidenciaProduccion({ inc }: { inc: IncidenciaProduccionItem }) {
+function TarjetaIncidenciaProduccion({ inc, onFotoClick }: { inc: IncidenciaProduccionItem; onFotoClick: (url: string) => void }) {
   return (
     <div className="rounded-xl border border-red-100 bg-red-50 p-3">
       <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-red-500">
@@ -44,7 +45,9 @@ function TarjetaIncidenciaProduccion({ inc }: { inc: IncidenciaProduccionItem })
       {inc.fotos && inc.fotos.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2">
           {inc.fotos.map((url) => (
-            <img key={url} src={url} alt="" className="h-20 w-20 rounded-md object-cover" />
+            <button key={url} type="button" onClick={() => onFotoClick(url)}>
+              <img src={url} alt="" className="h-20 w-20 rounded-md object-cover" />
+            </button>
           ))}
         </div>
       )}
@@ -52,7 +55,7 @@ function TarjetaIncidenciaProduccion({ inc }: { inc: IncidenciaProduccionItem })
   );
 }
 
-function TarjetaIncidenciaCalidad({ inc }: { inc: IncidenciaCalidadItem }) {
+function TarjetaIncidenciaCalidad({ inc, onFotoClick }: { inc: IncidenciaCalidadItem; onFotoClick: (url: string) => void }) {
   return (
     <div className="rounded-xl border border-amber-100 bg-amber-50 p-3">
       <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-amber-600">
@@ -70,7 +73,9 @@ function TarjetaIncidenciaCalidad({ inc }: { inc: IncidenciaCalidadItem }) {
       {inc.fotos && inc.fotos.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2">
           {inc.fotos.map((url) => (
-            <img key={url} src={url} alt="" className="h-20 w-20 rounded-md object-cover" />
+            <button key={url} type="button" onClick={() => onFotoClick(url)}>
+              <img src={url} alt="" className="h-20 w-20 rounded-md object-cover" />
+            </button>
           ))}
         </div>
       )}
@@ -86,6 +91,7 @@ export function IncidenciasScreen() {
   const [calidad, setCalidad] = useState<IncidenciaCalidadItem[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fotoAmpliada, setFotoAmpliada] = useState<string | null>(null);
 
   async function buscar() {
     setCargando(true);
@@ -171,7 +177,7 @@ export function IncidenciasScreen() {
             ) : (
               <div className="space-y-2">
                 {produccion.map((inc) => (
-                  <TarjetaIncidenciaProduccion key={inc.id} inc={inc} />
+                  <TarjetaIncidenciaProduccion key={inc.id} inc={inc} onFotoClick={setFotoAmpliada} />
                 ))}
               </div>
             )}
@@ -190,13 +196,14 @@ export function IncidenciasScreen() {
             ) : (
               <div className="space-y-2">
                 {calidad.map((inc) => (
-                  <TarjetaIncidenciaCalidad key={inc.id} inc={inc} />
+                  <TarjetaIncidenciaCalidad key={inc.id} inc={inc} onFotoClick={setFotoAmpliada} />
                 ))}
               </div>
             )}
           </section>
         </>
       )}
+      {fotoAmpliada && <VisorFotoOverlay url={fotoAmpliada} onCerrar={() => setFotoAmpliada(null)} />}
     </div>
   );
 }

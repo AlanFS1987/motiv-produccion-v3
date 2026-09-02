@@ -18,6 +18,7 @@ import { AlertTriangle, CheckCircle2, Clock, Megaphone, PlayCircle } from "lucid
 import { useAuth } from "../../context/AuthContext";
 import { calcularTurnoActual, calcularTurnoActualSuplente, type TipoTurno } from "../../lib/rotacion";
 import { obtenerDatosRelevo, type DatosRelevo, type RelevoLinea } from "../../lib/relevo";
+import { VisorFotoOverlay } from "../VisorFoto";
 
 const NOMBRE_TIPO: Record<TipoTurno, string> = { M: "Mañana", T: "Tarde", N: "Noche" };
 
@@ -152,6 +153,7 @@ export function RelevoScreen() {
 
 function TarjetaLineaRelevo({ linea }: { linea: RelevoLinea }) {
   const sinActividad = !linea.parteAbierto && !linea.ultimoCerrado;
+  const [fotoAmpliada, setFotoAmpliada] = useState<string | null>(null);
 
   return (
     <div className="rounded-2xl bg-white p-4 shadow-sm">
@@ -227,9 +229,9 @@ function TarjetaLineaRelevo({ linea }: { linea: RelevoLinea }) {
               {inc.fotos && inc.fotos.length > 0 && (
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {inc.fotos.map((url) => (
-                    <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+                    <button key={url} type="button" onClick={() => setFotoAmpliada(url)}>
                       <img src={url} alt="Foto de incidencia" className="h-12 w-12 rounded-md object-cover" />
-                    </a>
+                    </button>
                   ))}
                 </div>
               )}
@@ -237,6 +239,7 @@ function TarjetaLineaRelevo({ linea }: { linea: RelevoLinea }) {
           ))}
         </div>
       )}
+      {fotoAmpliada && <VisorFotoOverlay url={fotoAmpliada} onCerrar={() => setFotoAmpliada(null)} />}
     </div>
   );
 }

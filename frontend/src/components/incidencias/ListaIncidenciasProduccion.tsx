@@ -5,6 +5,7 @@ import {
   listarIncidenciasProduccionGenerales,
   type IncidenciaProduccion,
 } from "../../lib/incidencias";
+import { VisorFotoOverlay } from "../VisorFoto";
 
 interface ListaIncidenciasProduccionProps {
   turnoId: string;
@@ -16,6 +17,7 @@ interface ListaIncidenciasProduccionProps {
 export function ListaIncidenciasProduccion({ turnoId, lineaId, refrescarTrigger }: ListaIncidenciasProduccionProps) {
   const [incidencias, setIncidencias] = useState<IncidenciaProduccion[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [fotoAmpliada, setFotoAmpliada] = useState<string | null>(null);
 
   useEffect(() => {
     setCargando(true);
@@ -42,14 +44,15 @@ export function ListaIncidenciasProduccion({ turnoId, lineaId, refrescarTrigger 
           {inc.fotos && inc.fotos.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1.5">
               {inc.fotos.map((url) => (
-                <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+                <button key={url} type="button" onClick={() => setFotoAmpliada(url)}>
                   <img src={url} alt="Foto de incidencia" className="h-12 w-12 rounded-md object-cover" />
-                </a>
+                </button>
               ))}
             </div>
           )}
         </div>
       ))}
+      {fotoAmpliada && <VisorFotoOverlay url={fotoAmpliada} onCerrar={() => setFotoAmpliada(null)} />}
     </div>
   );
 }

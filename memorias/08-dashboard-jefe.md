@@ -71,7 +71,8 @@ las generales (`linea_id = null`).
 Dos bloques **separados** (nunca combinados en una lista), con fondo
 de color distinto para que no se puedan confundir ni visualmente:
 producción (rojo) y calidad (ámbar). Mismo filtro de fechas para
-ambos, consultas independientes.
+ambos, consultas independientes. Las fotos de cada incidencia se
+amplían tocándolas (`components/VisorFoto.tsx`, sesión 02/09/2026).
 
 ## Calidad (`calidad/CalidadLotesScreen.tsx`)
 

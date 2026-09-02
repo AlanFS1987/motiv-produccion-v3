@@ -17,18 +17,26 @@ pantalla propia, no una pestaña compartida con `JefeApp`.
 una tarjeta por lote, ordenados por `ultima_produccion`. Cada tarjeta:
 
 - 2 donuts SVG (mismo patrón sin librería que `PantallaCarrusel.tsx`,
-  no importado de allí para no acoplar shells):
-  - **Completa**: 1ª / comercial / contenedor. **Eco no se usa en
-    esta sección** — se ignora del todo, no se combina con
-    contenedor ni se muestra.
+  no importado de allí para no acoplar shells), cada uno con una
+  leyenda debajo (%  y m² por categoría, sesión 02/09/2026):
+  - **Completa**: 1ª / comercial / descarte (= `contenedor`). **Eco
+    no se usa en esta sección** — se ignora del todo, no se combina
+    con contenedor ni se muestra.
   - **Oficial**: 1ª / comercial (misma métrica que el resto de la
     app).
+  Los m² de cada categoría salen de `v_calidad_lote` (`m2_1a`,
+  `m2_comercial`, `m2_contenedor`, ya existían en la vista); en el
+  desglose por tono se calculan en cliente (`piezas × area_m2`).
 - Al hacer click, se expande el **desglose por tono** de ese lote
   (consulta directa a `parte` agrupada en cliente por `tono`, con las
-  mismas fórmulas completa/oficial recalculadas por tono).
+  mismas fórmulas completa/oficial recalculadas por tono, misma
+  leyenda %/m² que el lote).
 - Si el lote tiene alguna incidencia de calidad, aparece un botón
   ámbar con el recuento; al abrirlo lista **todas** las incidencias
-  (no solo la última) con foto y texto.
+  (no solo la última) con foto y texto. Las fotos se pueden ampliar
+  tocándolas (`components/VisorFoto.tsx`, capa a pantalla completa,
+  sesión 02/09/2026) — mismo componente reutilizado en todos los
+  demás sitios de la app que muestran fotos de incidencias.
 
 ## Buscador
 
