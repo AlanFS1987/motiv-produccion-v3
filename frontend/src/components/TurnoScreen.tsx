@@ -177,6 +177,56 @@ export function TurnoScreen() {
   const cargarRef = useRef(cargar);
   cargarRef.current = cargar;
 
+  // Última vez que sabemos con certeza qué turno hay cargado en
+  // pantalla — se lee siempre "fresca" (nunca un valor congelado de
+  // closure), mismo patrón que cargarRef, por el bug real ya conocido
+  // de AuthContext.tsx (26/08/2026: comparar contra una variable
+  // capturada en un efecto con deps=[] siempre daba "distinto").
+  const turnoInfoRef = useRef<TurnoActual | null>(null);
+  turnoInfoRef.current = turnoInfo;
+
+  /**
+   * Se llama en cada recuperación de foco / setTimeout en vez de
+   * cargar() directamente (sesión 02/09/2026 — bug de recarga
+   * destructiva). Calcula el turno "de reloj" (sin tocar Supabase,
+   * mismo cálculo que ya hace cargar() con calcularTurnoActual /
+   * calcularTurnoActualSuplente) y solo dispara la recarga completa
+   * si de verdad ha cambiado fecha, tipo o estado respecto al que ya
+   * hay en pantalla. Así, volver de la cámara, una notificación, o
+   * cualquier pestaña nueva (foto ampliada, etc.) dentro del MISMO
+   * turno ya no toca nada — ni pantalla de carga, ni llamada a
+   * Supabase. Solo se refresca de verdad cuando cambia la franja o se
+   * cruza al turno del día siguiente.
+   */
+  async function comprobarYCargarSiCambioTurno() {
+    if (!usuario) return;
+    let infoAhora: TurnoActual;
+    try {
+      if (usuario.rol === "suplente") {
+        infoAhora = await calcularTurnoActualSuplente();
+      } else if (usuario.letra) {
+        infoAhora = await calcularTurnoActual(usuario.letra);
+      } else {
+        return; // perfil incompleto — cargar() ya lo gestiona cuando toque
+      }
+    } catch {
+      return; // fallo en el cálculo local: no forzamos recarga por esto
+    }
+
+    const anterior = turnoInfoRef.current;
+    const mismoTurno =
+      anterior !== null &&
+      anterior.fecha === infoAhora.fecha &&
+      anterior.tipo === infoAhora.tipo &&
+      anterior.estado === infoAhora.estado;
+
+    if (!mismoTurno) {
+      cargarRef.current();
+    }
+  }
+  const comprobarRef = useRef(comprobarYCargarSiCambioTurno);
+  comprobarRef.current = comprobarYCargarSiCambioTurno;
+
   // No se debe disparar el refresco en segundo plano (visibilitychange /
   // setTimeout) mientras el responsable está dentro de un flujo de
   // captura activo — cargar() hace setCargando(true), y el render de
@@ -203,12 +253,12 @@ useEffect(() => {
   const demoraMs = Math.max(proximo.getTime() - ahora.getTime(), 1000);
 
   const timeoutId = window.setTimeout(() => {
-    if (!enFlujoActivoRef.current) cargarRef.current();
+    if (!enFlujoActivoRef.current) comprobarRef.current();
   }, demoraMs);
 
   function alRecuperarFoco() {
     if (document.visibilityState === "visible" && !enFlujoActivoRef.current) {
-      cargarRef.current();
+      comprobarRef.current();
     }
   }
   document.addEventListener("visibilitychange", alRecuperarFoco);
@@ -511,7 +561,7 @@ useEffect(() => {
 
               {desplegada && (
                 <div className="mt-2 space-y-2 border-t border-slate-100 pt-2">
-                  {sugerenciasContinuar[linea.id] && completados === 0 && (
+                  {sugerenciasContinuar[linea.id] && completados === 0 && !pendiente && (
                     <div className="rounded-lg bg-blue-50 p-2">
                       <p className="text-xs font-medium text-blue-900">
                         {sugerenciasContinuar[linea.id].marcaNombre} {sugerenciasContinuar[linea.id].formatoNombre} — {sugerenciasContinuar[linea.id].modeloNombre}
