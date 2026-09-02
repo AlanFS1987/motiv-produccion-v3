@@ -82,7 +82,12 @@ hora_captura_pantalla_texto_crudo, calibre_com_pct numeric (trigger),
 calibre_std_pct numeric generada, vigente bool default true,
 corrige_a_parte_id FK parte, completado bool default false,
 completado_at, created_at. Índice `idx_parte_formato_record`
-(`formato_id, vigente, completado, piezas_entradas desc`).
+(`formato_id, vigente, completado, piezas_entradas desc`). Índice único
+parcial `uq_parte_pendiente_por_linea_turno` (turno_id, linea_id) where
+vigente and not completado — como mucho un pendiente por línea+turno
+(sesión 02/09/2026, bug real: Foto 1 crea el parte antes de tiempo, y
+darle a "atrás" después dejaba huérfanos que colisionaban con
+"Continuar"/"Nuevo tono"; ver `02`).
 
 **incidencia_calidad** — id, parte_id, descripcion, fotos text[],
 created_by, created_at.

@@ -19,6 +19,21 @@ Al entrar se calcula el turno que corresponde ahora mismo
 busca/crea la fila `turno` y se recalcula el estado automáticamente en
 el instante exacto del próximo cambio (`setTimeout` + `visibilitychange`).
 
+**Recarga no destructiva** (sesión 02/09/2026): cada vez que la
+pestaña recupera el foco (cámara, foto abierta en pestaña nueva,
+notificación, bloquear/desbloquear el móvil...) se comprueba primero,
+solo por reloj y sin llamar a Supabase, si sigue siendo el mismo turno
+(fecha + tipo + estado) que el que ya hay en pantalla. Si es el mismo,
+no se toca nada — ni pantalla de carga ni red. Solo se dispara la
+recarga completa (que sí desmonta y reconstruye la pantalla) si de
+verdad cambió: cambio de franja o salto al turno del día siguiente. Se
+mantiene además la guarda de "flujo activo" (`lineaEnCaptura`,
+`verEditar`, `nuevoTonoOrigen`, `continuarOrigen`, `lineaConIncidencia`,
+`mostrandoIncidenciaGeneral`) para no interrumpir un formulario a
+medias tampoco en ese caso. Bug real que motivó esto: fotos de
+incidencia abiertas con `target="_blank"` no estaban en esa lista, así
+que perdían el turno cargado en pantalla cada vez que se cerraban.
+
 | Estado | Qué se ve | Qué se puede hacer |
 |---|---|---|
 | `descanso` | Mensaje "hoy es tu descanso" | Nada de gestión. Si hace falta cubrir el turno de otro: con las credenciales del titular que le toca (`01`). |
@@ -67,6 +82,19 @@ Wizard con pasos `hoja → tono → caja → codbar → pantalla → (incidencia
 El parte se **inserta al resolver el lote** (fin de `hoja` en el camino
 1, confirmación en 2 y 3), con piezas/minutos a 0. Por eso se puede
 dejar un lote preparado y retomarlo.
+
+**Solo un pendiente por línea+turno** (sesión 02/09/2026): como el
+parte ya existe en BD antes de terminar el wizard, darle a "atrás"
+justo después de la Foto 1 dejaba un parte huérfano
+(`completado=false`) sin que nadie lo cerrara; si luego se entraba por
+"Continuar" o "Nuevo tono/calibre", se creaba un segundo pendiente en
+la misma línea+turno, y el más antiguo (el huérfano) reaparecía más
+tarde tapando al que sí se había completado. Dos capas de arreglo:
+índice único parcial en BD (`uq_parte_pendiente_por_linea_turno`, ver
+`06`) que lo impide siempre, pase lo que pase; y en `TurnoScreen.tsx`
+las sugerencias "Continuar"/"Nuevo tono/calibre" del turno anterior
+dejan de mostrarse en cuanto ya hay un pendiente en esa línea (solo
+queda "Continuar parte").
 
 ### Paso hoja (Foto 1 — hoja de partida)
 Cámara en vivo con recuadro-guía 4:3, o galería. Recorte en cliente a
