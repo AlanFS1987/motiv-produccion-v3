@@ -188,7 +188,12 @@ export function TurnoScreen() {
   // acto" perdía el progreso al volver.
   const enFlujoActivoRef = useRef(false);
   enFlujoActivoRef.current =
-    lineaEnCaptura !== null || verEditar !== null || nuevoTonoOrigen !== null || continuarOrigen !== null;
+    lineaEnCaptura !== null ||
+    verEditar !== null ||
+    nuevoTonoOrigen !== null ||
+    continuarOrigen !== null ||
+    lineaConIncidencia !== null ||
+    mostrandoIncidenciaGeneral;
 
 useEffect(() => {
   if (!turnoInfo) return;
