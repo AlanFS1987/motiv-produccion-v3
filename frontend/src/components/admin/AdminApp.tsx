@@ -16,12 +16,13 @@ import { CalidadLotesScreen } from "../calidad/CalidadLotesScreen";
 import { AjustarLetrasScreen } from "./AjustarLetrasScreen";
 import { GestionUsuariosScreen } from "./GestionUsuariosScreen";
 import { CorreccionPartesScreen } from "./CorreccionPartesScreen";
+import { AdminNuevoParteScreen } from "./AdminNuevoParteScreen";
 import { PruebaCamaraScreen } from "./PruebaCamaraScreen";
 import { CierreFabricaScreen } from "./CierreFabricaScreen";
 import { ChecklistScreen } from "./ChecklistScreen";
 import { GamificacionScreen } from "./GamificacionScreen";
 
-type PestanaAdmin = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "ceria" | "rotacion" | "partes" | "prueba-camara" | "cierre-fabrica" | "checklist" | "gamificacion" | "gestion-usuarios";
+type PestanaAdmin = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "ceria" | "rotacion" | "partes" | "nuevo-parte" | "prueba-camara" | "cierre-fabrica" | "checklist" | "gamificacion" | "gestion-usuarios";
 function BotonPestana({
   activa,
   onClick,
@@ -87,6 +88,9 @@ export function AdminApp({ username }: { username: string }) {
           <BotonPestana activa={pestana === "partes"} onClick={() => setPestana("partes")}>
             Partes
           </BotonPestana>
+          <BotonPestana activa={pestana === "nuevo-parte"} onClick={() => setPestana("nuevo-parte")}>
+            Añadir parte
+          </BotonPestana>
           <BotonPestana activa={pestana === "prueba-camara"} onClick={() => setPestana("prueba-camara")}>
             Cámara
           </BotonPestana>
@@ -113,6 +117,7 @@ export function AdminApp({ username }: { username: string }) {
         {pestana === "ceria" && <CeriaScreen />}
         {pestana === "rotacion" && <AjustarLetrasScreen />}
         {pestana === "partes" && <CorreccionPartesScreen />}
+        {pestana === "nuevo-parte" && <AdminNuevoParteScreen />}
         {pestana === "prueba-camara" && <PruebaCamaraScreen />}
         {pestana === "cierre-fabrica" && <CierreFabricaScreen />}
         {pestana === "checklist" && <ChecklistScreen />}

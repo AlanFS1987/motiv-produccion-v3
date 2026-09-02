@@ -529,6 +529,9 @@ useEffect(() => {
                     Tono {pendiente.tono}
                     {pendiente.calibre ? ` · Cal. ${pendiente.calibre}` : ""}
                   </p>
+                  <p className="mt-1 text-[11px] text-amber-800">
+                    Termínalo para poder empezar otro en esta línea.
+                  </p>
                   <button
                     type="button"
                     onClick={() => setLineaEnCaptura(linea)}
@@ -705,12 +708,26 @@ useEffect(() => {
         {turnoId && <ListaIncidenciasProduccion turnoId={turnoId} lineaId={null} refrescarTrigger={refrescarIncidenciasProduccion} />}
       </div>
 
-      <BotonCerrarTurno onConfirmar={manejarCerrarTurno} cerrando={cerrandoTurno} />
+      <BotonCerrarTurno
+        onConfirmar={manejarCerrarTurno}
+        cerrando={cerrandoTurno}
+        lineasPendientes={Object.keys(partesPendientes).map(
+          (lineaId) => lineas.find((l) => l.id === lineaId)?.nombre ?? "Línea",
+        )}
+      />
     </div>
   );
 }
 
-function BotonCerrarTurno({ onConfirmar, cerrando }: { onConfirmar: () => void; cerrando: boolean }) {
+function BotonCerrarTurno({
+  onConfirmar,
+  cerrando,
+  lineasPendientes,
+}: {
+  onConfirmar: () => void;
+  cerrando: boolean;
+  lineasPendientes: string[];
+}) {
   const [confirmando, setConfirmando] = useState(false);
 
   if (!confirmando) {
@@ -728,6 +745,20 @@ function BotonCerrarTurno({ onConfirmar, cerrando }: { onConfirmar: () => void; 
 
   return (
     <div className="mt-6 rounded-xl bg-red-50 p-4 text-center">
+      {lineasPendientes.length > 0 && (
+        <div className="mb-3 rounded-lg bg-amber-100 p-3 text-left text-sm text-amber-900">
+          <p className="mb-1 flex items-center gap-1 font-medium">
+            <AlertTriangle size={14} aria-hidden />
+            Quedan partes sin terminar en: {lineasPendientes.join(", ")}.
+          </p>
+          <p>
+            Si cierras ahora, esos partes se quedan huérfanos — nadie podrá
+            completarlos desde aquí. Un administrador puede terminarlos
+            después desde "Añadir parte" en su panel, pero es mejor evitarlo
+            si puedes.
+          </p>
+        </div>
+      )}
       <p className="mb-3 text-sm text-red-800">
         Esto cierra el turno para todas las líneas ahora mismo. No se podrán abrir partes nuevos — solo corregir
         los que ya existan, dentro de la ventana habitual de 1h. ¿Confirmas?

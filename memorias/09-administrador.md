@@ -31,6 +31,38 @@ propias pestañas de gestión.
   igual que ya hacía el propio responsable al corregirse a sí mismo.
   Tono y calibre son editables al corregir (campos con
   `esTonoCalibreValido`, corregido 21/08/2026 para admin y responsable).
+- **Añadir parte a un turno ya cerrado**
+  (`admin/AdminNuevoParteScreen.tsx`) — pestaña "Añadir parte".
+  Complementa a la anterior: esa permite EDITAR partes que ya
+  existen, esta permite CREAR uno que nunca llegó a insertarse.
+
+  Caso real que lo motivó (sesión 02/09/2026): un responsable en su
+  primer turno no pudo abrir un segundo parte en una línea (el
+  primero seguía pendiente, `uq_parte_pendiente_por_linea_turno`,
+  ver `06`) y cerró el turno sin completarlo — el primer parte quedó
+  huérfano y el segundo nunca se creó.
+
+  El admin busca el turno por fecha+tipo con `obtenerTurnoPorFechaTipo`
+  (lib/resumen-turno.ts, SIN crearlo si no existe — a diferencia de
+  `obtenerOCrearTurno`) y, si lo encuentra, monta directamente
+  `CapturaParteScreen` — el mismo wizard del responsable, sin ningún
+  candado de "turno abierto". No hizo falta ninguna migración: la
+  política `parte_insert_responsable` ya incluía `'administrador'`
+  desde el principio (`20260101000010_rls.sql`) y no hay ningún
+  trigger que bloquee un INSERT en `parte` por `turno.cerrado_at` — el
+  único candado que existía era de UI (`TurnoScreen` solo monta el
+  wizard para "mi turno de hoy").
+
+  El turno **no se reabre**: `cerrado_at` se deja tal cual para no
+  disparar de nuevo el envío del resumen a Telegram. Si la línea+turno
+  ya tenía un parte pendiente huérfano, `CapturaParteScreen` lo
+  detecta solo (`obtenerPartePendiente`) y retoma el wizard donde se
+  quedó — mismo camino que "Continuar parte" del responsable, sin
+  lógica especial aquí para ese caso. Si no había ninguno, arranca un
+  parte nuevo desde "hoja" (segunda orden real para esa línea).
+  `responsable_id` del parte insertado queda como el admin que lo
+  crea, no el responsable original — mismo criterio que
+  `CorreccionPartesScreen`.
 - **Prueba de cámara** (`admin/PruebaCamaraScreen.tsx`) — pestaña
   "Cámara", solo de test, no toca ningún parte ni sube nada a
   Cloudinary. Deja probar **tanto la cámara nativa** (`<input

@@ -51,7 +51,11 @@ el desplegable de ninguna línea.
   refuerzo. Guarda en `asignacion_operario_linea`.
 - Si hay un parte pendiente (`completado = false`) de este turno en
   esta línea → botón **Continuar parte** (retoma el wizard donde se
-  quedó: si falta verificación de caja, vuelve a ella).
+  quedó: si falta verificación de caja, vuelve a ella), con una línea
+  de texto explicando que hay que terminarlo antes de poder abrir
+  otro (sesión 02/09/2026 — sin esto, la opción "Nueva orden"
+  simplemente desaparecía sin que quedara claro por qué; el
+  responsable no ve nunca un error, solo un botón que ya no está).
 - Si no → botón **Nuevo lote** y, si el turno anterior dejó partes en
   esta línea, sugerencias **Continuar** (mismo lote y tono, sin fotos
   de hoja) y **Nuevo tono/calibre** (mismo lote, sin foto de hoja).
@@ -67,6 +71,17 @@ línea (`linea_id = null`).
 `turno.cerrado_at = now()`, `como_cerro = 'manual'`. Eso dispara el
 envío del informe a Telegram (ver `05-automatismos.md`). Si nadie
 cierra, el cron lo hace 1 h después del fin de la franja.
+
+**Aviso de partes pendientes al cerrar** (sesión 02/09/2026): si al
+confirmar el cierre queda algún parte `completado = false` en
+cualquier línea, el segundo paso de la confirmación muestra qué
+líneas son antes del botón "Sí, cerrar turno" — no bloquea el cierre
+(puede ser una decisión legítima, ej. turno interrumpido por avería),
+solo evita que sea un accidente. A diferencia del cierre automático
+por cron (`20260820123000_cerrar_partes_pendientes_auto.sql`, que sí
+completa esos partes "sin producción" solo), el cierre manual no
+toca los partes pendientes — quedan huérfanos hasta que un admin los
+complete desde "Añadir parte" (`09`).
 
 ## Captura de un parte (`captura-parte/CapturaParteScreen.tsx`)
 
@@ -94,7 +109,12 @@ tarde tapando al que sí se había completado. Dos capas de arreglo:
 `06`) que lo impide siempre, pase lo que pase; y en `TurnoScreen.tsx`
 las sugerencias "Continuar"/"Nuevo tono/calibre" del turno anterior
 dejan de mostrarse en cuanto ya hay un pendiente en esa línea (solo
-queda "Continuar parte").
+queda "Continuar parte"). Ese mismo día, más tarde, un caso real (responsable cerró el turno
+sin completar el pendiente en vez de entender por qué no podía abrir
+uno nuevo) motivó dos ajustes más: el texto explicativo junto a
+"Continuar parte" (arriba) y el aviso de pendientes al cerrar turno
+(ver "Cerrar turno"), además de una vía de admin para completar/crear
+el parte que faltó (`09`, "Añadir parte a un turno ya cerrado").
 
 ### Paso hoja (Foto 1 — hoja de partida)
 Cámara en vivo con recuadro-guía 4:3, o galería. Recorte en cliente a
