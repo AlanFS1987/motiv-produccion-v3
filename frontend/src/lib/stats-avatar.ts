@@ -80,6 +80,25 @@ export async function seleccionarPersonaje(personajeId: string): Promise<Persona
 }
 
 
+
+export interface StatsCongeladas {
+  fuerza: number | null;
+  resistencia: number | null;
+  velocidad: number | null;
+  vida: number | null;
+}
+
+/** Stats CONGELADAS del nivel de la carta activa (misma fuente que usa Equipo) — para el overlay sobre la imagen. */
+export async function obtenerStatsCongeladasActivo(usuarioId: string): Promise<StatsCongeladas | null> {
+  const { data, error } = await supabase
+    .from("v_equipo_avatar_stats")
+    .select("fuerza, resistencia, velocidad, vida")
+    .eq("usuario_id", usuarioId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as StatsCongeladas | null) ?? null;
+}
+
 // ---------------------------------------------------------------
 // Generaciones POR NIVEL (sesión 23/08/2026) — sustituye al contador
 // plano de arriba para el flujo real de "Generar avatar": cada nivel

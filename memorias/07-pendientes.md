@@ -95,5 +95,19 @@ ambigüedad `nivel_id` en `fn_otorgar_bonus_nivel`).
    punto 11 de arriba (mejor squashear con el esquema de seguridad ya
    verificado en real, no a medias).
 11. Base de conocimiento de averías — no empezado.
-12. Limpieza menor: columna `rol` de `historial_ciclos` (redundante,
-    siempre `'operario'` desde que el responsable tiene tabla propia).
+
+
+## Ideas futuras sin decidir
+
+- **Juego de cartas coleccionables** (concepto planteado 02/09/2026,
+  pensado a ~6 meses vista): las cartas nunca se pierden, un rival
+  puede conseguir la copia de una carta ajena, posible combate en
+  tiempo real 4-5 cartas contra 4-5. Sin mecánica, normas ni
+  matemáticas decididas todavía — solo el concepto general. Decisión
+  tomada: NO tocar fuerza/resistencia/velocidad actuales para
+  anticipar esto (siguen representando honestamente "cuánto has
+  movido en tu vida"). Cuando se diseñe la mecánica real, lo natural
+  sería un stat de combate aparte, derivado y normalizado, guardado
+  también en `personaje_stats_nivel` (o tabla equivalente) — para que
+  una carta copiada por un rival lleve un número fijo, no algo que
+  siguiera cambiando con la vida en vivo del dueño original.

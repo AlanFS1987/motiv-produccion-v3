@@ -5,7 +5,7 @@
 // pestañas separadas, Stats y Avatar).
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ImagePlus, RefreshCw, X } from "lucide-react";
+import { ImagePlus, RefreshCw, X, Zap, Activity, Wind, Crown } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import {
   obtenerStatsEnVivo,
@@ -14,8 +14,10 @@ import {
   seleccionarPersonaje,
   obtenerNivelesDisponiblesParaGenerar,
   generarPersonajeParaNivel,
+  obtenerStatsCongeladasActivo,
   type StatsEnVivo,
   type NivelDisponibleGenerar,
+  type StatsCongeladas,
 } from "../../lib/stats-avatar";
 import type { PersonajeInfo } from "../../lib/gamificacion";
 import { subirACloudinary, construirPublicId } from "../../lib/cloudinary";
@@ -57,10 +59,58 @@ function BarraSimple({ valor, min, max, color }: { valor: number; min: number; m
   );
 }
 
+const ICONO: Record<"fuerza" | "resistencia" | "velocidad" | "vida", typeof Zap> = {
+  fuerza: Zap,
+  resistencia: Activity,
+  velocidad: Wind,
+  vida: Crown,
+};
+
+// Overlay sobre la imagen de la carta — icono + número + barra, con
+// stats CONGELADAS del nivel (misma fuente que BarritasOverlay de
+// Equipo, v_equipo_avatar_stats). Si el nivel de la carta activa aún
+// no tiene fila en personaje_stats_nivel, no se pinta nada — mismo
+// criterio que Equipo.
+function StatsCongeladasOverlay({ stats }: { stats: StatsCongeladas | null }) {
+  if (!stats || stats.fuerza === null) return null;
+  const filas: { clave: "fuerza" | "resistencia" | "velocidad" | "vida"; valor: number }[] = [
+    { clave: "fuerza", valor: stats.fuerza ?? 0 },
+    { clave: "resistencia", valor: stats.resistencia ?? 0 },
+    { clave: "velocidad", valor: stats.velocidad ?? 0 },
+    { clave: "vida", valor: stats.vida ?? 0 },
+  ];
+  const maxTramos = 1_000_000;
+  return (
+    <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1.5 bg-gradient-to-t from-black/80 to-transparent p-2.5 pt-8">
+      {filas.map((f) => {
+        const Icono = ICONO[f.clave];
+        return (
+          <div key={f.clave} className="flex items-center gap-1.5">
+            <Icono size={13} color={COLOR[f.clave]} aria-hidden />
+            <span className="min-w-[34px] text-[11px] font-medium tabular-nums text-white">
+              {f.valor.toLocaleString("es-ES")}
+            </span>
+            <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/25">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${Math.min(100, (Math.log10(f.valor + 1) / Math.log10(maxTramos)) * 100)}%`,
+                  backgroundColor: COLOR[f.clave],
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function StatsAvatarOperarioScreen() {
   const { usuario } = useAuth();
   const [stats, setStats] = useState<StatsEnVivo | null>(null);
   const [activo, setActivo] = useState<PersonajeInfo | null>(null);
+  const [statsCongeladas, setStatsCongeladas] = useState<StatsCongeladas | null>(null);
   const [nivelesDisponibles, setNivelesDisponibles] = useState<NivelDisponibleGenerar[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,14 +126,16 @@ export function StatsAvatarOperarioScreen() {
     setCargando(true);
     setError(null);
     try {
-      const [statsData, activoData, nivelesData] = await Promise.all([
+      const [statsData, activoData, nivelesData, statsCongeladasData] = await Promise.all([
         obtenerStatsEnVivo(usuario.id, usuario.rol as "operario" | "responsable"),
         obtenerPersonajeActivo(usuario.id),
         obtenerNivelesDisponiblesParaGenerar(usuario.id),
+        obtenerStatsCongeladasActivo(usuario.id),
       ]);
       setStats(statsData);
       setActivo(activoData);
       setNivelesDisponibles(nivelesData);
+      setStatsCongeladas(statsCongeladasData);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -140,9 +192,12 @@ export function StatsAvatarOperarioScreen() {
       </div>
 
       <div className="rounded-2xl bg-[var(--superficie)] p-4 shadow-sm">
-        <div className="mb-3 flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg bg-[var(--superficie-alt)]">
+        <div className="relative mb-3 flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg bg-[var(--superficie-alt)]">
           {activo ? (
-            <img src={activo.imagen_url} alt="Tu avatar" className="h-full w-full object-contain" />
+            <>
+              <img src={activo.imagen_url} alt="Tu avatar" className="h-full w-full object-contain" />
+              <StatsCongeladasOverlay stats={statsCongeladas} />
+            </>
           ) : (
             // Placeholder — el operario definirá una imagen graciosa propia más adelante.
             <span className="text-sm text-[var(--texto-tenue)]">Aún no tienes avatar</span>

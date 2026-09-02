@@ -488,6 +488,28 @@ intermedio; en el resto del proyecto siempre se llama con
 además `m2_total_vida` y `horas_plena_vida` en crudo. Para el
 responsable: `v_tiempo_responsable_ciclo`.
 
+**Fix 02/09/2026**: mismo bug que `v_puntos_responsable_total_vida`
+(25/08), pero en `v_stats_vida` — el CTE `historico` seguía sumando
+solo sobre `historial_ciclos`, vacío de filas de responsable desde la
+separación a `historial_ciclo_responsable`. Efecto real: para un
+responsable, la parte histórica de fuerza/resistencia daba 0 — "vida"
+reflejaba solo el ciclo en vivo actual. Como fuerza y resistencia se
+mueven en proporciones parecidas dentro de un único ciclo, las dos
+barras se veían casi iguales entre sí (síntoma reportado: "parece que
+se hubieran promediado"). Arreglo: `historico` ahora une
+`historial_ciclos` (operario) + `historial_ciclo_responsable`
+(responsable, con su propio vocabulario de columnas — `minutos_plena`/
+`minutos_no_alimentada` en vez de `tiempo_plena`/`tiempo_no_alimentada`).
+
+**Ratio fuerza responsable vs operario (verificado 02/09/2026, no es
+bug)**: con el reparto real de la fábrica (~48.000 m²/día entre 12-14
+operarios vs 3 responsables), el ratio medio observado es ~4,75x —
+coherente con lo esperado. `fuerza` del responsable es un agregado del
+equipo bajo su supervisión (`v_metros_responsable_ciclo`), no una
+cifra per cápita — decisión consciente, no una fórmula distinta a la
+del operario (ambas dividen entre 1000; solo cambia el origen del
+`m2_total`).
+
 ## Snapshot de stats por nivel y generaciones
 
 **Problema**: la carta de personaje de un nivel debe mostrar los stats
@@ -598,7 +620,11 @@ y contenido sexual/violento. (Una versión antigua de este doc decía
   (`v_stats_vida` + puntos), 6 tramos logarítmicos (10 … 1.000.000)
   para fuerza/resistencia/vida y rango 6-11 para velocidad, color fijo
   por stat. Debajo, avatar activo + historia + gestión (elegir /
-  generar).
+  generar) — la imagen lleva overlay de stats CONGELADAS (icono +
+  número + barra, `v_equipo_avatar_stats`) superpuesto sobre la propia
+  carta (02/09/2026, mismo patrón que `BarritasOverlay` de Equipo; no
+  se pinta si el nivel de la carta activa aún no tiene fila en
+  `personaje_stats_nivel` — mismo criterio en toda la app).
 - **Logros** (`LogrosOperarioScreen.tsx`): bloqueado = icono apagado
   + "???"; tramo = contador ×N + barra al siguiente; ciclo = solo ×N.
 

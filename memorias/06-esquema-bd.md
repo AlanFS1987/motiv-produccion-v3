@@ -182,7 +182,10 @@ antigua `v_rendimiento_operario_por_turno`, eliminada),
 (con `username` horneado desde 24/08).
 
 Producción/stats/logros operario: `v_piezas_operario_formato_ciclo` →
-`v_produccion_operario_ciclo`, `v_stats_vida`, `v_rey_formato_historico`,
+`v_produccion_operario_ciclo`, `v_stats_vida` (fix 02/09/2026: el
+histórico de responsable ahora suma también `historial_ciclo_responsable`,
+antes solo `historial_ciclos` — mismo bug que `v_puntos_responsable_
+total_vida` del 25/08, ver `04`), `v_rey_formato_historico`,
 `v_rey_formato_actual`, `v_mi_mejor_parte_por_formato`,
 `v_ganador_por_ciclo`, `v_veces_rey_de_reyes`, `v_avatar_activo_operario`
 (solo `imagen_url`, para saltar la RLS de `personaje_rpg`).
