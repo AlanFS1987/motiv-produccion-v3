@@ -33,9 +33,12 @@ export const TOOLS = [
     function: {
       name: "get_identidad",
       description:
-        "Responde preguntas sobre CERIA: quién es, qué puede hacer, cómo funciona. " +
-        "CUÁNDO USARLA: \"¿quién eres?\", \"¿qué puedes hacer?\", cualquier pregunta " +
-        "personal o conversacional sobre el propio asistente.",
+        "Responde preguntas sobre CERIA (quién es, qué puede hacer) Y preguntas sobre el " +
+        "PROCESO/FUNCIONAMIENTO de la sección (qué hace la Qualitron, el calibre, la " +
+        "empaquetadora, el paletizador, categorías de calidad, flujo de una pieza, turnos " +
+        "y personal). CUÁNDO USARLA: \"¿quién eres?\", \"¿qué puedes hacer?\", cualquier " +
+        "pregunta personal sobre el asistente, o cualquier pregunta sobre cómo funciona la " +
+        "sección/máquinas que NO requiera consultar datos concretos (piezas, tiempos, %).",
       parameters: { type: "object", properties: {}, required: [] },
     },
   },

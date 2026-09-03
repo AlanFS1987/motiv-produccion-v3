@@ -296,12 +296,37 @@ Deno.serve(async (req: Request) => {
     message1.tool_calls.map(async (tc: any) => {
       const nombre = tc.function.name as string;
       const args = JSON.parse(tc.function.arguments || "{}");
+      const t0 = performance.now();
       let resultado;
       try {
         resultado = await executeTool(nombre, args, supabase);
       } catch (err) {
-        resultado = { datos: { error: err instanceof Error ? err.message : String(err) }, filas: 0 };
+        const errorTool = err instanceof Error ? err.message : String(err);
+        resultado = { datos: { error: errorTool }, filas: 0 };
       }
+      const duracion_ms = Math.round(performance.now() - t0);
+      const errorTool = (resultado as any)?.datos?.error && Object.keys((resultado as any).datos).length === 1
+        ? (resultado as any).datos.error
+        : null;
+
+      supabase
+        .from("ceria_tool_logs")
+        .insert({
+          conversacion_id: conversacionId,
+          user_id,
+          herramienta: nombre,
+          args,
+          filas: (resultado as any).filas ?? null,
+          filas_totales: (resultado as any).filas_totales ?? null,
+          limitado: (resultado as any).limitado ?? false,
+          duracion_ms,
+          error: errorTool,
+        })
+        // deno-lint-ignore no-explicit-any
+        .then(({ error: logErr }: { error: any }) => {
+          if (logErr) console.error("Error guardando log de Ceria:", logErr.message);
+        });
+
       const prompt = await cargarPrompt(nombre, supabase);
       return { tool_call_id: tc.id as string, nombre, args, prompt, ...resultado };
     }),
@@ -318,7 +343,8 @@ Deno.serve(async (req: Request) => {
         ...historialLimpio,
         { role: "user", content: pregunta },
       ],
-      max_completion_tokens: 500,
+      max_completion_tokens: 3500,
+      reasoning_effort: "low",
     });
     const respuesta = resId.ok
       ? (resId.data.choices?.[0]?.message?.content ?? "Sin respuesta.")

@@ -90,3 +90,5 @@ diseño original.
 Ve las mismas 5 pestañas del jefe (`admin/AdminApp.tsx` reutiliza los
 componentes de `jefe/` y `calidad/`, no los duplica) más sus propias
 pestañas de gestión — ver `09-administrador.md`.
+
+Caveat de datos (validado 03/09/2026): si el denominador de un turno supera claramente líneas_activas × 480, normalmente no es un error de la vista — es que un responsable no reseteó la estadística de los apiladores en el cambio de lote anterior, y el parte siguiente arrastra minutos de más (visto en real: un parte con más de 800 min en un turno de 480). Ceria ya lo detecta y explica (ver 11); el dashboard no lo hace todavía — si se ve un % de rendimiento sospechosamente bajo, revisar get_partes de ese turno antes de asumir que es un problema real de producción.
