@@ -5,7 +5,19 @@
 // librería de markdown nueva, solo un regex simple para ese único caso.
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Bot, History, Loader2, MessageSquarePlus, Send, Trash2, User, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Bot,
+  ChevronDown,
+  ChevronUp,
+  History,
+  Loader2,
+  MessageSquarePlus,
+  Send,
+  Trash2,
+  User,
+  X,
+} from "lucide-react";
 import {
   cargarConversacion,
   eliminarConversacion,
@@ -87,6 +99,7 @@ export function CeriaScreen() {
   const [conversaciones, setConversaciones] = useState<ConversacionCeria[]>([]);
   const [cargandoConversaciones, setCargandoConversaciones] = useState(false);
   const [borrandoId, setBorrandoId] = useState<string | null>(null);
+  const [logsAbiertos, setLogsAbiertos] = useState<Set<string>>(new Set());
   const finRef = useRef<HTMLDivElement | null>(null);
 
   // Al montar: si la pestaña se recargó sola (Chrome "Ahorro de
@@ -152,7 +165,14 @@ export function CeriaScreen() {
       setCargando(false);
     }
   }
-
+    function toggleLog(id: string) {
+    setLogsAbiertos((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
   function nuevaConversacion() {
     localStorage.removeItem(CLAVE_LOCALSTORAGE);
     setConversacionId(null);
@@ -230,6 +250,29 @@ export function CeriaScreen() {
                   <AlertTriangle size={12} aria-hidden />
                   Algunos datos están limitados a las filas más recientes.
                 </p>
+              )}
+              {m.filasInfo && m.filasInfo.length > 0 && (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleLog(m.id)}
+                    className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600"
+                  >
+                    {logsAbiertos.has(m.id) ? <ChevronUp size={12} aria-hidden /> : <ChevronDown size={12} aria-hidden />}
+                    {logsAbiertos.has(m.id) ? "Ocultar detalles" : "Ver qué hizo Ceria"}
+                  </button>
+                  {logsAbiertos.has(m.id) && (
+                    <div className="mt-1 space-y-0.5 rounded-lg bg-slate-900 p-2 font-mono text-[11px] text-slate-200">
+                      {m.filasInfo.map((f, i) => (
+                        <p key={i}>
+                          → {f.herramienta} · {f.filas} fila{f.filas === 1 ? "" : "s"}
+                          {f.filas_totales && f.limitado ? ` (de ${f.filas_totales})` : ""}
+                          {f.duracion_ms != null ? ` · ${f.duracion_ms}ms` : ""}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
             {m.role === "user" && (

@@ -328,7 +328,7 @@ Deno.serve(async (req: Request) => {
         });
 
       const prompt = await cargarPrompt(nombre, supabase);
-      return { tool_call_id: tc.id as string, nombre, args, prompt, ...resultado };
+      return { tool_call_id: tc.id as string, nombre, args, prompt, ...resultado, duracion_ms };
     }),
   );
 
@@ -373,6 +373,7 @@ Deno.serve(async (req: Request) => {
     filas: r.filas,
     filas_totales: r.filas_totales,
     limitado: r.limitado ?? false,
+    duracion_ms: r.duracion_ms,
   }));
 
   const promptsUsados = [...new Set(resultados.map((r) => r.prompt).filter(Boolean))];

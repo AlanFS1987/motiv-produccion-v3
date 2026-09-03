@@ -13,6 +13,7 @@ export interface FilaInfoCeria {
   filas: number;
   filas_totales?: number;
   limitado?: boolean;
+  duracion_ms?: number;
 }
 
 export interface RespuestaCeria {
