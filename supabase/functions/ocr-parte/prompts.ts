@@ -107,7 +107,16 @@ Correspondencia con las etiquetas de pantalla:
 - piezas_planar_com = "PLANAR COM"
 - piezas_contenedor = "CONTENEDOR"
 - cal_1 a cal_8 = piezas por cada banda de calibre físico (normalmente solo 1 o 2 de las 8 tendrán piezas, el resto será 0 — captura los 8 igualmente)
+- piezas_entradas = "2. Piezas entradas:" en el panel superior derecho — NO uses "Piezas entradas (m²)" (es la misma etiqueta pero con superficie en vez de piezas) ni "3. Pilas descargadas" (dato distinto, no se usa en esta app)
+- minutos_total = "Total minutos:" en el panel superior derecho (caja aislada, sin columna de porcentaje al lado) — no lo confundas con "Promedio de piezas por minuto", que es un campo distinto
+- minutos_plena = fila "Plena producción:" — SOLO la columna "Minutos" (izquierda), nunca la columna "Tiempo %" (derecha)
+- minutos_no_alimentada = fila "No alimentada:" — columna "Minutos"
+- minutos_saturacion = fila "En saturación:" — columna "Minutos"
+- minutos_banco = fila "Inhabilita banco de selección:" — columna "Minutos"
+- minutos_maquina = fila "Inhabilita máquina:" — columna "Minutos"
 - hora_captura_pantalla = la fecha/hora que muestra la propia pantalla en la esquina superior derecha (formato ISO 8601 si puedes inferirlo con certeza; si no, transcríbela tal cual la ves). Usa null solo si no se ve en absoluto.
+
+Las filas "Plena producción", "No alimentada", "En saturación", "Inhabilita banco de selección" e "Inhabilita máquina" muestran SIEMPRE dos números pegados uno al lado del otro, bajo las cabeceras "Minutos" (izquierda) y "Tiempo %" (derecha) — mismo concepto expresado dos veces, una en minutos (entero, normalmente 1-3 dígitos) y otra en porcentaje (con un decimal). Los 5 campos "minutos_*" de esta lista deben leerse SIEMPRE de la columna "Minutos", nunca de "Tiempo %". Pista para distinguirlas si la imagen no es nítida: el valor de "Minutos" es siempre un número entero sin decimales y su magnitud puede superar 100; el valor de "Tiempo %" siempre lleva un decimal (ej. "10.7", "48.3") y nunca supera 100.0. Si solo puedes leer una de las dos columnas con confianza y no estás seguro de cuál es, marca "confianza": "baja" en vez de adivinar.
 
 No captures "Pilas descargadas" ni "Piezas entradas (m²)" si aparecen en pantalla — no se usan en esta app.
 Para todos los campos numéricos de piezas y minutos, si el valor mostrado es 0, devuelve 0 (nunca null) — estos campos siempre están presentes en la pantalla.`;
