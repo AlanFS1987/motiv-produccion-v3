@@ -42,6 +42,32 @@ export async function cargarConversacion(
   return (data ?? []) as { role: "user" | "assistant"; contenido: string }[];
 }
 
+export interface ConversacionCeria {
+  id: string;
+  titulo: string;
+  created_at: string;
+}
+
+/**
+ * Lista las conversaciones del jefe logueado, más recientes primero
+ * (RLS ya filtra a solo las suyas — no hace falta pasar user_id).
+ */
+export async function listarConversaciones(): Promise<ConversacionCeria[]> {
+  const { data, error } = await supabase
+    .from("ceria_conversaciones")
+    .select("id, titulo, created_at")
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ConversacionCeria[];
+}
+
+/** Borra una conversación entera (los mensajes caen en cascada). */
+export async function eliminarConversacion(conversacionId: string): Promise<void> {
+  const { error } = await supabase.from("ceria_conversaciones").delete().eq("id", conversacionId);
+  if (error) throw new Error(error.message);
+}
 /**
  * Envía una pregunta a Ceria. `conversacionId` es null en el primer
  * mensaje de una conversación nueva — la Edge Function crea una fila

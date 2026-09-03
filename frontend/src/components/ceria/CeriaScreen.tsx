@@ -5,8 +5,15 @@
 // librería de markdown nueva, solo un regex simple para ese único caso.
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Bot, Loader2, MessageSquarePlus, Send, User } from "lucide-react";
-import { cargarConversacion, preguntarCeria, type FilaInfoCeria } from "../../lib/ceria";
+import { AlertTriangle, Bot, History, Loader2, MessageSquarePlus, Send, Trash2, User, X } from "lucide-react";
+import {
+  cargarConversacion,
+  eliminarConversacion,
+  listarConversaciones,
+  preguntarCeria,
+  type ConversacionCeria,
+  type FilaInfoCeria,
+} from "../../lib/ceria";
 
 const CLAVE_LOCALSTORAGE = "ceria_conversacion_id";
 
@@ -76,6 +83,10 @@ export function CeriaScreen() {
   const [cargando, setCargando] = useState(false);
   const [cargandoHistorial, setCargandoHistorial] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [historialAbierto, setHistorialAbierto] = useState(false);
+  const [conversaciones, setConversaciones] = useState<ConversacionCeria[]>([]);
+  const [cargandoConversaciones, setCargandoConversaciones] = useState(false);
+  const [borrandoId, setBorrandoId] = useState<string | null>(null);
   const finRef = useRef<HTMLDivElement | null>(null);
 
   // Al montar: si la pestaña se recargó sola (Chrome "Ahorro de
@@ -148,7 +159,49 @@ export function CeriaScreen() {
     setMensajes([MENSAJE_BIENVENIDA]);
     setError(null);
   }
+    async function abrirHistorial() {
+    setHistorialAbierto(true);
+    setCargandoConversaciones(true);
+    try {
+      setConversaciones(await listarConversaciones());
+    } catch {
+      setConversaciones([]);
+    } finally {
+      setCargandoConversaciones(false);
+    }
+  }
 
+  async function continuarConversacion(id: string) {
+    setHistorialAbierto(false);
+    setCargandoHistorial(true);
+    setError(null);
+    try {
+      const mensajesGuardados = await cargarConversacion(id);
+      setConversacionId(id);
+      setMensajes([
+        MENSAJE_BIENVENIDA,
+        ...mensajesGuardados.map((m) => ({ id: crypto.randomUUID(), role: m.role, contenido: m.contenido })),
+      ]);
+    } catch {
+      setError("No se pudo cargar esa conversación");
+    } finally {
+      setCargandoHistorial(false);
+    }
+  }
+
+  async function borrarConversacion(id: string) {
+    if (!confirm("¿Borrar esta conversación? No se puede deshacer.")) return;
+    setBorrandoId(id);
+    try {
+      await eliminarConversacion(id);
+      setConversaciones((prev) => prev.filter((c) => c.id !== id));
+      if (id === conversacionId) nuevaConversacion();
+    } catch {
+      setError("No se pudo borrar la conversación");
+    } finally {
+      setBorrandoId(null);
+    }
+  }
   return (
     <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-2xl flex-col">
       {/* Historial de mensajes */}
@@ -219,15 +272,96 @@ export function CeriaScreen() {
         ))}
         <button
           type="button"
+          onClick={abrirHistorial}
+          disabled={cargando}
+          title="Ver conversaciones anteriores"
+          className="ml-auto flex items-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+        >
+          <History size={14} aria-hidden />
+          Historial
+        </button>
+        <button
+          type="button"
           onClick={nuevaConversacion}
           disabled={cargando}
           title="Empezar una conversación nueva"
-          className="ml-auto flex items-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+          className="flex items-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-40"
         >
           <MessageSquarePlus size={14} aria-hidden />
           Nueva
         </button>
       </div>
+
+      {historialAbierto && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
+          onClick={() => setHistorialAbierto(false)}
+        >
+          <div
+            className="max-h-[70vh] w-full max-w-md overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <h2 className="text-sm font-semibold text-slate-900">Conversaciones anteriores</h2>
+              <button
+                type="button"
+                onClick={() => setHistorialAbierto(false)}
+                className="rounded-full p-1 text-slate-400 hover:bg-slate-100"
+              >
+                <X size={18} aria-hidden />
+              </button>
+            </div>
+            <div className="max-h-[55vh] overflow-y-auto">
+              {cargandoConversaciones && (
+                <div className="flex items-center gap-2 p-4 text-sm text-slate-400">
+                  <Loader2 size={16} className="animate-spin" aria-hidden />
+                  Cargando...
+                </div>
+              )}
+              {!cargandoConversaciones && conversaciones.length === 0 && (
+                <p className="p-4 text-sm text-slate-400">Todavía no tienes conversaciones guardadas.</p>
+              )}
+              {conversaciones.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => continuarConversacion(c.id)}
+                  className={`flex w-full items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50 ${
+                    c.id === conversacionId ? "bg-slate-50" : ""
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-slate-900">{c.titulo}</p>
+                    <p className="text-xs text-slate-400">
+                      {new Date(c.created_at).toLocaleDateString("es-ES", {
+                        day: "2-digit",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                  <span
+                    role="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      borrarConversacion(c.id);
+                    }}
+                    className="shrink-0 rounded-full p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500"
+                    title="Borrar conversación"
+                  >
+                    {borrandoId === c.id ? (
+                      <Loader2 size={16} className="animate-spin" aria-hidden />
+                    ) : (
+                      <Trash2 size={16} aria-hidden />
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Input */}
       <form
