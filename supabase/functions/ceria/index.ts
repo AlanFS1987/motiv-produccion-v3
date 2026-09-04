@@ -19,6 +19,7 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, jsonError, jsonOk } from "../_shared/cors.ts";
 import { TOOLS, executeTool } from "./tools.ts";
+import { resolverModeloFase3, llamarFase3 } from "./modelos.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -50,9 +51,12 @@ DOS EJES QUE NUNCA SE MEZCLAN
   get_incidencias_produccion.
 - CALIDAD: 1ª/comercial/eco/contenedor, defectos de producto. Herramientas:
   get_calidad_modelo, get_calidad_lote, get_incidencias_calidad.
-- get_partes trae ambos bloques del mismo parte, pero SIEMPRE en secciones
-  separadas — nunca concluyas que un paro de máquina "causó" un defecto de
-  calidad, ni al revés. Son independientes por diseño.
+- get_partes trae ambos bloques del mismo parte. Puedes y DEBES mostrarlos
+  juntos en la misma tabla o frase cuando ayude a entender el dato — una
+  cantidad sin su calidad al lado, o al revés, es un dato pobre. Lo único
+  PROHIBIDO es la causalidad: nunca digas que un paro de máquina "explicó"
+  o "causó" una calidad baja de ese mismo parte, ni al revés. Son
+  independientes en cuanto a CAUSA, no en cuanto a poder mostrarse juntos.
 
 ═══════════════════════════════════════════
 CALIDAD: DOS MÉTRICAS, MUÉSTRALAS SIEMPRE JUNTAS
@@ -94,6 +98,32 @@ SUMAS
 Todos los totales que ves en los datos YA vienen sumados por la base de
 datos. No re-sumes filas tú mismo ni inventes un total que no esté en los
 datos recibidos.
+
+═══════════════════════════════════════════
+FORMATO DE RESPUESTA — SIEMPRE TEXTO NATURAL
+═══════════════════════════════════════════
+Tu respuesta final es SIEMPRE texto natural en español, para que la lea
+una persona. NUNCA devuelvas JSON, código ni estructuras de datos crudas
+como respuesta — eso es un fallo grave, aunque internamente estés
+decidiendo qué preguntar o qué herramienta usar. Si necesitas presentar
+datos estructurados, usa una lista o texto plano, nunca un objeto {}.
+
+═══════════════════════════════════════════
+NO ABUSES DE LAS PREGUNTAS DE ACLARACIÓN
+═══════════════════════════════════════════
+Si la petición ya tiene información suficiente para dar una respuesta
+razonable — aunque no sea exactamente como la habría pedido el jefe—,
+respóndela directamente con una interpretación sensata por defecto, e
+indica brevemente qué asumiste. Por defecto, cuando pidan "por lotes" o
+"agrupado": agrupa por número de orden, suma piezas, y muestra SIEMPRE
+las dos métricas de calidad (completa y oficial) juntas. Pregunta SOLO
+cuando la petición sea genuinamente ambigua y cualquier respuesta que
+des sin preguntar sería inútil o claramente equivocada — nunca para
+matices de formato que puedes decidir tú mismo con un criterio razonable.
+Ejemplo real: si piden "dame por lote la cantidad y calidad, todo junto",
+agrupa por lote directamente y responde con la tabla de una vez — NO
+preguntes "¿agrupado o por partes?", esa petición ya especificó "por
+lote", no hay nada que aclarar.
 
 ═══════════════════════════════════════════
 CONTEXTO BÁSICO
@@ -177,7 +207,7 @@ async function cargarHistorial(
 // deno-lint-ignore no-explicit-any
 async function llamarOpenAI(body: Record<string, unknown>): Promise<{ ok: true; data: any } | { ok: false; error: string }> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30_000);
+  const timeoutId = setTimeout(() => controller.abort(), 60_000);
   try {
     const res = await fetch(OPENAI_URL, {
       method: "POST",
@@ -192,14 +222,34 @@ async function llamarOpenAI(body: Record<string, unknown>): Promise<{ ok: true; 
     return { ok: true, data: await res.json() };
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
-      return { ok: false, error: "OpenAI no respondió a tiempo (timeout de 30s)" };
+      return { ok: false, error: "OpenAI no respondió a tiempo (timeout de 60s)" };
     }
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   } finally {
     clearTimeout(timeoutId);
   }
 }
-
+/**
+ * Red de seguridad: pese a la instrucción del prompt de nunca
+ * devolver JSON crudo, el modelo lo ha hecho en la práctica (visto
+ * en real 04-05/09/2026, dos veces). En vez de seguir puliendo solo
+ * el prompt, esto garantiza que el jefe nunca vea un objeto {} tal
+ * cual — si el texto parece JSON, extrae el campo más probable con
+ * el mensaje real.
+ */
+function sanearRespuestaJSON(texto: string): string {
+  const limpio = texto.trim();
+  if (!limpio.startsWith("{") && !limpio.startsWith("[")) return texto;
+  try {
+    // deno-lint-ignore no-explicit-any
+    const obj: any = JSON.parse(limpio);
+    const candidato = obj.question ?? obj.mensaje ?? obj.respuesta ?? obj.message ?? obj.texto;
+    if (typeof candidato === "string" && candidato.trim()) return candidato;
+  } catch {
+    // No era JSON válido de verdad — se deja el texto tal cual.
+  }
+  return texto;
+}
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonError("Método no permitido, usa POST", 405);
@@ -223,13 +273,24 @@ Deno.serve(async (req: Request) => {
     return jsonError("Ceria solo está disponible para el jefe de planta", 403);
   }
 
-  let body: { pregunta?: string; conversacion_id?: string | null; fecha_referencia?: string | null };
+  let body: {
+    pregunta?: string;
+    conversacion_id?: string | null;
+    fecha_referencia?: string | null;
+    modelo_fase3?: string | null;
+  };
   try {
     body = await req.json();
   } catch {
     return jsonError("El cuerpo de la petición no es JSON válido", 400);
   }
-  const { pregunta, conversacion_id: conversacionIdEntrada = null, fecha_referencia = null } = body;
+  const {
+    pregunta,
+    conversacion_id: conversacionIdEntrada = null,
+    fecha_referencia = null,
+    modelo_fase3 = null,
+  } = body;
+  const modeloSeleccionado = resolverModeloFase3(modelo_fase3);
   if (!pregunta) return jsonError("Falta el campo 'pregunta'", 400);
 
   let conversacionId = conversacionIdEntrada;
@@ -357,16 +418,16 @@ Deno.serve(async (req: Request) => {
   }
 
   // ══════════════════════════════ FASE 3 — redactar respuesta ═════
-  const toolMessages = resultados.map((r) => ({
-    role: "tool",
-    tool_call_id: r.tool_call_id,
-    content: JSON.stringify({
-      datos: r.datos,
-      filas: r.filas,
-      filas_totales: r.filas_totales,
-      limitado: r.limitado,
-    }),
-  }));
+  // Mensajes SIEMPRE genéricos (role: "user"|"assistant", content:
+  // string) — sin tool_calls ni mensajes "tool" de OpenAI, para que
+  // cualquier proveedor (OpenAI, Anthropic, DeepSeek) pueda leerlos
+  // igual. Los datos crudos de las herramientas viajan como un bloque
+  // de texto al final de la pregunta, mismo patrón que ya usábamos
+  // para [DATOS_DISPONIBLES] en el historial.
+  const datosCrudos = resultados.reduce((acc: Record<string, unknown>, r) => {
+    acc[r.nombre] = r.datos;
+    return acc;
+  }, {});
 
   const filasInfo = resultados.map((r) => ({
     herramienta: r.nombre,
@@ -385,34 +446,34 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  const fase3 = await llamarOpenAI({
-    messages: [
-      { role: "system", content: systemFase3Parts.join("\n\n═══\n\n") },
-      ...historialLimpio,
-      { role: "user", content: pregunta },
-      { role: "assistant", content: null, tool_calls: message1.tool_calls },
-      ...toolMessages,
-    ],
-    // Aquí sí conviene algo de razonamiento (comparar cifras, elegir
-    // qué destacar), pero con presupuesto suficiente para que no se
-    // coma la respuesta igual que en fase 1.
-    max_completion_tokens: 3000,
-    reasoning_effort: "low",
-  });
+  const mensajesFase3 = [
+    ...historialLimpio.map((h) => ({ role: h.role as "user" | "assistant", content: h.content })),
+    {
+      role: "user" as const,
+      content: `${pregunta}\n\n[DATOS_OBTENIDOS]\n${JSON.stringify(datosCrudos)}\n[/DATOS_OBTENIDOS]`,
+    },
+  ];
 
-  if (!fase3.ok) return jsonError(`Ceria (fase3): ${fase3.error}`, 502);
-  const respuesta = fase3.data.choices?.[0]?.message?.content ?? "Sin respuesta.";
+  const fase3 = await llamarFase3(
+    modeloSeleccionado,
+    systemFase3Parts.join("\n\n═══\n\n"),
+    mensajesFase3,
+  );
+
+  if (!fase3.ok) return jsonError(`Ceria (fase3, ${modeloSeleccionado.etiqueta}): ${fase3.error}`, 502);
+  const respuesta = sanearRespuestaJSON(fase3.texto);
   const toolUsadaStr = resultados.map((r) => r.nombre).join(", ");
-
-  const datosCrudos = resultados.reduce((acc: Record<string, unknown>, r) => {
-    acc[r.nombre] = r.datos;
-    return acc;
-  }, {});
 
   await Promise.all([
     guardarMensaje(conversacionId, "user", pregunta, null, supabase),
     guardarMensaje(conversacionId, "assistant", respuesta, toolUsadaStr, supabase, datosCrudos),
   ]);
 
-  return jsonOk({ respuesta, tool_usada: toolUsadaStr, filas_info: filasInfo, conversacion_id: conversacionId });
+  return jsonOk({
+    respuesta,
+    tool_usada: toolUsadaStr,
+    filas_info: filasInfo,
+    conversacion_id: conversacionId,
+    modelo_fase3_usado: modeloSeleccionado.etiqueta,
+  });
 });

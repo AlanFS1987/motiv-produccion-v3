@@ -23,6 +23,7 @@ import {
   eliminarConversacion,
   listarConversaciones,
   preguntarCeria,
+  MODELOS_FASE3_OPCIONES,
   type ConversacionCeria,
   type FilaInfoCeria,
 } from "../../lib/ceria";
@@ -41,6 +42,7 @@ interface Mensaje {
   role: "user" | "assistant";
   contenido: string;
   filasInfo?: FilaInfoCeria[];
+  modeloFase3Usado?: string;
 }
 
 const CHIPS: { etiqueta: string; pregunta: string }[] = [
@@ -100,6 +102,7 @@ export function CeriaScreen() {
   const [cargandoConversaciones, setCargandoConversaciones] = useState(false);
   const [borrandoId, setBorrandoId] = useState<string | null>(null);
   const [logsAbiertos, setLogsAbiertos] = useState<Set<string>>(new Set());
+  const [modeloFase3, setModeloFase3] = useState<string>("gpt-5-mini");
   const finRef = useRef<HTMLDivElement | null>(null);
 
   // Al montar: si la pestaña se recargó sola (Chrome "Ahorro de
@@ -153,11 +156,17 @@ export function CeriaScreen() {
     setCargando(true);
 
     try {
-      const res = await preguntarCeria(preguntaLimpia, conversacionId);
+      const res = await preguntarCeria(preguntaLimpia, conversacionId, modeloFase3);
       setConversacionId(res.conversacion_id);
       setMensajes((prev) => [
         ...prev,
-        { id: crypto.randomUUID(), role: "assistant", contenido: res.respuesta, filasInfo: res.filas_info },
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          contenido: res.respuesta,
+          filasInfo: res.filas_info,
+          modeloFase3Usado: res.modelo_fase3_usado,
+        },
       ]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error desconocido al preguntar a Ceria");
@@ -270,6 +279,7 @@ export function CeriaScreen() {
                           {f.duracion_ms != null ? ` · ${f.duracion_ms}ms` : ""}
                         </p>
                       ))}
+                      {m.modeloFase3Usado && <p className="text-slate-400">Redactado por: {m.modeloFase3Usado}</p>}
                     </div>
                   )}
                 </div>
@@ -313,6 +323,18 @@ export function CeriaScreen() {
             {chip.etiqueta}
           </button>
         ))}
+                <select
+          value={modeloFase3}
+          onChange={(e) => setModeloFase3(e.target.value)}
+          title="Modelo que redacta la respuesta (Fase 3) — solo para pruebas"
+          className="rounded-full border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-500"
+        >
+          {MODELOS_FASE3_OPCIONES.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.etiqueta}
+            </option>
+          ))}
+        </select>
         <button
           type="button"
           onClick={abrirHistorial}

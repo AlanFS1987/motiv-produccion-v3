@@ -254,7 +254,7 @@ export async function executeTool(
         id, tono, piezas_1a, piezas_comercial, piezas_eco, piezas_contenedor, piezas_entradas,
         minutos_total, minutos_plena, minutos_no_alimentada, minutos_saturacion, minutos_banco, minutos_maquina,
         completado, created_at,
-        turno:turno_id ( fecha, tipo ),
+        turno:turno_id!inner ( fecha, tipo ),
         linea:linea_id ( nombre ),
         operario:operario_id ( username ),
         lote:lote_id (
@@ -357,7 +357,7 @@ export async function executeTool(
         .from("incidencia_produccion")
         .select(
           `id, descripcion, fotos, created_at,
-           turno:turno_id ( fecha, tipo ),
+           turno:turno_id!inner ( fecha, tipo ),
            linea:linea_id ( nombre )`,
           { count: "exact" },
         )

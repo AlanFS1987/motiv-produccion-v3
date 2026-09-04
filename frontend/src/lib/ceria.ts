@@ -21,7 +21,19 @@ export interface RespuestaCeria {
   tool_usada?: string;
   filas_info?: FilaInfoCeria[];
   conversacion_id: string;
+  modelo_fase3_usado?: string;
 }
+
+/** Mismo catálogo que supabase/functions/ceria/modelos.ts — solo id + etiqueta, para el selector. */
+export const MODELOS_FASE3_OPCIONES = [
+  { id: "gpt-5-mini", etiqueta: "GPT-5-mini (actual)" },
+  { id: "gpt-5.6-luna", etiqueta: "GPT-5.6 Luna" },
+  { id: "gpt-5.4-mini", etiqueta: "GPT-5.4 Mini" },
+  { id: "claude-haiku-4.5", etiqueta: "Claude Haiku 4.5" },
+  { id: "claude-sonnet-4.6", etiqueta: "Claude Sonnet 4.6" },
+  { id: "deepseek-v4-flash", etiqueta: "DeepSeek V4 Flash" },
+  { id: "deepseek-v4-pro", etiqueta: "DeepSeek V4 Pro" },
+] as const;
 
 /**
  * Carga los mensajes ya guardados de una conversación existente —
@@ -79,9 +91,10 @@ export async function eliminarConversacion(conversacionId: string): Promise<void
 export async function preguntarCeria(
   pregunta: string,
   conversacionId: string | null,
+  modeloFase3?: string,
 ): Promise<RespuestaCeria> {
   const { data, error } = await supabase.functions.invoke<RespuestaCeria>("ceria", {
-    body: { pregunta, conversacion_id: conversacionId },
+    body: { pregunta, conversacion_id: conversacionId, modelo_fase3: modeloFase3 ?? null },
   });
 
   if (error) {
