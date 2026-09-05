@@ -13,6 +13,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Bar, BarChart, Tooltip as RechartsTooltip, YAxis } from "recharts";
 import {
   calcularKpis,
   obtenerSerieUltimosDias,
@@ -47,6 +48,59 @@ function agruparPorFecha(turnos: TurnoCombinado[]): { fecha: string; porTurno: M
   return [...mapa.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([fecha, porTurno]) => ({ fecha, porTurno }));
 }
 
+interface DatoBarra {
+  plena: number;
+  no_alimentada: number;
+  saturacion: number;
+  banco: number;
+  maquina: number;
+  sin_reportar: number;
+}
+
+/** Tooltip de Recharts: desglose exacto en minutos de la barra sobre la que está el ratón/dedo. */
+function TooltipBarra({
+  active,
+  payload,
+  fechaTurno,
+  m2,
+  piezas,
+}: {
+  active?: boolean;
+  payload?: { payload: DatoBarra }[];
+  fechaTurno: string;
+  m2: number;
+  piezas: number;
+}) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  const filas: { nombre: string; valor: number; color: string }[] = [
+    { nombre: "Plena", valor: d.plena, color: COLORES_TIEMPO.plena },
+    { nombre: "No alimentada", valor: d.no_alimentada, color: COLORES_TIEMPO.no_alimentada },
+    { nombre: "Saturación", valor: d.saturacion, color: COLORES_TIEMPO.saturacion },
+    { nombre: "Banco", valor: d.banco, color: COLORES_TIEMPO.banco },
+    { nombre: "Máquina", valor: d.maquina, color: COLORES_TIEMPO.maquina },
+  ];
+  if (d.sin_reportar > 0) filas.push({ nombre: "Sin reportar", valor: d.sin_reportar, color: COLORES_TIEMPO.sin_reportar });
+
+  return (
+    <div className="w-44 rounded-lg bg-slate-900 p-2 text-left text-[11px] text-white shadow-lg">
+      <p className="mb-1 font-semibold">{fechaTurno}</p>
+      {filas.map((f) => (
+        <p key={f.nombre} className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full" style={{ background: f.color }} />
+            {f.nombre}
+          </span>
+          <span>{f.valor} min</span>
+        </p>
+      ))}
+      <p className="mt-1 border-t border-slate-700 pt-1">
+        {Math.round(m2)} m² · {piezas} piezas
+      </p>
+    </div>
+  );
+}
+
 /** Una barra apilada de tiempos de un turno, con m² y calidad debajo. */
 function BarraTurno({ turno, tipo }: { turno: TurnoCombinado | undefined; tipo: TipoTurno }) {
   if (!turno?.produccion) {
@@ -62,26 +116,41 @@ function BarraTurno({ turno, tipo }: { turno: TurnoCombinado | undefined; tipo: 
 
   const p = turno.produccion;
   const denom = p.rendimiento_denominador || 480;
-  const segmentos: { valor: number; color: string }[] = [
-    { valor: p.minutos_plena ?? 0, color: COLORES_TIEMPO.plena },
-    { valor: p.minutos_no_alimentada ?? 0, color: COLORES_TIEMPO.no_alimentada },
-    { valor: p.minutos_saturacion ?? 0, color: COLORES_TIEMPO.saturacion },
-    { valor: p.minutos_banco ?? 0, color: COLORES_TIEMPO.banco },
-    { valor: p.minutos_maquina ?? 0, color: COLORES_TIEMPO.maquina },
-  ];
-  const sumaSegmentos = segmentos.reduce((acc, s) => acc + s.valor, 0);
-  const restante = Math.max(0, denom - sumaSegmentos);
+  const dato: DatoBarra = {
+    plena: p.minutos_plena ?? 0,
+    no_alimentada: p.minutos_no_alimentada ?? 0,
+    saturacion: p.minutos_saturacion ?? 0,
+    banco: p.minutos_banco ?? 0,
+    maquina: p.minutos_maquina ?? 0,
+    sin_reportar: 0,
+  };
+  const sumaSegmentos = dato.plena + dato.no_alimentada + dato.saturacion + dato.banco + dato.maquina;
+  dato.sin_reportar = Math.max(0, denom - sumaSegmentos);
 
   return (
     <div className="flex w-16 flex-col items-center gap-1">
       <span className="text-[11px] font-medium text-slate-600">{p.pct_rendimiento ?? "—"}%</span>
-      <div className="flex h-32 w-10 flex-col-reverse overflow-hidden rounded-md border border-slate-200">
-        {segmentos.map((s, i) => (
-          <div key={i} style={{ height: `${(s.valor / denom) * 100}%`, background: s.color }} />
-        ))}
-        {restante > 0 && (
-          <div style={{ height: `${(restante / denom) * 100}%`, background: COLORES_TIEMPO.sin_reportar }} />
-        )}
+      <div className="h-32 w-10 rounded-md border border-slate-200">
+        <BarChart width={40} height={128} data={[dato]} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+          <YAxis hide domain={[0, denom]} />
+          <RechartsTooltip
+            cursor={{ fill: "rgba(0,0,0,0.05)" }}
+            wrapperStyle={{ zIndex: 50, outline: "none" }}
+            content={
+              <TooltipBarra
+                fechaTurno={`${NOMBRE_TURNO[tipo]} · ${turno.fecha}`}
+                m2={p.m2_total}
+                piezas={p.piezas_total}
+              />
+            }
+          />
+          <Bar dataKey="plena" stackId="a" fill={COLORES_TIEMPO.plena} isAnimationActive={false} />
+          <Bar dataKey="no_alimentada" stackId="a" fill={COLORES_TIEMPO.no_alimentada} isAnimationActive={false} />
+          <Bar dataKey="saturacion" stackId="a" fill={COLORES_TIEMPO.saturacion} isAnimationActive={false} />
+          <Bar dataKey="banco" stackId="a" fill={COLORES_TIEMPO.banco} isAnimationActive={false} />
+          <Bar dataKey="maquina" stackId="a" fill={COLORES_TIEMPO.maquina} isAnimationActive={false} />
+          <Bar dataKey="sin_reportar" stackId="a" fill={COLORES_TIEMPO.sin_reportar} isAnimationActive={false} />
+        </BarChart>
       </div>
       <span className="text-[11px] font-semibold text-slate-700">{NOMBRE_TURNO[tipo].slice(0, 1)}</span>
       <span className="text-[10px] text-slate-400">{Math.round(p.m2_total)} m²</span>

@@ -24,12 +24,6 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-// Umbral de similitud (pg_trgm) por debajo del cual se crea un
-// registro nuevo en vez de enlazar. Validado localmente: coincidencia
-// exacta = 1.0, typo típico de OCR ("Nues" por "Nuez") ≈ 0.71,
-// producto sin relación ≈ 0.08 — 0.4 separa bien ambos casos.
-// Ajustar aquí si, con datos reales, se ven falsos positivos/negativos.
-const UMBRAL_SIMILITUD = 0.4;
 
 interface RequestBody {
   modelo_texto: string;
@@ -199,6 +193,20 @@ Deno.serve(async (req: Request) => {
         if (reabrirErr) throw reabrirErr;
         loteReabierto = true;
       }
+
+      // El lote ya existe: su producto_id guardado es la fuente de
+      // verdad, no lo que se acaba de resolver de ESTA lectura de OCR
+      // (puede venir de otra línea produciendo el mismo pedido en
+      // paralelo, con una foto distinta de la misma hoja). Sin esto,
+      // la respuesta puede devolver un producto_id que no coincide con
+      // el que de verdad tiene el lote.
+      const { data: loteProducto, error: loteProductoErr } = await supabase
+        .from("lote")
+        .select("producto_id")
+        .eq("id", loteId)
+        .single();
+      if (loteProductoErr) throw loteProductoErr;
+      productoId = loteProducto.producto_id as string;
     } else {
       const espesorTexto = espesorATexto(espesor_mm);
       if (!espesorTexto) {
@@ -256,25 +264,32 @@ Deno.serve(async (req: Request) => {
 });
 
 /**
- * Busca por similitud (pg_trgm) en `modelo` o `marca`; si hay una
- * coincidencia clara (>= UMBRAL_SIMILITUD) enlaza con ella, si no,
- * crea un registro nuevo. Nunca bloquea (05-modelo-de-datos.md 7.4).
+ * Busca coincidencia EXACTA (tras normalizar) en `modelo` o `marca`;
+ * si existe, se enlaza con ella, si no, se crea un registro nuevo.
+ * Nunca bloquea (05-modelo-de-datos.md 7.4).
+ *
+ * Antes: enlazaba por similitud (pg_trgm, umbral 0.4). Comprobado con
+ * datos reales (incidente 2026-09): no existe un umbral seguro para
+ * este catálogo — productos distintos pueden diferir en un solo
+ * carácter (ej. "HARMONY HUELVA C3" vs "C1", sim=0.79), indistinguible
+ * de un typo real de OCR con cualquier métrica de texto. Ahora solo se
+ * enlaza con coincidencia EXACTA tras normalizar; cualquier otra cosa
+ * crea un registro nuevo. Los duplicados se fusionan a mano (pantalla
+ * de administrador — pendiente de construir).
  */
 async function resolverOCrear(
   tabla: "modelo" | "marca",
   nombreCrudo: string,
 ): Promise<string> {
   const nombreNormalizado = normalizarTexto(nombreCrudo);
-  const rpcName = tabla === "modelo" ? "fn_buscar_modelo_similar" : "fn_buscar_marca_similar";
 
-  const { data: candidatos, error: rpcErr } = await supabase.rpc(rpcName, {
-    p_nombre_normalizado: nombreNormalizado,
-  });
-  if (rpcErr) throw rpcErr;
-
-  if (candidatos && candidatos.length > 0 && candidatos[0].similitud >= UMBRAL_SIMILITUD) {
-    return candidatos[0].id as string;
-  }
+  const { data: exacto, error: selErr } = await supabase
+    .from(tabla)
+    .select("id")
+    .eq("nombre_normalizado", nombreNormalizado)
+    .maybeSingle();
+  if (selErr) throw selErr;
+  if (exacto) return exacto.id as string;
 
   const { data: nuevo, error: insErr } = await supabase
     .from(tabla)
