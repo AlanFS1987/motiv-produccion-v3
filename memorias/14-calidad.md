@@ -51,8 +51,16 @@ todo el histórico de un lote sin fecha por fila (solo
 `primera_produccion`/`ultima_produccion`). El filtro comprueba
 `primera_produccion <= fecha <= ultima_produccion` — un lote que
 estuvo parado semanas y se retomó puede aparecer en fechas donde no
-se tocó realmente. Si esto molesta en real, hace falta una vista
-nueva que una por `turno.fecha`.
+se tocó realmente. Esta pantalla (`calidad`) sigue usando ese filtro
+aproximado tal cual, sin cambios.
+
+Para Ceria sí se construyó la vista exacta que aquí se pedía
+(sesión 05/09/2026): la función `calidad_lote_por_fecha` filtra con
+precisión por `turno.fecha` de cada parte, en vez de por el rango
+aproximado de vida del lote. Si algún día esta pantalla necesita el
+mismo rigor (por ejemplo, si el filtro por fecha empieza a dar
+resultados confusos en real), se puede reutilizar esa función en vez
+de escribir una nueva — ver `11-ceria.md`.
 
 ## Archivos
 

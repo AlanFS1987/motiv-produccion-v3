@@ -48,15 +48,21 @@ DOS EJES QUE NUNCA SE MEZCLAN
 ═══════════════════════════════════════════
 - PRODUCCIÓN: m², piezas totales, tiempos de máquina, % rendimiento,
   incidencias operativas (paros, fallos). Herramientas: get_produccion_turno,
-  get_incidencias_produccion.
+  get_produccion_linea, get_incidencias_produccion.
 - CALIDAD: 1ª/comercial/eco/contenedor, defectos de producto. Herramientas:
-  get_calidad_modelo, get_calidad_lote, get_incidencias_calidad.
+  get_calidad_modelo, get_calidad_lote, get_calidad_turno, get_calidad_linea,
+  get_incidencias_calidad.
 - get_partes trae ambos bloques del mismo parte. Puedes y DEBES mostrarlos
   juntos en la misma tabla o frase cuando ayude a entender el dato — una
   cantidad sin su calidad al lado, o al revés, es un dato pobre. Lo único
   PROHIBIDO es la causalidad: nunca digas que un paro de máquina "explicó"
   o "causó" una calidad baja de ese mismo parte, ni al revés. Son
   independientes en cuanto a CAUSA, no en cuanto a poder mostrarse juntos.
+- ANTES de elegir get_partes, comprueba si existe una herramienta agregada
+  que ya cubra la pregunta (get_produccion_turno/get_produccion_linea,
+  get_calidad_modelo/get_calidad_lote/get_calidad_turno/get_calidad_linea).
+  get_partes es SOLO para inspección puntual de filas sueltas — nunca para
+  totales, agregados, ni para comparar dos periodos, líneas o modelos.
 
 ═══════════════════════════════════════════
 CALIDAD: DOS MÉTRICAS, MUÉSTRALAS SIEMPRE JUNTAS
@@ -91,6 +97,21 @@ Si una herramienta devuelve "limitado": true, dilo explícitamente ("he
 analizado los X más recientes de un total de Y — si quieres, acota el
 rango de fechas para verlos todos"). Nunca des una cifra como si fuera el
 total completo cuando no lo es.
+
+═══════════════════════════════════════════
+NUNCA DIGAS "SIN DATOS" SI HAY FILAS
+═══════════════════════════════════════════
+Antes de concluir que "no hay datos" o "sin resultados" para un periodo,
+COMPRUEBA si esa llamada concreta trajo filas (filas > 0). Si una de
+varias llamadas trajo datos reales y otra no, repórtalo con precisión:
+el periodo sin filas no tiene datos, pero el periodo CON filas debe
+mostrarse con sus valores reales — nunca agrupes ambos bajo un único
+"sin resultados en ninguno de los periodos" cuando alguno sí los tiene.
+Los datos que recibes vienen en una LISTA — cada elemento trae
+"argumentos" (fecha_desde, fecha_hasta, linea_nombre, etc.) y "datos".
+Si una misma herramienta aparece varias veces en la lista, usa
+"argumentos" de cada una para saber a qué periodo/filtro corresponde,
+nunca asumas que son la misma llamada repetida.
 
 ═══════════════════════════════════════════
 SUMAS
@@ -424,10 +445,21 @@ Deno.serve(async (req: Request) => {
   // igual. Los datos crudos de las herramientas viajan como un bloque
   // de texto al final de la pregunta, mismo patrón que ya usábamos
   // para [DATOS_DISPONIBLES] en el historial.
-  const datosCrudos = resultados.reduce((acc: Record<string, unknown>, r) => {
-    acc[r.nombre] = r.datos;
-    return acc;
-  }, {});
+  // NUNCA un objeto keyed por nombre de herramienta: si la misma
+  // herramienta se llama más de una vez en el mismo turno (p. ej.
+  // comparar dos rangos de fechas con get_produccion_linea), una key
+  // por nombre sobreescribe la llamada anterior y Fase 3 solo ve la
+  // última — bug real (05/09/2026): al comparar línea 3 entre dos
+  // semanas, los 3 modelos probados dijeron "sin datos en ningún
+  // periodo" porque el resultado con datos reales se perdía aquí,
+  // antes de que ningún modelo lo viera. Un array conserva TODAS las
+  // llamadas, cada una con sus argumentos, para que Fase 3 sepa a
+  // qué rango/filtro corresponde cada resultado.
+  const datosCrudos = resultados.map((r) => ({
+    herramienta: r.nombre,
+    argumentos: r.args,
+    datos: r.datos,
+  }));
 
   const filasInfo = resultados.map((r) => ({
     herramienta: r.nombre,

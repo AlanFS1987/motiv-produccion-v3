@@ -22,8 +22,11 @@ export const LIMITS: Record<string, number> = {
   get_incidencias_produccion: 300,
   get_incidencias_calidad: 300,
   get_produccion_turno: 90, // ~90 turnos = 30 días × 3 turnos, tope razonable
+  get_calidad_turno: 90,
   get_calidad_modelo: 50,
   get_calidad_lote: 50,
+  get_produccion_linea: 10, // como mucho 6 líneas, tope razonable
+  get_calidad_linea: 10,
 };
 
 // ── SCHEMA de herramientas para la API de OpenAI (function calling) ─
@@ -92,7 +95,7 @@ export const TOOLS = [
         "por turno, en un rango de fechas. CUÁNDO USARLA: \"¿qué tal fue el lunes?\", " +
         "\"¿cómo va esta semana?\", \"compara el rendimiento de las líneas\". " +
         "NUNCA incluye datos de calidad (1ª/comercial/etc) — para eso usar " +
-        "get_calidad_modelo o get_calidad_lote.",
+        "get_calidad_modelo, get_calidad_lote o get_calidad_turno.",
       parameters: {
         type: "object",
         properties: {
@@ -107,13 +110,86 @@ export const TOOLS = [
   {
     type: "function",
     function: {
+      name: "get_calidad_turno",
+      description:
+        "EJE CALIDAD. Resumen de calidad (1ª/comercial/eco/contenedor, completa y oficial, " +
+        "más m²) agregado por turno, en un rango de fechas — mismas claves fecha+turno que " +
+        "get_produccion_turno, para el resumen diario. CUÁNDO USARLA: \"¿cómo fue la " +
+        "calidad de ayer?\", \"calidad de esta semana\", \"solo el turno de noche\". Para " +
+        "el resumen completo del día, úsala JUNTO con get_produccion_turno. NUNCA incluye " +
+        "tiempos de máquina ni % de rendimiento — eso es producción pura.",
+      parameters: {
+        type: "object",
+        properties: {
+          fecha_desde: { type: "string", description: "YYYY-MM-DD (requerido)" },
+          fecha_hasta: { type: "string", description: "YYYY-MM-DD (requerido)" },
+          turno: { type: "string", enum: ["M", "T", "N"], description: "Filtrar por tipo de turno (opcional)" },
+        },
+        required: ["fecha_desde", "fecha_hasta"],
+      },
+    },
+  },
+    {
+    type: "function",
+    function: {
+      name: "get_produccion_linea",
+      description:
+        "EJE PRODUCCIÓN. Resumen de UNA línea (o todas) agregado sobre TODO un rango de " +
+        "fechas — una sola fila por línea con el rango entero ya sumado (no evolución por " +
+        "turno). CUÁNDO USARLA: \"¿cómo fue la línea 3 esta semana?\", y sobre todo para " +
+        "COMPARAR dos periodos de la misma línea (\"línea 3 esta semana vs la pasada\") — " +
+        "en ese caso llama a esta herramienta DOS VECES, una por cada rango, y compara tú " +
+        "los resultados. NUNCA uses get_partes para esto — esta herramienta ya suma en " +
+        "SQL, get_partes te obligaría a sumar tú mismo con riesgo de error. NUNCA " +
+        "incluye calidad — ver get_calidad_linea.",
+      parameters: {
+        type: "object",
+        properties: {
+          fecha_desde: { type: "string", description: "YYYY-MM-DD (requerido)" },
+          fecha_hasta: { type: "string", description: "YYYY-MM-DD (requerido)" },
+          linea_nombre: { type: "string", description: "Nombre de línea, ej. 'Línea 3' (opcional, si se omite trae las 6)" },
+        },
+        required: ["fecha_desde", "fecha_hasta"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_calidad_linea",
+      description:
+        "EJE CALIDAD. Resumen de calidad de UNA línea (o todas) agregado sobre TODO un " +
+        "rango de fechas — una sola fila por línea. Mismo caso de uso que " +
+        "get_produccion_linea: para comparar dos periodos, llamar dos veces con rangos " +
+        "distintos. NUNCA uses get_partes para esto — esta herramienta ya suma en SQL. " +
+        "Incluye SIEMPRE las dos métricas (completa y oficial). NUNCA incluye tiempos ni " +
+        "rendimiento — ver get_produccion_linea.",
+      parameters: {
+        type: "object",
+        properties: {
+          fecha_desde: { type: "string", description: "YYYY-MM-DD (requerido)" },
+          fecha_hasta: { type: "string", description: "YYYY-MM-DD (requerido)" },
+          linea_nombre: { type: "string", description: "Nombre de línea, ej. 'Línea 3' (opcional, si se omite trae las 6)" },
+        },
+        required: ["fecha_desde", "fecha_hasta"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "get_partes",
       description:
         "Detalle de partes individuales por operario, línea o lote — trae PRODUCCIÓN y " +
         "CALIDAD del mismo parte, pero siempre en dos bloques separados (nunca mezclar " +
         "conclusiones entre ellos). CUÁNDO USARLA: \"¿qué hizo Fulano el martes?\", " +
-        "\"¿cómo fue la línea 3 esta semana?\". Puede venir limitado a las filas más " +
-        "recientes — si `limitado=true` en la respuesta, avisa siempre al usuario.",
+        "inspección puntual de partes sueltos. NUNCA la uses para totales, agregados o " +
+        "para COMPARAR periodos/líneas/modelos — para eso ya existen herramientas que " +
+        "suman en SQL: get_produccion_turno/get_produccion_linea (producción), " +
+        "get_calidad_modelo/get_calidad_lote/get_calidad_turno/get_calidad_linea " +
+        "(calidad). Si dudas entre get_partes y una de esas, usa siempre la agregada " +
+        "primero. Puede venir limitado a las filas más recientes — si `limitado=true` " +
+        "en la respuesta, avisa siempre al usuario.",
       parameters: {
         type: "object",
         properties: {
@@ -135,13 +211,23 @@ export const TOOLS = [
         "contenedor) — incluye SIEMPRE dos métricas: 'completa' (sobre el total real) y " +
         "'oficial' (solo 1ª+comercial entre sí, la métrica de empresa). CUÁNDO USARLA: " +
         "\"¿cuánto BALI ROCK se ha producido y con qué calidad?\". Histórico completo por " +
-        "defecto (sin filtro de fecha). NUNCA incluye tiempos ni rendimiento — eso es " +
-        "producción, ver get_produccion_turno.",
+        "defecto (sin filtro de fecha). Si das fecha_desde/fecha_hasta, filtra con " +
+        "precisión por esas fechas (turno.fecha real de cada parte) — ÚSALO SIEMPRE que la " +
+        "pregunta mencione un periodo, en vez de get_partes + sumar tú mismo. NUNCA incluye " +
+        "tiempos ni rendimiento — eso es producción, ver get_produccion_turno.",
       parameters: {
         type: "object",
         properties: {
           nombre_modelo: { type: "string", description: "Búsqueda parcial por nombre del modelo (opcional)" },
           formato: { type: "string", description: "ej. '600x1200' (opcional)" },
+          fecha_desde: {
+            type: "string",
+            description: "YYYY-MM-DD (opcional). Si se omite, agrega TODO el histórico, sin filtrar.",
+          },
+          fecha_hasta: {
+            type: "string",
+            description: "YYYY-MM-DD (opcional). Si se omite y hay fecha_desde, se asume un solo día.",
+          },
         },
         required: [],
       },
@@ -156,7 +242,11 @@ export const TOOLS = [
         "con numero_orden, calidad de esa orden en particular. (2) RANKING: sin numero_orden, " +
         "devuelve varios lotes ordenados por calidad oficial (mejor o peor) — usar para " +
         "\"¿cuál es el mejor/peor lote?\", \"compara la calidad entre lotes\". " +
-        "Mismas dos métricas que get_calidad_modelo (completa y oficial) en ambos modos.",
+        "Mismas dos métricas que get_calidad_modelo (completa y oficial) en ambos modos. " +
+        "Si das fecha_desde/fecha_hasta, filtra con precisión por esas fechas (usa " +
+        "turno.fecha real de cada parte) — ÚSALO SIEMPRE que la pregunta mencione un día, " +
+        "semana o rango concreto, en vez de pedir get_partes y sumar tú mismo: eso es " +
+        "propenso a error con varios partes por lote, esta herramienta ya suma en SQL.",
       parameters: {
         type: "object",
         properties: {
@@ -168,6 +258,14 @@ export const TOOLS = [
             type: "string",
             enum: ["mejor_primero", "peor_primero"],
             description: "Solo en modo ranking: cómo ordenar por pct_1a_oficial (opcional, default mejor_primero)",
+          },
+          fecha_desde: {
+            type: "string",
+            description: "YYYY-MM-DD (opcional). Si se omite, agrega TODO el histórico del lote, sin filtrar.",
+          },
+          fecha_hasta: {
+            type: "string",
+            description: "YYYY-MM-DD (opcional). Si se omite y hay fecha_desde, se asume un solo día.",
           },
         },
         required: [],
@@ -247,6 +345,45 @@ export async function executeTool(
       return { datos: data, filas: data?.length ?? 0 };
     }
 
+    case "get_calidad_turno": {
+      const limit = LIMITS.get_calidad_turno;
+      let q = supabase
+        .from("v_calidad_turno")
+        .select("*")
+        .gte("fecha", args.fecha_desde as string)
+        .lte("fecha", args.fecha_hasta as string)
+        .order("fecha", { ascending: false })
+        .limit(limit);
+      if (args.turno) q = q.eq("tipo_turno", args.turno as string);
+      const { data, error } = await q;
+      if (error) throw new Error(`get_calidad_turno: ${error.message}`);
+      return { datos: data, filas: data?.length ?? 0 };
+    }
+    
+        case "get_produccion_linea": {
+      const limit = LIMITS.get_produccion_linea;
+      const { data, error } = await supabase.rpc("produccion_linea_por_fecha", {
+        p_fecha_desde: args.fecha_desde,
+        p_fecha_hasta: args.fecha_hasta ?? args.fecha_desde,
+        p_linea_nombre: args.linea_nombre ?? null,
+      });
+      if (error) throw new Error(`get_produccion_linea: ${error.message}`);
+      const filas = (data ?? []).slice(0, limit);
+      return { datos: filas, filas: filas.length };
+    }
+
+    case "get_calidad_linea": {
+      const limit = LIMITS.get_calidad_linea;
+      const { data, error } = await supabase.rpc("calidad_linea_por_fecha", {
+        p_fecha_desde: args.fecha_desde,
+        p_fecha_hasta: args.fecha_hasta ?? args.fecha_desde,
+        p_linea_nombre: args.linea_nombre ?? null,
+      });
+      if (error) throw new Error(`get_calidad_linea: ${error.message}`);
+      const filas = (data ?? []).slice(0, limit);
+      return { datos: filas, filas: filas.length };
+    }
+
     case "get_partes": {
       const limit = LIMITS.get_partes;
 
@@ -313,6 +450,24 @@ export async function executeTool(
 
     case "get_calidad_modelo": {
       const limit = LIMITS.get_calidad_modelo;
+
+      if (args.fecha_desde) {
+        const { data, error } = await supabase.rpc("calidad_modelo_por_fecha", {
+          p_fecha_desde: args.fecha_desde,
+          p_fecha_hasta: args.fecha_hasta ?? args.fecha_desde,
+          p_nombre_modelo: args.nombre_modelo ?? null,
+          p_formato: args.formato ?? null,
+        });
+        if (error) throw new Error(`get_calidad_modelo (con fecha): ${error.message}`);
+        const filas = (data ?? []).slice(0, limit);
+        return {
+          datos: filas,
+          filas: filas.length,
+          filas_totales: data?.length ?? 0,
+          limitado: (data?.length ?? 0) > limit,
+        };
+      }
+
       let q = supabase
         .from("v_calidad_modelo")
         .select("*")
@@ -328,6 +483,28 @@ export async function executeTool(
     case "get_calidad_lote": {
       const limit = LIMITS.get_calidad_lote;
 
+      // Con fecha: usa la función SQL nueva, que filtra con precisión
+      // por turno.fecha (no la aproximación de v_calidad_lote). Cubre
+      // los dos modos (consulta concreta y ranking) en un solo camino,
+      // porque p_numero_orden acepta null.
+      if (args.fecha_desde) {
+        const { data, error } = await supabase.rpc("calidad_lote_por_fecha", {
+          p_fecha_desde: args.fecha_desde,
+          p_fecha_hasta: args.fecha_hasta ?? args.fecha_desde,
+          p_numero_orden: args.numero_orden ?? null,
+          p_orden_calidad: args.orden_calidad ?? "mejor_primero",
+        });
+        if (error) throw new Error(`get_calidad_lote (con fecha): ${error.message}`);
+        const filas = (data ?? []).slice(0, limit);
+        return {
+          datos: filas,
+          filas: filas.length,
+          filas_totales: data?.length ?? 0,
+          limitado: (data?.length ?? 0) > limit,
+        };
+      }
+
+      // Sin fecha: histórico completo, como siempre.
       if (args.numero_orden) {
         const { data, error } = await supabase
           .from("v_calidad_lote")
