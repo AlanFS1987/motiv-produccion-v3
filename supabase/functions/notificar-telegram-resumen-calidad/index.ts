@@ -47,6 +47,11 @@ function formatearPct(numerador: number, denominador: number): string {
   return `${((numerador / denominador) * 100).toFixed(1)}%`;
 }
 
+/** Versión sin HTML del mismo texto, para el feed in-app (no interpreta parse_mode). */
+function aTextoPlano(html: string): string {
+  return html.replace(/<\/?[^>]+>/g, "");
+}
+
 interface LotePendiente {
   id: string;
   numeroOrden: string;
@@ -186,6 +191,18 @@ Deno.serve(async (req) => {
         loteIds: [lote.id],
       });
     }
+
+    // Guarda el mismo contenido completo también en el feed in-app —
+    // sin trocear ni depender de que el envío a Telegram tenga éxito.
+    // Sin referencia_id: es un digest de varios lotes, no un registro
+    // único (mismo criterio que ya tenía la Fase 2).
+    const textoCompletoInApp = bloques.map((b) => aTextoPlano(b.texto)).join("\n\n");
+    const { error: notifErr } = await supabase.from("notificaciones").insert({
+      tipo: "resumen_calidad",
+      titulo: `${lotes.length} lote${lotes.length === 1 ? "" : "s"} finalizado${lotes.length === 1 ? "" : "s"}`,
+      cuerpo: textoCompletoInApp,
+    });
+    if (notifErr) console.error("No se pudo guardar el resumen de calidad in-app:", notifErr);
 
     // Partir en varios mensajes si hace falta (mismo patrón que
     // generar-resumen-turno), pero ahora cada mensaje lleva también

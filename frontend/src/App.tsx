@@ -13,11 +13,13 @@ import { CalidadApp } from "./components/calidad/CalidadApp";
 import { AdminApp } from "./components/admin/AdminApp";
 import { PantallaCarrusel } from "./components/pantalla/PantallaCarrusel";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
+import { NotificacionesBell } from "./components/notificaciones/NotificacionesBell"
 import { RolSinInterfaz } from "./components/RolSinInterfaz";
 import { HistorialResponsableScreen } from "./components/responsable/HistorialResponsableScreen";
 import { RelevoScreen } from "./components/responsable/RelevoScreen";
 import { ProgresoFlotante } from "./components/responsable/ProgresoFlotante";
-type Pestana = "turno" | "resumen" | "lotes" | "historial" | "relevo";
+import { ChatScreen } from "./components/chat/ChatScreen";
+type Pestana = "turno" | "resumen" | "lotes" | "historial" | "relevo" | "chat";
 
 export default function App() {
   const { sesion, usuario, cargando, errorPerfil } = useAuth();
@@ -102,6 +104,7 @@ function AppAutenticada({ username }: { username: string }) {
           </span>
           <div className="flex items-center gap-3">
             <ThemeSwitcher />
+            <NotificacionesBell />
             <button
               onClick={() => cerrarSesion()}
               className="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-[var(--texto-secundario)] hover:bg-[var(--superficie-alt)]"
@@ -131,6 +134,9 @@ function AppAutenticada({ username }: { username: string }) {
           <BotonPestana activa={pestana === "relevo"} onClick={() => irAPestana("relevo")}>
             Relevo
           </BotonPestana>
+          <BotonPestana activa={pestana === "chat"} onClick={() => irAPestana("chat")}>
+            Chat
+          </BotonPestana>
         </div>
       </div>
 
@@ -147,6 +153,8 @@ function AppAutenticada({ username }: { username: string }) {
             <GestionLotes />
           ) : pestana === "historial" ? (
             <HistorialResponsableScreen />
+          ) : pestana === "chat" ? (
+            <ChatScreen />
           ) : (
             <RelevoScreen />
           )}

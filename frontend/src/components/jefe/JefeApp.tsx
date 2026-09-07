@@ -14,13 +14,15 @@ import { useState } from "react";
 import { LogOut } from "lucide-react";
 import { cerrarSesion } from "../../lib/auth";
 import { ThemeSwitcher } from "../ThemeSwitcher";
+import { NotificacionesBell } from "../notificaciones/NotificacionesBell";
 import { CeriaScreen } from "../ceria/CeriaScreen";
 import { VistaRapidaScreen } from "./VistaRapidaScreen";
 import { VistaDetalladaScreen } from "./VistaDetalladaScreen";
 import { IncidenciasScreen } from "./IncidenciasScreen";
 import { CalidadLotesScreen } from "../calidad/CalidadLotesScreen";
+import { ChatScreen } from "../chat/ChatScreen";
 
-type PestanaJefe = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "ceria";
+type PestanaJefe = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "ceria" | "chat";
 
 function BotonPestana({
   activa,
@@ -53,14 +55,17 @@ export function JefeApp({ username }: { username: string }) {
           <span className="text-sm text-[var(--texto-secundario)]">
             Conectado como <strong className="text-[var(--texto)]">{username}</strong>
           </span>
-          <ThemeSwitcher />
-          <button
-            onClick={() => cerrarSesion()}
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-[var(--texto-secundario)] hover:bg-[var(--superficie-alt)]"
-          >
-            <LogOut size={16} aria-hidden />
-            Salir
-          </button>
+          <div className="flex items-center gap-3">
+            <ThemeSwitcher />
+            <NotificacionesBell />
+            <button
+              onClick={() => cerrarSesion()}
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-[var(--texto-secundario)] hover:bg-[var(--superficie-alt)]"
+            >
+              <LogOut size={16} aria-hidden />
+              Salir
+            </button>
+          </div>
         </div>
       </header>
 
@@ -81,6 +86,9 @@ export function JefeApp({ username }: { username: string }) {
           <BotonPestana activa={pestana === "ceria"} onClick={() => setPestana("ceria")}>
             Ceria
           </BotonPestana>
+          <BotonPestana activa={pestana === "chat"} onClick={() => setPestana("chat")}>
+            Chat
+          </BotonPestana>
         </div>
       </div>
 
@@ -90,6 +98,7 @@ export function JefeApp({ username }: { username: string }) {
         {pestana === "incidencias" && <IncidenciasScreen />}
         {pestana === "calidad" && <CalidadLotesScreen />}
         {pestana === "ceria" && <CeriaScreen />}
+        {pestana === "chat" && <ChatScreen />}
       </div>
     </div>
   );

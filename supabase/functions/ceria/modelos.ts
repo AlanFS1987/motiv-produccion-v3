@@ -161,7 +161,7 @@ async function llamarEstiloOpenAI(
     // Familia GPT de razonamiento (gpt-5-mini, gpt-5.4-mini,
     // gpt-5.6-luna): mismo ajuste que ya usa Fase 1/Fase 3 hoy —
     // "low" evita que gaste de más pensando antes de responder.
-    body.max_completion_tokens = 3000;
+    body.max_completion_tokens = 6000;
     body.reasoning_effort = "low";
   }
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { LogOut, Home, Factory, History, Sparkles } from "lucide-react";
+import { LogOut, Home, Factory, History, Sparkles, MessageCircle } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { cerrarSesion } from "../../lib/auth";
 import { calcularTurnoActual, calcularTurnoActualSuplente, type TurnoActual } from "../../lib/rotacion";
@@ -9,12 +9,14 @@ import { InicioOperarioScreen } from "./InicioOperarioScreen";
 import { MiLineaScreen } from "./MiLineaScreen";
 import { HistorialOperarioScreen } from "./HistorialOperarioScreen";
 import { LimpiezaScreen } from "./LimpiezaScreen";
+import { ChatScreen } from "../chat/ChatScreen";
 import { ThemeSwitcher } from "../ThemeSwitcher";
+import { NotificacionesBell } from "../notificaciones/NotificacionesBell";
 
 // Orden pedido en sesión (19/08/2026): Inicio, Mi línea, Historial,
 // Limpieza — distinto del orden de exploración inicial de
 // 03-rol-operario.md 5.0.
-type Pestana = "inicio" | "mi_linea" | "historial" | "limpieza";
+type Pestana = "inicio" | "mi_linea" | "historial" | "limpieza" | "chat";
 
 const NOMBRE_TIPO: Record<"M" | "T" | "N", string> = { M: "Mañana", T: "Tarde", N: "Noche" };
 
@@ -117,6 +119,7 @@ export function OperarioApp() {
           </span>
           <div className="flex items-center gap-3">
             <ThemeSwitcher />
+            <NotificacionesBell />
             <button
               onClick={() => cerrarSesion()}
               className="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-[var(--texto-secundario)] hover:bg-[var(--superficie-alt)]"
@@ -141,6 +144,9 @@ export function OperarioApp() {
           </BotonPestana>
           <BotonPestana activa={pestana === "limpieza"} onClick={() => setPestana("limpieza")} icono={<Sparkles size={16} />}>
             Limpieza
+          </BotonPestana>
+          <BotonPestana activa={pestana === "chat"} onClick={() => setPestana("chat")} icono={<MessageCircle size={16} />}>
+            Chat
           </BotonPestana>
         </div>
       </div>
@@ -173,6 +179,8 @@ export function OperarioApp() {
             nombreTipo={NOMBRE_TIPO}
           />
         )}
+
+        {pestana === "chat" && <ChatScreen />}
       </main>
     </div>
   );

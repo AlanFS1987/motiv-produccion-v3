@@ -91,6 +91,13 @@ function escapeHtml(texto: string): string {
   return texto.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/** Versión sin HTML del mismo texto, para el feed in-app (no interpreta parse_mode). El enlace del PDF se convierte en "texto (url)" antes de quitar el resto de etiquetas. */
+function aTextoPlano(html: string): string {
+  return html
+    .replace(/<a href="([^"]+)">([^<]*)<\/a>/g, "$2 ($1)")
+    .replace(/<\/?[^>]+>/g, "");
+}
+
 /** Una incidencia con sus fotos (antes solo se guardaba la descripción). */
 interface IncidenciaConFotos {
   descripcion: string;
@@ -385,6 +392,18 @@ Deno.serve(async (req: Request) => {
     }
 
     const textoCompleto = bloques.join("\n\n");
+
+    // Guarda el mismo contenido completo también en el feed in-app —
+    // sin trocear (el troceo de abajo solo hace falta por el límite
+    // de Telegram) y sin depender de que el envío a Telegram tenga
+    // éxito (se hace antes, no después).
+    const { error: notifErr } = await supabase.from("notificaciones").insert({
+      tipo: "resumen_turno",
+      titulo: `Turno ${NOMBRE_TIPO[turnoRow.tipo] ?? turnoRow.tipo} · ${formatearFecha(turnoRow.fecha)}`,
+      cuerpo: aTextoPlano(textoCompleto),
+      referencia_id: turnoId,
+    });
+    if (notifErr) console.error("No se pudo guardar el resumen de turno in-app:", notifErr);
 
     // 9) Partir en varios mensajes si hace falta, SIEMPRE en un
     // límite de bloque completo (nunca a mitad de uno) — así ningún

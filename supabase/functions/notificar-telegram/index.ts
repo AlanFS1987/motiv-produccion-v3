@@ -75,6 +75,14 @@ async function enviarTelegram(chatId: string, texto: string, fotos: string[]) {
   }
 }
 
+/** Guarda la misma notificación también en el feed in-app (`notificaciones`) — no bloquea el envío a Telegram si falla, solo lo registra en logs. */
+async function guardarNotificacionInApp(tipo: string, titulo: string, cuerpo: string, referenciaId: number) {
+  const { error } = await supabase
+    .from("notificaciones")
+    .insert({ tipo, titulo, cuerpo, referencia_id: referenciaId });
+  if (error) console.error(`No se pudo guardar notificación in-app (${tipo}):`, error);
+}
+
 async function manejarIncidenciaCalidad(id: number) {
   const { data, error } = await supabase
     .from("incidencia_calidad")
@@ -116,6 +124,15 @@ async function manejarIncidenciaCalidad(id: number) {
     `"${data.descripcion}"\n\n` +
     `${formatFecha(data.created_at)}`;
 
+  await guardarNotificacionInApp(
+    "incidencia_calidad",
+    `${linea?.nombre ?? "—"} · Turno ${turno?.tipo ?? "—"}`,
+    `${modelo?.nombre ?? "—"} · tono ${parte?.tono ?? "—"}\n` +
+      `Resp: ${responsable?.username ?? "—"} · Operario: ${operario}\n\n` +
+      `"${data.descripcion}"`,
+    id,
+  );
+
   await enviarTelegram(TELEGRAM_CHAT_CALIDAD, texto, data.fotos ?? []);
 }
 
@@ -144,6 +161,13 @@ async function manejarIncidenciaProduccion(id: number) {
     `Resp: ${responsable?.username ?? "—"} · Operario: ${operario}\n\n` +
     `"${data.descripcion}"\n\n` +
     `${formatFecha(data.created_at)}`;
+
+  await guardarNotificacionInApp(
+    "incidencia_produccion",
+    `${linea?.nombre ?? "Todo el turno"} · Turno ${turno?.tipo ?? "—"}`,
+    `Resp: ${responsable?.username ?? "—"} · Operario: ${operario}\n\n"${data.descripcion}"`,
+    id,
+  );
 
   await enviarTelegram(TELEGRAM_CHAT_PRODUCCION, texto, data.fotos ?? []);
 }
@@ -214,6 +238,17 @@ async function manejarNuevoLote(id: number) {
     `Verificación: ${verificacion}\n` +
     (lineasDetalle ? `${lineasDetalle}\n\n` : `\n`) +
     `${formatFecha(data.created_at)}`;
+
+  await guardarNotificacionInApp(
+    "nuevo_lote",
+    `Orden ${lote?.numero_orden ?? "—"} · ${linea?.nombre ?? "—"}`,
+    `${modelo?.nombre ?? "—"} · ${marca?.nombre ?? "—"}\n` +
+      `Formato ${formato?.nombre ?? "—"} · Tono ${data.tono ?? "—"}\n` +
+      `Resp: ${responsable?.username ?? "—"} · Operario: ${operario}\n` +
+      `Verificación: ${verificacion}` +
+      (lineasDetalle ? `\n${lineasDetalle}` : ""),
+    id,
+  );
 
   await enviarTelegram(TELEGRAM_CHAT_NUEVOS_LOTES, texto, data.fotos_caja ?? []);
 }

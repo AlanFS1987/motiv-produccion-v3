@@ -365,10 +365,8 @@ Deno.serve(async (req: Request) => {
   if (askUserCall) {
     const args = JSON.parse(askUserCall.function.arguments || "{}");
     const respuesta = args.mensaje || MENU_ASK_USER;
-    await Promise.all([
-      guardarMensaje(conversacionId, "user", pregunta, null, supabase),
-      guardarMensaje(conversacionId, "assistant", respuesta, "ask_user", supabase),
-    ]);
+    await guardarMensaje(conversacionId, "user", pregunta, null, supabase);
+    await guardarMensaje(conversacionId, "assistant", respuesta, "ask_user", supabase);
     return jsonOk({ respuesta, tool_usada: "ask_user", conversacion_id: conversacionId });
   }
 
@@ -425,16 +423,14 @@ Deno.serve(async (req: Request) => {
         ...historialLimpio,
         { role: "user", content: pregunta },
       ],
-      max_completion_tokens: 3500,
+      max_completion_tokens: 6500,
       reasoning_effort: "low",
     });
     const respuesta = resId.ok
       ? (resId.data.choices?.[0]?.message?.content ?? "Sin respuesta.")
       : "No pude responder ahora mismo.";
-    await Promise.all([
-      guardarMensaje(conversacionId, "user", pregunta, null, supabase),
-      guardarMensaje(conversacionId, "assistant", respuesta, "get_identidad", supabase),
-    ]);
+    await guardarMensaje(conversacionId, "user", pregunta, null, supabase);
+    await guardarMensaje(conversacionId, "assistant", respuesta, "get_identidad", supabase);
     return jsonOk({ respuesta, tool_usada: "get_identidad", conversacion_id: conversacionId });
   }
 
@@ -496,10 +492,8 @@ Deno.serve(async (req: Request) => {
   const respuesta = sanearRespuestaJSON(fase3.texto);
   const toolUsadaStr = resultados.map((r) => r.nombre).join(", ");
 
-  await Promise.all([
-    guardarMensaje(conversacionId, "user", pregunta, null, supabase),
-    guardarMensaje(conversacionId, "assistant", respuesta, toolUsadaStr, supabase, datosCrudos),
-  ]);
+  await guardarMensaje(conversacionId, "user", pregunta, null, supabase);
+  await guardarMensaje(conversacionId, "assistant", respuesta, toolUsadaStr, supabase, datosCrudos);
 
   return jsonOk({
     respuesta,
