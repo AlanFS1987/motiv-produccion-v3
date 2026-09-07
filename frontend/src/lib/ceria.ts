@@ -35,6 +35,24 @@ export const MODELOS_FASE3_OPCIONES = [
   { id: "deepseek-v4-pro", etiqueta: "DeepSeek V4 Pro" },
 ] as const;
 
+/** Ids desactivados por el admin (ceria_modelo_activo) — ausencia de fila = activo, así que solo se listan los que están apagados. */
+export async function listarModelosDesactivados(): Promise<Set<string>> {
+  const { data, error } = await supabase.from("ceria_modelo_activo").select("modelo_id").eq("activo", false);
+  if (error) throw new Error(error.message);
+  return new Set((data ?? []).map((f) => f.modelo_id as string));
+}
+
+/** Solo el admin puede llamar a esto (RLS) — activo=true borra la fila (vuelve al estado por defecto), activo=false la crea/actualiza. */
+export async function establecerModeloActivo(modeloId: string, activo: boolean): Promise<void> {
+  if (activo) {
+    const { error } = await supabase.from("ceria_modelo_activo").delete().eq("modelo_id", modeloId);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  const { error } = await supabase.from("ceria_modelo_activo").upsert({ modelo_id: modeloId, activo: false });
+  if (error) throw new Error(error.message);
+}
+
 /**
  * Carga los mensajes ya guardados de una conversación existente —
  * usado para reconstruir el chat visualmente cuando la pestaña se

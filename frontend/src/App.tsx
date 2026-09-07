@@ -18,7 +18,7 @@ import { RolSinInterfaz } from "./components/RolSinInterfaz";
 import { HistorialResponsableScreen } from "./components/responsable/HistorialResponsableScreen";
 import { RelevoScreen } from "./components/responsable/RelevoScreen";
 import { ProgresoFlotante } from "./components/responsable/ProgresoFlotante";
-import { ChatScreen } from "./components/chat/ChatScreen";
+import { ChatHomeScreen } from "./components/chat/ChatHomeScreen";
 type Pestana = "turno" | "resumen" | "lotes" | "historial" | "relevo" | "chat";
 
 export default function App() {
@@ -154,7 +154,7 @@ function AppAutenticada({ username }: { username: string }) {
           ) : pestana === "historial" ? (
             <HistorialResponsableScreen />
           ) : pestana === "chat" ? (
-            <ChatScreen />
+            <ChatHomeScreen />
           ) : (
             <RelevoScreen />
           )}

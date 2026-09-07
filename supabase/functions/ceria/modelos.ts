@@ -68,9 +68,26 @@ export const MODELOS_FASE3: ModeloFase3[] = [
 const MODELO_DEFECTO = MODELOS_FASE3[0];
 
 /** Resuelve el id recibido del frontend a su config; si no existe o viene vacío, usa el de siempre (gpt-5-mini). */
-export function resolverModeloFase3(id: string | null | undefined): ModeloFase3 {
+/**
+ * Resuelve el id recibido del frontend a su config; si no existe,
+ * viene vacío, o el admin lo ha desactivado (ceria_modelo_activo),
+ * usa el de siempre (gpt-5-mini). Async porque necesita consultar la
+ * tabla — así un modelo apagado queda bloqueado también si alguien lo
+ * pide llamando a la API directamente, no solo oculto en la UI.
+ */
+export async function resolverModeloFase3(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  id: string | null | undefined,
+): Promise<ModeloFase3> {
   if (!id) return MODELO_DEFECTO;
-  return MODELOS_FASE3.find((m) => m.id === id) ?? MODELO_DEFECTO;
+  const candidato = MODELOS_FASE3.find((m) => m.id === id);
+  if (!candidato) return MODELO_DEFECTO;
+
+  const { data } = await supabase.from("ceria_modelo_activo").select("activo").eq("modelo_id", id).maybeSingle();
+  if (data?.activo === false) return MODELO_DEFECTO;
+
+  return candidato;
 }
 
 type ResultadoLlamada = { ok: true; texto: string } | { ok: false; error: string };

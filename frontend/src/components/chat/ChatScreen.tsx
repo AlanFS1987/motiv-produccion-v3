@@ -106,7 +106,7 @@ export function ChatScreen() {
   if (!usuario) return null;
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-2xl flex-col">
+    <div className="mx-auto flex h-full max-w-2xl flex-col">
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {cargando && <p className="text-center text-sm text-[var(--texto-tenue)]">Cargando chat...</p>}
 

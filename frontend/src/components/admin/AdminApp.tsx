@@ -14,9 +14,10 @@ import { VistaRapidaScreen } from "../jefe/VistaRapidaScreen";
 import { VistaDetalladaScreen } from "../jefe/VistaDetalladaScreen";
 import { IncidenciasScreen } from "../jefe/IncidenciasScreen";
 import { CalidadLotesScreen } from "../calidad/CalidadLotesScreen";
-import { ChatScreen } from "../chat/ChatScreen";
+import { ChatHomeScreen } from "../chat/ChatHomeScreen";
 import { AjustarLetrasScreen } from "./AjustarLetrasScreen";
 import { GestionUsuariosScreen } from "./GestionUsuariosScreen";
+import { ChatAccesoScreen } from "./ChatAccesoScreen";
 import { CorreccionPartesScreen } from "./CorreccionPartesScreen";
 import { AdminNuevoParteScreen } from "./AdminNuevoParteScreen";
 import { PruebaCamaraScreen } from "./PruebaCamaraScreen";
@@ -24,7 +25,7 @@ import { CierreFabricaScreen } from "./CierreFabricaScreen";
 import { ChecklistScreen } from "./ChecklistScreen";
 import { GamificacionScreen } from "./GamificacionScreen";
 
-type PestanaAdmin = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "ceria" | "rotacion" | "partes" | "nuevo-parte" | "prueba-camara" | "cierre-fabrica" | "checklist" | "gamificacion" | "gestion-usuarios" | "chat";
+type PestanaAdmin = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "ceria" | "rotacion" | "partes" | "nuevo-parte" | "prueba-camara" | "cierre-fabrica" | "checklist" | "gamificacion" | "gestion-usuarios" | "chat" | "accesos";
 function BotonPestana({
   activa,
   onClick,
@@ -114,6 +115,9 @@ export function AdminApp({ username }: { username: string }) {
           <BotonPestana activa={pestana === "gestion-usuarios"} onClick={() => setPestana("gestion-usuarios")}>
             Usuarios
           </BotonPestana>
+          <BotonPestana activa={pestana === "accesos"} onClick={() => setPestana("accesos")}>
+            Accesos
+          </BotonPestana>
         </div>
       </div>
 
@@ -123,7 +127,7 @@ export function AdminApp({ username }: { username: string }) {
         {pestana === "incidencias" && <IncidenciasScreen />}
         {pestana === "calidad" && <CalidadLotesScreen />}
         {pestana === "ceria" && <CeriaScreen />}
-        {pestana === "chat" && <ChatScreen />}
+        {pestana === "chat" && <ChatHomeScreen />}
         {pestana === "rotacion" && <AjustarLetrasScreen />}
         {pestana === "partes" && <CorreccionPartesScreen />}
         {pestana === "nuevo-parte" && <AdminNuevoParteScreen />}
@@ -132,6 +136,7 @@ export function AdminApp({ username }: { username: string }) {
         {pestana === "checklist" && <ChecklistScreen />}
         {pestana === "gamificacion" && <GamificacionScreen />}
         {pestana === "gestion-usuarios" && <GestionUsuariosScreen />}
+        {pestana === "accesos" && <ChatAccesoScreen />}
       </div>
     </div>
   );

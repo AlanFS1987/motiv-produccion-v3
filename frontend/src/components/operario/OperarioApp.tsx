@@ -9,7 +9,7 @@ import { InicioOperarioScreen } from "./InicioOperarioScreen";
 import { MiLineaScreen } from "./MiLineaScreen";
 import { HistorialOperarioScreen } from "./HistorialOperarioScreen";
 import { LimpiezaScreen } from "./LimpiezaScreen";
-import { ChatScreen } from "../chat/ChatScreen";
+import { ChatHomeScreen } from "../chat/ChatHomeScreen";
 import { ThemeSwitcher } from "../ThemeSwitcher";
 import { NotificacionesBell } from "../notificaciones/NotificacionesBell";
 
@@ -180,7 +180,7 @@ export function OperarioApp() {
           />
         )}
 
-        {pestana === "chat" && <ChatScreen />}
+        {pestana === "chat" && <ChatHomeScreen />}
       </main>
     </div>
   );

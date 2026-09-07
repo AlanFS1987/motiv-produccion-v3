@@ -22,6 +22,7 @@ import {
   cargarConversacion,
   eliminarConversacion,
   listarConversaciones,
+  listarModelosDesactivados,
   preguntarCeria,
   MODELOS_FASE3_OPCIONES,
   type ConversacionCeria,
@@ -103,6 +104,23 @@ export function CeriaScreen() {
   const [borrandoId, setBorrandoId] = useState<string | null>(null);
   const [logsAbiertos, setLogsAbiertos] = useState<Set<string>>(new Set());
   const [modeloFase3, setModeloFase3] = useState<string>("gpt-5-mini");
+  const [modelosDesactivados, setModelosDesactivados] = useState<Set<string>>(new Set());
+
+  // Si el admin apaga el modelo que tenías seleccionado mientras lo
+  // tenías puesto, vuelve al de por defecto en vez de dejarte con uno
+  // que ya no va a funcionar en el servidor.
+  useEffect(() => {
+    listarModelosDesactivados()
+      .then((desactivados) => {
+        setModelosDesactivados(desactivados);
+        if (desactivados.has(modeloFase3)) setModeloFase3("gpt-5-mini");
+      })
+      .catch(() => {
+        // Si falla la consulta, se deja el desplegable completo — no
+        // bloquea el chat por esto.
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const finRef = useRef<HTMLDivElement | null>(null);
 
   // Al montar: si la pestaña se recargó sola (Chrome "Ahorro de
@@ -329,7 +347,7 @@ export function CeriaScreen() {
           title="Modelo que redacta la respuesta (Fase 3) — solo para pruebas"
           className="rounded-full border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-500"
         >
-          {MODELOS_FASE3_OPCIONES.map((m) => (
+          {MODELOS_FASE3_OPCIONES.filter((m) => !modelosDesactivados.has(m.id)).map((m) => (
             <option key={m.id} value={m.id}>
               {m.etiqueta}
             </option>

@@ -13,8 +13,9 @@
 //   - Consultas de detalle avisan si el resultado quedó truncado
 //     (filas_totales > filas devueltas).
 //
-// Solo accesible para rol 'jefe' o 'administrador' (comprobado aquí,
-// además de la RLS de las tablas ceria_* y de las tablas de datos).
+// Accesible según chat_acceso (tipo_chat='ceria') — editable por el
+// admin desde la app (sesión 07/09/2026), comprobado aquí además de
+// la RLS de las tablas ceria_* y de las tablas de datos.
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, jsonError, jsonOk } from "../_shared/cors.ts";
@@ -290,7 +291,21 @@ Deno.serve(async (req: Request) => {
   // Solo jefe/administrador pueden usar Ceria — comprobación explícita
   // aquí además de la RLS de ceria_conversaciones/ceria_mensajes.
   const { data: perfil } = await supabase.from("usuario").select("rol").eq("id", user_id).maybeSingle();
-  if (!perfil || !["jefe", "administrador"].includes(perfil.rol as string)) {
+  if (!perfil) {
+    return jsonError("Ceria solo está disponible para el jefe de planta", 403);
+  }
+
+  // Antes: array fijo ["jefe", "administrador"] escrito a mano aquí
+  // mismo. Ahora consulta chat_acceso (20260907180000_chat_acceso_
+  // por_rol.sql) — el admin puede dar o quitar acceso a Ceria por rol
+  // desde la app, sin tocar código ni desplegar nada.
+  const { data: acceso } = await supabase
+    .from("chat_acceso")
+    .select("puede_ver")
+    .eq("tipo_chat", "ceria")
+    .eq("rol", perfil.rol)
+    .maybeSingle();
+  if (!acceso?.puede_ver) {
     return jsonError("Ceria solo está disponible para el jefe de planta", 403);
   }
 
@@ -311,7 +326,7 @@ Deno.serve(async (req: Request) => {
     fecha_referencia = null,
     modelo_fase3 = null,
   } = body;
-  const modeloSeleccionado = resolverModeloFase3(modelo_fase3);
+  const modeloSeleccionado = await resolverModeloFase3(supabase, modelo_fase3);
   if (!pregunta) return jsonError("Falta el campo 'pregunta'", 400);
 
   let conversacionId = conversacionIdEntrada;

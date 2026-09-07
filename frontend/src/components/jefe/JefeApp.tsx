@@ -20,7 +20,7 @@ import { VistaRapidaScreen } from "./VistaRapidaScreen";
 import { VistaDetalladaScreen } from "./VistaDetalladaScreen";
 import { IncidenciasScreen } from "./IncidenciasScreen";
 import { CalidadLotesScreen } from "../calidad/CalidadLotesScreen";
-import { ChatScreen } from "../chat/ChatScreen";
+import { ChatHomeScreen } from "../chat/ChatHomeScreen";
 
 type PestanaJefe = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "ceria" | "chat";
 
@@ -98,7 +98,7 @@ export function JefeApp({ username }: { username: string }) {
         {pestana === "incidencias" && <IncidenciasScreen />}
         {pestana === "calidad" && <CalidadLotesScreen />}
         {pestana === "ceria" && <CeriaScreen />}
-        {pestana === "chat" && <ChatScreen />}
+        {pestana === "chat" && <ChatHomeScreen />}
       </div>
     </div>
   );

@@ -194,9 +194,14 @@ export async function guardarSilencio(usuarioId: string, silencio: SilencioHorar
 // -------------------------------------------------------------
 // Realtime
 // -------------------------------------------------------------
+let contadorCanalNotificaciones = 0;
+
+// Nombre único por suscripción: puede haber varias activas a la vez
+// (la campana y la lista de Chat, por ejemplo) — supabase-js no deja
+// añadir más callbacks a un canal ya suscrito con el mismo nombre.
 export function suscribirseANotificaciones(onNueva: (n: Notificacion) => void): () => void {
   const canal = supabase
-    .channel("notificaciones-realtime")
+    .channel(`notificaciones-realtime-${contadorCanalNotificaciones++}`)
     .on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "notificaciones" },
