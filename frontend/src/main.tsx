@@ -18,6 +18,14 @@ createRoot(document.getElementById('root')!).render(
 // Registro del service worker (PWA) + autoactualización: en cuanto
 // detecta una versión nueva instalada, recarga sola la página para
 // aplicarla — nadie tiene que desinstalar ni borrar caché a mano.
+// Cuando Vite no puede cargar un chunk (típicamente porque el
+// archivo cambió de nombre en un despliegue posterior mientras esta
+// pestaña seguía abierta), recarga la página entera en vez de
+// dejarla colgada.
+window.addEventListener("vite:preloadError", () => {
+  window.location.reload();
+});
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
