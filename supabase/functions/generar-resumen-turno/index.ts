@@ -402,6 +402,7 @@ Deno.serve(async (req: Request) => {
       titulo: `Turno ${NOMBRE_TIPO[turnoRow.tipo] ?? turnoRow.tipo} · ${formatearFecha(turnoRow.fecha)}`,
       cuerpo: aTextoPlano(textoCompleto),
       referencia_id: turnoId,
+      data: pdfUrl ? { pdfUrl } : null,
     });
     if (notifErr) console.error("No se pudo guardar el resumen de turno in-app:", notifErr);
 

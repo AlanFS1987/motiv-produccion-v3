@@ -272,6 +272,23 @@ export function NotificacionesBell() {
                       {n.cuerpo && (
                         <p className="mt-0.5 whitespace-pre-wrap text-xs text-[var(--texto-secundario)]">{n.cuerpo}</p>
                       )}
+                      {n.data?.fotos && n.data.fotos.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {n.data.fotos.map((url) => (
+                            <img key={url} src={url} alt="" className="max-h-32 rounded-lg" />
+                          ))}
+                        </div>
+                      )}
+                      {n.data?.pdfUrl && (
+                        <a
+                          href={n.data.pdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 inline-block text-xs text-[var(--acento)] underline"
+                        >
+                          Ver informe completo en PDF
+                        </a>
+                      )}
                       <p className="mt-1 text-[10px] text-[var(--texto-tenue)]">{formatFecha(n.createdAt)}</p>
                     </div>
                   ))}

@@ -75,10 +75,18 @@ export function limpiarNombreModelo(bruto: string | null | undefined): string {
  * Convierte el espesor detectado (número en mm) al formato de columna
  * de `lote.espesor` (04-rol-administrador.md 6.1: solo 9mm u 11mm).
  */
+/**
+ * Convierte el espesor detectado (número en mm) al formato de columna
+ * de `lote.espesor`. Válido cualquier valor entre 8 y 14mm, ambos
+ * inclusive, con hasta un decimal (hojas reales confirmadas con
+ * 9,5 y 10,5mm, además de los 9 y 11 originales). Fuera de rango se
+ * rechaza — es más probable que sea un fallo de OCR que un espesor
+ * real de fábrica.
+ */
 export function espesorATexto(espesorMm: number | null | undefined): string | null {
-  if (espesorMm === 9) return "9mm";
-  if (espesorMm === 11) return "11mm";
-  return null;
+  if (espesorMm == null) return null;
+  if (espesorMm < 8 || espesorMm > 14) return null;
+  return `${espesorMm}mm`;
 }
 
 // ─────────────────────────────────────────────────────────────────

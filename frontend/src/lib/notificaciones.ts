@@ -32,6 +32,11 @@ export const ETIQUETA_TIPO: Record<TipoNotificacion, string> = {
   resumen_calidad: "Resumen de calidad",
 };
 
+export interface NotificacionData {
+  fotos?: string[];
+  pdfUrl?: string | null;
+}
+
 export interface Notificacion {
   id: string;
   tipo: TipoNotificacion;
@@ -39,6 +44,7 @@ export interface Notificacion {
   cuerpo: string | null;
   referenciaId: string | null;
   createdAt: string;
+  data: NotificacionData | null;
 }
 
 export interface ResumenCanal {
@@ -59,6 +65,7 @@ function mapearNotificacion(fila: any): Notificacion {
     cuerpo: fila.cuerpo,
     referenciaId: fila.referencia_id,
     createdAt: fila.created_at,
+    data: fila.data ?? null,
   };
 }
 
@@ -105,7 +112,7 @@ export async function obtenerResumenCanales(usuarioId: string): Promise<ResumenC
 export async function listarNotificacionesPorTipo(tipo: TipoNotificacion): Promise<Notificacion[]> {
   const { data, error } = await supabase
     .from("notificaciones")
-    .select("id, tipo, titulo, cuerpo, referencia_id, created_at")
+    .select("id, tipo, titulo, cuerpo, referencia_id, created_at, data")
     .eq("tipo", tipo)
     .order("created_at", { ascending: false })
     .limit(MAX_POR_CANAL);

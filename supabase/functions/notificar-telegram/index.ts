@@ -76,10 +76,16 @@ async function enviarTelegram(chatId: string, texto: string, fotos: string[]) {
 }
 
 /** Guarda la misma notificación también en el feed in-app (`notificaciones`) — no bloquea el envío a Telegram si falla, solo lo registra en logs. */
-async function guardarNotificacionInApp(tipo: string, titulo: string, cuerpo: string, referenciaId: number) {
+async function guardarNotificacionInApp(
+  tipo: string,
+  titulo: string,
+  cuerpo: string,
+  referenciaId: number,
+  datos?: Record<string, unknown>,
+) {
   const { error } = await supabase
     .from("notificaciones")
-    .insert({ tipo, titulo, cuerpo, referencia_id: referenciaId });
+    .insert({ tipo, titulo, cuerpo, referencia_id: referenciaId, data: datos ?? null });
   if (error) console.error(`No se pudo guardar notificación in-app (${tipo}):`, error);
 }
 
@@ -131,6 +137,7 @@ async function manejarIncidenciaCalidad(id: number) {
       `Resp: ${responsable?.username ?? "—"} · Operario: ${operario}\n\n` +
       `"${data.descripcion}"`,
     id,
+    { fotos: data.fotos ?? [] },
   );
 
   await enviarTelegram(TELEGRAM_CHAT_CALIDAD, texto, data.fotos ?? []);
@@ -167,6 +174,7 @@ async function manejarIncidenciaProduccion(id: number) {
     `${linea?.nombre ?? "Todo el turno"} · Turno ${turno?.tipo ?? "—"}`,
     `Resp: ${responsable?.username ?? "—"} · Operario: ${operario}\n\n"${data.descripcion}"`,
     id,
+    { fotos: data.fotos ?? [] },
   );
 
   await enviarTelegram(TELEGRAM_CHAT_PRODUCCION, texto, data.fotos ?? []);
@@ -248,6 +256,7 @@ async function manejarNuevoLote(id: number) {
       `Verificación: ${verificacion}` +
       (lineasDetalle ? `\n${lineasDetalle}` : ""),
     id,
+    { fotos: data.fotos_caja ?? [] },
   );
 
   await enviarTelegram(TELEGRAM_CHAT_NUEVOS_LOTES, texto, data.fotos_caja ?? []);

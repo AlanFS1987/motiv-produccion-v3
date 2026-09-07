@@ -212,7 +212,7 @@ Deno.serve(async (req: Request) => {
       if (!espesorTexto) {
         return jsonError(
           `espesor_mm="${espesor_mm}" no es válido para crear un lote nuevo ` +
-            `(el OCR debe devolver 9 u 11 — revisar Foto 1)`,
+            `(el OCR debe devolver un valor entre 8 y 12 — revisar Foto 1)`,
           422,
         );
       }
