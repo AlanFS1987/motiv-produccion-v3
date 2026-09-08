@@ -317,3 +317,110 @@ descartado — el real es con login (`10`). La migración no se edita.
 - `auth_leaked_password_protection` (comprobación de contraseñas
   filtradas contra HaveIBeenPwned) está desactivado en Supabase Auth.
   Toggle en el panel, sin código — pendiente de decidir (`07`).
+  # Addendum a 06-esquema-bd.md — migraciones del 07/09/2026
+
+Cubre únicamente las migraciones fechadas `20260907*` (7 en total,
+sesión de notificaciones in-app + chat unificado, ver `15`) más
+`20260907190000_ceria_modelo_activo.sql`. **No hay ninguna migración
+con fecha 08/09/2026 todavía.**
+
+Pendiente aparte (no cubierto aquí): el tramo 27/08→06/09 sigue sin
+repasar en este archivo (temas, rectificado, calidad, Ceria 03-05/09).
+
+Sugerencia de cambio en la cabecera del archivo, línea 3:
+
+> Contrastado con la BD real el 19/08/2026 y actualizado con cada
+> migración hasta `20260826`, más las migraciones de notificaciones
+> in-app / chat / `ceria_modelo_activo` del `20260907` (sesión
+> 07/09/2026, ver `15`). **Tramo 27/08→06/09 pendiente de repasar.**
+
+---
+
+## Añadir a "## Tablas"
+
+**notificaciones** — feed de eventos in-app, independiente de
+Telegram (`15`): id, `tipo` (check: incidencia_calidad /
+incidencia_produccion / nuevo_lote / resumen_turno / resumen_calidad),
+titulo, cuerpo, referencia_id (id de la fila origen), data jsonb
+(fotos, URL de PDF), created_at. Sin política de INSERT para
+`authenticated`/`anon` — solo escriben las 3 Edge Functions que ya
+mandan a Telegram, con `service_role`. `check` de `tipo` pensado para
+ampliarse con un 6º valor (`mensaje_chat`) si algún día hiciera falta.
+
+**notificacion_estado_usuario** — "hasta dónde ha leído cada usuario",
+clave compuesta **(usuario_id, tipo)** desde el 07/09/2026 (antes era
+un único timestamp por usuario; el rediseño a canales por tipo obligó
+a que cada canal tenga su propio contador de no-leídas). Ausencia de
+fila para un tipo = nunca abierto ese canal = todo no-leído en él.
+
+**notificacion_preferencias** — interruptor de push por (usuario_id,
+tipo), default activado. **Sin efecto real hoy** — solo gobernará el
+envío de push cuando exista (Fase 7, sin construir); no oculta nada
+del feed ni afecta al contador de no-leídas.
+
+**notificacion_silencio** — horario general de silencio por usuario
+(activo bool, hora_inicio, hora_fin — mismo rango todos los días, no
+distingue entre semana/fin de semana). Mismo caso que la anterior:
+**sin efecto real hasta que exista push**.
+
+**chat_mensajes** — canal único de chat humano, sin salas: usuario_id,
+texto, fotos text[] (Cloudinary, preset `motiv_v3_chat`), created_at,
+`eliminado` bool default false (borrado **suave**, nunca DELETE real
+— mismo criterio que `parte.vigente`), borrado_por, borrado_at. Check
+`texto is not null or fotos is not null`. Alcance de roles:
+responsable, suplente, operario, jefe, administrador — **calidad y
+jefe_rectificado quedan fuera a propósito** (dependen solo de
+Telegram), misma decisión que en `notificaciones`.
+
+**chat_acceso** — control de acceso por rol para los **7 "chats"**
+(los 5 automáticos de arriba + `general` + `ceria`): tipo_chat, rol,
+puede_ver, puede_escribir. **Deny-by-default**: ausencia de fila =
+sin acceso; quitar el "ver" de un rol borra la fila en vez de dejarla
+con `puede_ver=false`. Solo `general` usa `puede_escribir` de forma
+distinta a `puede_ver` — en el resto un único interruptor.
+
+**ceria_modelo_activo** — apagado de modelos de Fase 3 de Ceria por
+el administrador (`11`): modelo_id (PK, texto — id del catálogo fijo
+en código `MODELOS_FASE3`), activo. Convención **opuesta** a
+`chat_acceso` a propósito: ausencia de fila = modelo **activo** (el
+catálogo ya viene fijo en código, el caso base es "todo encendido");
+solo se inserta fila cuando el admin apaga uno en concreto.
+
+---
+
+## Añadir a "## Funciones"
+
+| Función | Notas |
+|---|---|
+| `fn_chat_acceso(p_tipo_chat text, p_permiso text default 'ver')` | security definer, stable. Consulta `chat_acceso` para `fn_rol_actual()`; `p_permiso` es `'ver'` o `'escribir'`. Devuelve `false` si no hay fila (deny-by-default). Usada por las políticas RLS de `notificaciones` y `chat_mensajes`, y por la Edge Function de Ceria para decidir si el rol que llama tiene acceso a `tipo_chat='ceria'` (`11`) |
+| `fn_notificar_telegram()` | ya existía (`05`) — extendida el 07/09/2026 para, además de la llamada HTTP a Telegram, hacer INSERT en `notificaciones` con título/cuerpo enriquecidos (línea + turno). Hubo un vaivén de diseño el mismo día: un intento intermedio reconstruía el texto completo en PL/pgSQL aparte del que arma la Edge Function para Telegram — se revirtió al detectar que ambas versiones se desincronizaban (una línea que faltaba en una de las dos); el texto vive en un solo sitio |
+| `fn_disparar_resumen_turno(uuid)`, `fn_disparar_resumen_calidad()` | tras el mismo vaivén del 07/09, **vuelven a ser solo el disparo HTTP** — el INSERT en `notificaciones` para `resumen_turno` y `resumen_calidad` lo hacen directamente las propias Edge Functions (`generar-resumen-turno`, `notificar-telegram-resumen-calidad`), no la función SQL. Sigue pendiente lo ya anotado sobre `fn_disparar_resumen_turno` (expuesta a `anon`/`authenticated` vía RPC, ver `07`) — no tocado esta sesión |
+
+---
+
+## Añadir a la tabla de "## Políticas RLS"
+
+| Tabla | SELECT | INSERT | UPDATE | DELETE |
+|---|---|---|---|---|
+| notificaciones | `fn_chat_acceso(tipo, 'ver')` (07/09, sustituye a una lista fija de roles usada en un paso intermedio del mismo día) | solo desde funciones `security definer` (sin GRANT a authenticated/anon) | — | — |
+| chat_mensajes | `fn_rol_actual() in ('responsable','suplente','operario','jefe','administrador')` | mismo conjunto + `usuario_id = auth.uid()` | borrado suave: propio (`usuario_id = auth.uid()`) o administrador — nunca DELETE real | — |
+| chat_acceso | cualquier rol conocido | admin (`for all`) | admin | admin |
+| notificacion_estado_usuario | propio | propio | propio | propio (política única `for all`, `usuario_id = auth.uid()`) |
+| notificacion_preferencias | propio | propio | propio | propio (`for all`, `usuario_id = auth.uid()`) |
+| notificacion_silencio | propio | propio | propio | propio (`for all`, `usuario_id = auth.uid()`) |
+| ceria_modelo_activo | cualquier rol conocido | admin (`for all`) | admin | admin |
+
+Nota de estilo: `notificacion_estado_usuario`/`preferencias`/`silencio`
+usan las 3 una única política `for all using/with check (usuario_id =
+auth.uid())` — no hay policies separadas por operación, a diferencia
+del resto de la tabla.
+
+---
+
+## Referencias cruzadas a añadir
+
+- `15-notificaciones-chat.md` — detalle completo del sistema (fases
+  de la sesión, historia del vaivén de `fn_notificar_telegram`,
+  pantallas).
+- `11-ceria.md` — `ceria_modelo_activo` y `fn_chat_acceso` aplicado a
+  `tipo_chat='ceria'`.
