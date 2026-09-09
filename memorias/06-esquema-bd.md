@@ -4,7 +4,11 @@ Contrastado con la BD real el 19/08/2026 y actualizado con cada
 migración hasta `20260826` (sesión 26/08/2026: limpieza de tablas
 temporales de la migración v2, y endurecimiento de seguridad — RPCs
 `security definer` expuestas de más y `search_path` fijo en todas las
-funciones, a raíz del linter de Supabase).
+funciones, a raíz del linter de Supabase), más las migraciones de
+notificaciones in-app / chat / `ceria_modelo_activo` del `20260907`
+(sesión 07/09/2026, ver `15`). **Tramo 27/08→06/09 pendiente de
+repasar** (temas, rectificado, calidad, Ceria 03-05/09). No hay
+ninguna migración con fecha 08/09/2026 todavía.
 
 Extensiones: `pg_trgm`, `pgcrypto`, `pg_cron`, `pg_net`.
 
@@ -148,6 +152,55 @@ solo vía `fn_cerrar_ciclos_pendientes` o backfill manual.
 
 **ceria_prompts**, **ceria_conversaciones**, **ceria_mensajes** — `11`.
 
+**ceria_modelo_activo** (07/09/2026) — apagado de modelos de Fase 3 de
+Ceria por el administrador (`11`): modelo_id (PK, texto — id del
+catálogo fijo en código `MODELOS_FASE3`), activo. Convención
+**opuesta** a `chat_acceso` a propósito: ausencia de fila = modelo
+**activo** (el catálogo ya viene fijo en código, el caso base es "todo
+encendido"); solo se inserta fila cuando el admin apaga uno en concreto.
+
+**notificaciones** (07/09/2026) — feed de eventos in-app, independiente
+de Telegram (`15`): id, `tipo` (check: incidencia_calidad /
+incidencia_produccion / nuevo_lote / resumen_turno / resumen_calidad),
+titulo, cuerpo, referencia_id (id de la fila origen), data jsonb
+(fotos, URL de PDF), created_at. Sin política de INSERT para
+`authenticated`/`anon` — solo escriben las 3 Edge Functions que ya
+mandan a Telegram, con `service_role`. `check` de `tipo` pensado para
+ampliarse con un 6º valor (`mensaje_chat`) si algún día hiciera falta.
+
+**notificacion_estado_usuario** — "hasta dónde ha leído cada usuario",
+clave compuesta **(usuario_id, tipo)** desde el 07/09/2026 (antes era
+un único timestamp por usuario; el rediseño a canales por tipo obligó
+a que cada canal tenga su propio contador de no-leídas). Ausencia de
+fila para un tipo = nunca abierto ese canal = todo no-leído en él.
+
+**notificacion_preferencias** — interruptor de push por (usuario_id,
+tipo), default activado. **Sin efecto real hoy** — solo gobernará el
+envío de push cuando exista (Fase 7, sin construir); no oculta nada
+del feed ni afecta al contador de no-leídas.
+
+**notificacion_silencio** — horario general de silencio por usuario
+(activo bool, hora_inicio, hora_fin — mismo rango todos los días, no
+distingue entre semana/fin de semana). Mismo caso que la anterior:
+**sin efecto real hasta que exista push**.
+
+**chat_mensajes** — canal único de chat humano, sin salas: usuario_id,
+texto, fotos text[] (Cloudinary, preset `motiv_v3_chat`), created_at,
+`eliminado` bool default false (borrado **suave**, nunca DELETE real
+— mismo criterio que `parte.vigente`), borrado_por, borrado_at. Check
+`texto is not null or fotos is not null`. Alcance de roles:
+responsable, suplente, operario, jefe, administrador — **calidad y
+jefe_rectificado quedan fuera a propósito** (dependen solo de
+Telegram), misma decisión que en `notificaciones`.
+
+**chat_acceso** — control de acceso por rol para los **7 "chats"**
+(los 5 tipos automáticos de `notificaciones` + `general` + `ceria`):
+tipo_chat, rol, puede_ver, puede_escribir. **Deny-by-default**:
+ausencia de fila = sin acceso; quitar el "ver" de un rol borra la fila
+en vez de dejarla con `puede_ver=false`. Solo `general` usa
+`puede_escribir` de forma distinta a `puede_ver` — en el resto un
+único interruptor.
+
 **Tablas temporales del import v2 → v3 — eliminadas 26/08/2026**:
 `staging_responsable_v2`, `stg_migracion_v2`, `tmp_puntos_turno`
 cumplieron su función de backfill (ver `04`, `historial_ciclo_responsable`)
@@ -231,8 +284,10 @@ no lo tenían (lint `function_search_path_mutable`). `ALTER FUNCTION
 | `fn_parte_set_formato_id()` | trigger before insert en parte |
 | `fn_calcular_calibre_com_pct()` | trigger before insert/update en parte |
 | `fn_buscar_modelo_similar`, `fn_buscar_marca_similar` | pg_trgm, top 5 |
-| `fn_notificar_telegram()`, `fn_disparar_resumen_calidad()` | security definer, leen app_secrets, `net.http_post` |
-| `fn_disparar_resumen_turno(uuid)` | security definer, lee app_secrets, `net.http_post`. **Pendiente de restringir** (`07`): la llama un trigger no-definer (`fn_trigger_resumen_turno_cierre`) que corre con los permisos de quien cierra el turno de verdad — restringir su ejecución a `service_role` sin antes hacer también ese trigger `security definer` rompería el cierre manual de turno. Sigue expuesta a `anon`/`authenticated` vía RPC (lint 26/08/2026, sin arreglar a propósito) |
+| `fn_notificar_telegram()` | security definer, lee app_secrets, `net.http_post` (`05`). Extendida el 07/09/2026 para, además de la llamada HTTP a Telegram, hacer INSERT en `notificaciones` con título/cuerpo enriquecidos (línea + turno). Hubo un vaivén de diseño el mismo día: un intento intermedio reconstruía el texto completo en PL/pgSQL aparte del que arma la Edge Function para Telegram — se revirtió al detectar que ambas versiones se desincronizaban (una línea que faltaba en una de las dos); el texto vive en un solo sitio (`15`) |
+| `fn_disparar_resumen_calidad()` | security definer, lee app_secrets, `net.http_post`. Tras el vaivén del 07/09/2026 **vuelve a ser solo el disparo HTTP** — el INSERT en `notificaciones` para `resumen_calidad` lo hace directamente la Edge Function `notificar-telegram-resumen-calidad`, no la función SQL |
+| `fn_disparar_resumen_turno(uuid)` | security definer, lee app_secrets, `net.http_post`. Igual que la anterior tras el 07/09/2026: solo disparo HTTP, el INSERT en `notificaciones` para `resumen_turno` lo hace la Edge Function `generar-resumen-turno`. **Pendiente de restringir** (`07`): la llama un trigger no-definer (`fn_trigger_resumen_turno_cierre`) que corre con los permisos de quien cierra el turno de verdad — restringir su ejecución a `service_role` sin antes hacer también ese trigger `security definer` rompería el cierre manual de turno. Sigue expuesta a `anon`/`authenticated` vía RPC (lint 26/08/2026, sin arreglar a propósito; no tocado en la sesión 07/09) |
+| `fn_chat_acceso(p_tipo_chat text, p_permiso text default 'ver')` | (07/09/2026) security definer, stable. Consulta `chat_acceso` para `fn_rol_actual()`; `p_permiso` es `'ver'` o `'escribir'`. Devuelve `false` si no hay fila (deny-by-default). Usada por las políticas RLS de `notificaciones` y `chat_mensajes`, y por la Edge Function de Ceria para decidir si el rol que llama tiene acceso a `tipo_chat='ceria'` (`11`) |
 | `fn_encolar_resumenes_turno_pendientes()` | cierre automático + reintento |
 | `fn_cerrar_ciclos_pendientes()` | security definer, idempotente (`on conflict do update`); escribe en `historial_ciclos` (operario) y `historial_ciclo_responsable` (responsable, tabla separada desde 25/08/2026). **Sin `not exists` desde las reescrituras del 25/08**: recorre TODO `cycle_id` anterior al actual con datos en las vistas en vivo y sobrescribe cualquier fila que ya exista — ya no distingue "cerrar por primera vez" de "recalcular a propósito". Detalle y por qué no es un riesgo hoy en `04`. Ejecución **solo service_role** desde 26/08/2026 (lint de seguridad: sin caller legítimo por RPC hoy — la dispara solo el cron; cuando se construya el botón admin "Recalcular ciclo anterior", ver `07`, decidir entre check de rol o llamada vía Edge Function) |
 | `fn_nivel_actual(uuid)` | security definer, stable. Ejecución **solo service_role** desde 26/08/2026 — su propio comentario ya decía que no estaba pensada como RPC libre; hoy solo la usa internamente `fn_otorgar_bonus_nivel` |
@@ -301,6 +356,19 @@ el linter las marca pero no son explotables vía RPC).
 | configuracion | `configuracion_select_autenticados`: cualquier autenticado (lo necesitan `rotacion.ts` y la pantalla) | admin | admin | admin |
 | modelo, marca, formato, producto, linea, checklist_items, logros_definicion, puntos_*, niveles, cierre_fabrica | autenticados | admin | admin | admin |
 | app_secrets | ninguno (revoke) | | | |
+| notificaciones | `fn_chat_acceso(tipo, 'ver')` (07/09, sustituye a una lista fija de roles usada en un paso intermedio del mismo día) | solo desde funciones `security definer` (sin GRANT a authenticated/anon) | — | — |
+| chat_mensajes | `fn_rol_actual() in ('responsable','suplente','operario','jefe','administrador')` | mismo conjunto + `usuario_id = auth.uid()` | borrado suave: propio (`usuario_id = auth.uid()`) o administrador — nunca DELETE real | — |
+| chat_acceso | cualquier rol conocido | admin (`for all`) | admin | admin |
+| notificacion_estado_usuario | propio | propio | propio | propio (política única `for all`, `usuario_id = auth.uid()`) |
+| notificacion_preferencias | propio | propio | propio | propio (`for all`, `usuario_id = auth.uid()`) |
+| notificacion_silencio | propio | propio | propio | propio (`for all`, `usuario_id = auth.uid()`) |
+| ceria_modelo_activo | cualquier rol conocido | admin (`for all`) | admin | admin |
+
+Nota de estilo (07/09/2026): `notificacion_estado_usuario`/
+`notificacion_preferencias`/`notificacion_silencio` usan las 3 una
+única política `for all using/with check (usuario_id = auth.uid())` —
+no hay policies separadas por operación, a diferencia del resto de la
+tabla.
 
 La pantalla de fábrica no lee `parte`: lee vistas (owner). Desde
 24/08 `pantalla` sí tiene SELECT en `usuario` e `historial_ciclos`.
@@ -317,110 +385,11 @@ descartado — el real es con login (`10`). La migración no se edita.
 - `auth_leaked_password_protection` (comprobación de contraseñas
   filtradas contra HaveIBeenPwned) está desactivado en Supabase Auth.
   Toggle en el panel, sin código — pendiente de decidir (`07`).
-  # Addendum a 06-esquema-bd.md — migraciones del 07/09/2026
 
-Cubre únicamente las migraciones fechadas `20260907*` (7 en total,
-sesión de notificaciones in-app + chat unificado, ver `15`) más
-`20260907190000_ceria_modelo_activo.sql`. **No hay ninguna migración
-con fecha 08/09/2026 todavía.**
+## Referencias cruzadas
 
-Pendiente aparte (no cubierto aquí): el tramo 27/08→06/09 sigue sin
-repasar en este archivo (temas, rectificado, calidad, Ceria 03-05/09).
-
-Sugerencia de cambio en la cabecera del archivo, línea 3:
-
-> Contrastado con la BD real el 19/08/2026 y actualizado con cada
-> migración hasta `20260826`, más las migraciones de notificaciones
-> in-app / chat / `ceria_modelo_activo` del `20260907` (sesión
-> 07/09/2026, ver `15`). **Tramo 27/08→06/09 pendiente de repasar.**
-
----
-
-## Añadir a "## Tablas"
-
-**notificaciones** — feed de eventos in-app, independiente de
-Telegram (`15`): id, `tipo` (check: incidencia_calidad /
-incidencia_produccion / nuevo_lote / resumen_turno / resumen_calidad),
-titulo, cuerpo, referencia_id (id de la fila origen), data jsonb
-(fotos, URL de PDF), created_at. Sin política de INSERT para
-`authenticated`/`anon` — solo escriben las 3 Edge Functions que ya
-mandan a Telegram, con `service_role`. `check` de `tipo` pensado para
-ampliarse con un 6º valor (`mensaje_chat`) si algún día hiciera falta.
-
-**notificacion_estado_usuario** — "hasta dónde ha leído cada usuario",
-clave compuesta **(usuario_id, tipo)** desde el 07/09/2026 (antes era
-un único timestamp por usuario; el rediseño a canales por tipo obligó
-a que cada canal tenga su propio contador de no-leídas). Ausencia de
-fila para un tipo = nunca abierto ese canal = todo no-leído en él.
-
-**notificacion_preferencias** — interruptor de push por (usuario_id,
-tipo), default activado. **Sin efecto real hoy** — solo gobernará el
-envío de push cuando exista (Fase 7, sin construir); no oculta nada
-del feed ni afecta al contador de no-leídas.
-
-**notificacion_silencio** — horario general de silencio por usuario
-(activo bool, hora_inicio, hora_fin — mismo rango todos los días, no
-distingue entre semana/fin de semana). Mismo caso que la anterior:
-**sin efecto real hasta que exista push**.
-
-**chat_mensajes** — canal único de chat humano, sin salas: usuario_id,
-texto, fotos text[] (Cloudinary, preset `motiv_v3_chat`), created_at,
-`eliminado` bool default false (borrado **suave**, nunca DELETE real
-— mismo criterio que `parte.vigente`), borrado_por, borrado_at. Check
-`texto is not null or fotos is not null`. Alcance de roles:
-responsable, suplente, operario, jefe, administrador — **calidad y
-jefe_rectificado quedan fuera a propósito** (dependen solo de
-Telegram), misma decisión que en `notificaciones`.
-
-**chat_acceso** — control de acceso por rol para los **7 "chats"**
-(los 5 automáticos de arriba + `general` + `ceria`): tipo_chat, rol,
-puede_ver, puede_escribir. **Deny-by-default**: ausencia de fila =
-sin acceso; quitar el "ver" de un rol borra la fila en vez de dejarla
-con `puede_ver=false`. Solo `general` usa `puede_escribir` de forma
-distinta a `puede_ver` — en el resto un único interruptor.
-
-**ceria_modelo_activo** — apagado de modelos de Fase 3 de Ceria por
-el administrador (`11`): modelo_id (PK, texto — id del catálogo fijo
-en código `MODELOS_FASE3`), activo. Convención **opuesta** a
-`chat_acceso` a propósito: ausencia de fila = modelo **activo** (el
-catálogo ya viene fijo en código, el caso base es "todo encendido");
-solo se inserta fila cuando el admin apaga uno en concreto.
-
----
-
-## Añadir a "## Funciones"
-
-| Función | Notas |
-|---|---|
-| `fn_chat_acceso(p_tipo_chat text, p_permiso text default 'ver')` | security definer, stable. Consulta `chat_acceso` para `fn_rol_actual()`; `p_permiso` es `'ver'` o `'escribir'`. Devuelve `false` si no hay fila (deny-by-default). Usada por las políticas RLS de `notificaciones` y `chat_mensajes`, y por la Edge Function de Ceria para decidir si el rol que llama tiene acceso a `tipo_chat='ceria'` (`11`) |
-| `fn_notificar_telegram()` | ya existía (`05`) — extendida el 07/09/2026 para, además de la llamada HTTP a Telegram, hacer INSERT en `notificaciones` con título/cuerpo enriquecidos (línea + turno). Hubo un vaivén de diseño el mismo día: un intento intermedio reconstruía el texto completo en PL/pgSQL aparte del que arma la Edge Function para Telegram — se revirtió al detectar que ambas versiones se desincronizaban (una línea que faltaba en una de las dos); el texto vive en un solo sitio |
-| `fn_disparar_resumen_turno(uuid)`, `fn_disparar_resumen_calidad()` | tras el mismo vaivén del 07/09, **vuelven a ser solo el disparo HTTP** — el INSERT en `notificaciones` para `resumen_turno` y `resumen_calidad` lo hacen directamente las propias Edge Functions (`generar-resumen-turno`, `notificar-telegram-resumen-calidad`), no la función SQL. Sigue pendiente lo ya anotado sobre `fn_disparar_resumen_turno` (expuesta a `anon`/`authenticated` vía RPC, ver `07`) — no tocado esta sesión |
-
----
-
-## Añadir a la tabla de "## Políticas RLS"
-
-| Tabla | SELECT | INSERT | UPDATE | DELETE |
-|---|---|---|---|---|
-| notificaciones | `fn_chat_acceso(tipo, 'ver')` (07/09, sustituye a una lista fija de roles usada en un paso intermedio del mismo día) | solo desde funciones `security definer` (sin GRANT a authenticated/anon) | — | — |
-| chat_mensajes | `fn_rol_actual() in ('responsable','suplente','operario','jefe','administrador')` | mismo conjunto + `usuario_id = auth.uid()` | borrado suave: propio (`usuario_id = auth.uid()`) o administrador — nunca DELETE real | — |
-| chat_acceso | cualquier rol conocido | admin (`for all`) | admin | admin |
-| notificacion_estado_usuario | propio | propio | propio | propio (política única `for all`, `usuario_id = auth.uid()`) |
-| notificacion_preferencias | propio | propio | propio | propio (`for all`, `usuario_id = auth.uid()`) |
-| notificacion_silencio | propio | propio | propio | propio (`for all`, `usuario_id = auth.uid()`) |
-| ceria_modelo_activo | cualquier rol conocido | admin (`for all`) | admin | admin |
-
-Nota de estilo: `notificacion_estado_usuario`/`preferencias`/`silencio`
-usan las 3 una única política `for all using/with check (usuario_id =
-auth.uid())` — no hay policies separadas por operación, a diferencia
-del resto de la tabla.
-
----
-
-## Referencias cruzadas a añadir
-
-- `15-notificaciones-chat.md` — detalle completo del sistema (fases
-  de la sesión, historia del vaivén de `fn_notificar_telegram`,
-  pantallas).
+- `15-notificaciones-chat.md` — detalle completo del sistema de
+  notificaciones in-app y chat (fases de la sesión 07/09/2026,
+  historia del vaivén de `fn_notificar_telegram`, pantallas).
 - `11-ceria.md` — `ceria_modelo_activo` y `fn_chat_acceso` aplicado a
   `tipo_chat='ceria'`.
