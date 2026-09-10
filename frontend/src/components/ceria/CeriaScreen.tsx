@@ -199,7 +199,15 @@ export function CeriaScreen() {
     listarModelosDesactivados()
       .then((desactivados) => {
         setModelosDesactivados(desactivados);
-        if (desactivados.has(modeloFase3)) setModeloFase3("gpt-5-mini");
+        if (desactivados.has(modeloFase3)) {
+          // Mismo criterio que resolverModeloFase3 en el backend: cae
+          // al primer modelo del catálogo que SÍ esté activo, no a un
+          // id fijo que también podría estar bloqueado (bug real:
+          // admin bloquea todo menos deepseek-v4-pro, y esto seguía
+          // reasignando "gpt-5-mini", que también estaba bloqueado).
+          const primerActivo = MODELOS_FASE3_OPCIONES.find((m) => !desactivados.has(m.id));
+          if (primerActivo) setModeloFase3(primerActivo.id);
+        }
       })
       .catch(() => {
         // Si falla la consulta, se deja el desplegable completo — no

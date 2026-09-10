@@ -80,14 +80,24 @@ export async function resolverModeloFase3(
   supabase: any,
   id: string | null | undefined,
 ): Promise<ModeloFase3> {
-  if (!id) return MODELO_DEFECTO;
-  const candidato = MODELOS_FASE3.find((m) => m.id === id);
-  if (!candidato) return MODELO_DEFECTO;
+  const { data: desactivadosData } = await supabase
+    .from("ceria_modelo_activo")
+    .select("modelo_id")
+    .eq("activo", false);
+  const desactivados = new Set((desactivadosData ?? []).map((d: { modelo_id: string }) => d.modelo_id));
 
-  const { data } = await supabase.from("ceria_modelo_activo").select("activo").eq("modelo_id", id).maybeSingle();
-  if (data?.activo === false) return MODELO_DEFECTO;
+  const candidato = id ? MODELOS_FASE3.find((m) => m.id === id) : null;
+  if (candidato && !desactivados.has(candidato.id)) return candidato;
 
-  return candidato;
+  // El pedido no vale (no existe, vacío, o desactivado) — cae al
+  // primer modelo del catálogo que SÍ esté activo, no a un id fijo
+  // que podría estar bloqueado también (bug real: admin bloquea
+  // todo menos uno, y el fallback ciego a gpt-5-mini lo saltaba).
+  const primerActivo = MODELOS_FASE3.find((m) => !desactivados.has(m.id));
+  if (!primerActivo) {
+    throw new Error("Todos los modelos de Fase 3 están desactivados — el admin debe reactivar al menos uno.");
+  }
+  return primerActivo;
 }
 
 type ResultadoLlamada = { ok: true; texto: string } | { ok: false; error: string };

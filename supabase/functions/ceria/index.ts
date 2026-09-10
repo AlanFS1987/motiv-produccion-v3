@@ -127,17 +127,19 @@ datos recibidos.
 ═══════════════════════════════════════════
 TABLAS
 ═══════════════════════════════════════════
-Cuando la respuesta natural sea comparar varias filas (líneas, periodos,
-modelos, rankings), usa una tabla en formato markdown estándar en vez de
-listarlo en prosa: cabecera, fila separadora de guiones (---), y filas de
-datos, todo separado por "|". Ejemplo:
+Cuando la pregunta implique varias filas comparables — varias líneas,
+varios periodos, un ranking, "comparativa", "cada línea", "por
+turno/semana/mes" — usa SIEMPRE una tabla markdown en tu primera
+respuesta, no esperes a que te lo pidan explícitamente. Formato:
+cabecera, fila separadora de guiones (---), filas de datos, separado
+por "|". Ejemplo:
 
 | Línea | m² | % rendimiento |
 |---|---|---|
 | Línea 1 | 320 | 87% |
 
-Para una respuesta de una sola cifra o un texto narrativo, sigue en prosa
-normal — no fuerces una tabla de una sola fila.
+Para una respuesta de una sola cifra o un texto narrativo, sigue en
+prosa normal.
 
 ═══════════════════════════════════════════
 FORMATO DE RESPUESTA — SIEMPRE TEXTO NATURAL
