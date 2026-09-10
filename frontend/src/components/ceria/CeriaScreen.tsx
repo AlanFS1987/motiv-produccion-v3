@@ -54,39 +54,125 @@ const CHIPS: { etiqueta: string; pregunta: string }[] = [
   { etiqueta: "Resumen semanal", pregunta: "Dame un resumen de la producción de esta semana" },
 ];
 
-/** Divide un texto en trozos, separando las imágenes markdown ![desc](url) del resto. */
-function partesConImagenes(texto: string): { tipo: "texto" | "imagen"; contenido: string; alt?: string }[] {
-  const regex = /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g;
-  const partes: { tipo: "texto" | "imagen"; contenido: string; alt?: string }[] = [];
-  let ultimoIndex = 0;
-  let match: RegExpExecArray | null;
+interface ParteMensaje {
+  tipo: "texto" | "imagen" | "tabla";
+  contenido?: string;
+  alt?: string;
+  cabeceras?: string[];
+  filas?: string[][];
+}
 
-  while ((match = regex.exec(texto)) !== null) {
-    if (match.index > ultimoIndex) {
-      partes.push({ tipo: "texto", contenido: texto.slice(ultimoIndex, match.index) });
+const REGEX_IMAGEN = /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g;
+const REGEX_FILA_TABLA = /^\|(.+)\|\s*$/;
+const REGEX_SEPARADOR_TABLA = /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+
+function partirCeldas(linea: string): string[] {
+  return linea.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+}
+
+/** Primer paso: separa bloques de tabla markdown (cabecera + separador --- + filas) del resto. */
+function extraerTablas(texto: string): ParteMensaje[] {
+  const lineas = texto.split("\n");
+  const partes: ParteMensaje[] = [];
+  let bufferTexto: string[] = [];
+  let i = 0;
+
+  const flushTexto = () => {
+    const contenido = bufferTexto.join("\n").trim();
+    if (contenido) partes.push({ tipo: "texto", contenido });
+    bufferTexto = [];
+  };
+
+  while (i < lineas.length) {
+    const linea = lineas[i];
+    const siguiente = lineas[i + 1];
+    if (linea && REGEX_FILA_TABLA.test(linea) && siguiente && REGEX_SEPARADOR_TABLA.test(siguiente)) {
+      flushTexto();
+      const cabeceras = partirCeldas(linea);
+      const filas: string[][] = [];
+      i += 2;
+      while (i < lineas.length && REGEX_FILA_TABLA.test(lineas[i])) {
+        filas.push(partirCeldas(lineas[i]));
+        i++;
+      }
+      partes.push({ tipo: "tabla", cabeceras, filas });
+      continue;
     }
-    partes.push({ tipo: "imagen", contenido: match[2], alt: match[1] });
-    ultimoIndex = match.index + match[0].length;
+    bufferTexto.push(linea);
+    i++;
   }
-  if (ultimoIndex < texto.length) {
-    partes.push({ tipo: "texto", contenido: texto.slice(ultimoIndex) });
-  }
+  flushTexto();
   return partes;
 }
 
+/** Segundo paso: dentro de cada trozo de texto que quedó, separa imágenes markdown (igual que antes). */
+function partesDeMensaje(texto: string): ParteMensaje[] {
+  const resultado: ParteMensaje[] = [];
+  for (const parte of extraerTablas(texto)) {
+    if (parte.tipo !== "texto" || !parte.contenido) {
+      resultado.push(parte);
+      continue;
+    }
+    const contenido = parte.contenido;
+    const regex = new RegExp(REGEX_IMAGEN);
+    let ultimoIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(contenido)) !== null) {
+      if (match.index > ultimoIndex) {
+        resultado.push({ tipo: "texto", contenido: contenido.slice(ultimoIndex, match.index) });
+      }
+      resultado.push({ tipo: "imagen", contenido: match[2], alt: match[1] });
+      ultimoIndex = match.index + match[0].length;
+    }
+    if (ultimoIndex < contenido.length) {
+      resultado.push({ tipo: "texto", contenido: contenido.slice(ultimoIndex) });
+    }
+  }
+  return resultado;
+}
+
 function ContenidoMensaje({ texto }: { texto: string }) {
-  const partes = partesConImagenes(texto);
+  const partes = partesDeMensaje(texto);
   return (
     <div className="space-y-2">
-      {partes.map((p, i) =>
-        p.tipo === "imagen" ? (
-          <img key={i} src={p.contenido} alt={p.alt || ""} className="max-h-64 rounded-lg border border-slate-200" />
-        ) : (
+      {partes.map((p, i) => {
+        if (p.tipo === "imagen") {
+          return <img key={i} src={p.contenido} alt={p.alt || ""} className="max-h-64 rounded-lg border border-slate-200" />;
+        }
+        if (p.tipo === "tabla") {
+          return (
+            <div key={i} className="overflow-x-auto rounded-lg border border-slate-200">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-100">
+                  <tr>
+                    {p.cabeceras!.map((c, j) => (
+                      <th key={j} className="whitespace-nowrap px-2 py-1.5 font-semibold text-slate-700">
+                        {c}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {p.filas!.map((fila, fi) => (
+                    <tr key={fi} className="border-t border-slate-200 odd:bg-white even:bg-slate-50">
+                      {fila.map((celda, ci) => (
+                        <td key={ci} className="whitespace-nowrap px-2 py-1.5 text-slate-600">
+                          {celda}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+        return (
           <p key={i} className="whitespace-pre-wrap text-sm leading-relaxed">
             {p.contenido}
           </p>
-        ),
-      )}
+        );
+      })}
     </div>
   );
 }

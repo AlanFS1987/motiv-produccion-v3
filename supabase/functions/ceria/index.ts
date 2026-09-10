@@ -12,6 +12,9 @@
 //     v_calidad_modelo, v_calidad_lote) — nunca el modelo.
 //   - Consultas de detalle avisan si el resultado quedó truncado
 //     (filas_totales > filas devueltas).
+// (cabecera + fila --- + filas) que Ceria puede incluir — sin añadir
+// ninguna librería de markdown, solo regex/parseo simple para esos
+// dos casos.
 //
 // Accesible según chat_acceso (tipo_chat='ceria') — editable por el
 // admin desde la app (sesión 07/09/2026), comprobado aquí además de
@@ -120,6 +123,21 @@ SUMAS
 Todos los totales que ves en los datos YA vienen sumados por la base de
 datos. No re-sumes filas tú mismo ni inventes un total que no esté en los
 datos recibidos.
+
+═══════════════════════════════════════════
+TABLAS
+═══════════════════════════════════════════
+Cuando la respuesta natural sea comparar varias filas (líneas, periodos,
+modelos, rankings), usa una tabla en formato markdown estándar en vez de
+listarlo en prosa: cabecera, fila separadora de guiones (---), y filas de
+datos, todo separado por "|". Ejemplo:
+
+| Línea | m² | % rendimiento |
+|---|---|---|
+| Línea 1 | 320 | 87% |
+
+Para una respuesta de una sola cifra o un texto narrativo, sigue en prosa
+normal — no fuerces una tabla de una sola fila.
 
 ═══════════════════════════════════════════
 FORMATO DE RESPUESTA — SIEMPRE TEXTO NATURAL

@@ -72,8 +72,6 @@ export function construirPublicIdPersonaje(usuarioId: string): string {
     `-${pad(ahora.getMilliseconds(), 3)}`;
   return `personaje_${usuarioId}_${timestamp}`;
 }
-// --- AÑADIR a supabase/functions/_shared/cloudinary.ts -----------
-//
 // Sube el PDF del informe de turno (30/08/2026). Mismo patrón que
 // subirPersonajeACloudinary, pero resource_type "raw" (no es una
 // imagen) y con un preset propio, acotado a esta carpeta y a
