@@ -110,7 +110,9 @@ Producción:
 - `get_produccion_turno` — agregado por turno, rango de fechas
   (`v_produccion_turno`). Expone `rendimiento_numerador`/
   `rendimiento_denominador` crudos para poder sumar varios turnos sin
-  promediar % ya redondeados.
+  promediar % ya redondeados. Trae también `responsable_username`
+  (quién abrió el turno, vía `turno.abierto_por` — la vista no lo
+  expone, se resuelve aparte) — añadido sesión 10/09/2026.
 - `get_produccion_linea` — **nueva**, una fila por línea con **todo
   un rango de fechas ya sumado** (`produccion_linea_por_fecha`).
   Pensada para comparar dos periodos de la misma línea: se llama dos
@@ -118,8 +120,14 @@ Producción:
   para esto. Mismo suelo de 480 min/turno que `v_produccion_turno`,
   aplicado por turno+línea antes de sumar entre turnos.
 - `get_partes` — detalle de filas sueltas (con límite 300 +
-  aviso `limitado`).
-- `get_incidencias_produccion`.
+  aviso `limitado`). Trae `operario.username` y, desde sesión
+  10/09/2026, también `responsable.username` (ambas FK directa de
+  `parte`).
+- `get_incidencias_produccion` — trae también `creador.username`
+  (quién la reportó) y `operario_username` (operario de la
+  línea+turno, sin FK directa — se resuelve contra
+  `asignacion_operario_linea`; `null` en incidencias generales sin
+  línea) — añadido sesión 10/09/2026.
 
 Calidad:
 - `get_calidad_modelo` — histórico por producto, ahora también con
@@ -135,11 +143,14 @@ Calidad:
 - `get_calidad_turno` — **nueva**, expone `v_calidad_turno` (existía
   en BD desde el 21/08 para el dashboard del jefe, nunca conectada a
   Ceria). El resumen diario de calidad, el más pedido y el más barato
-  de construir.
+  de construir. Trae también `responsable_username`, mismo mecanismo
+  que `get_produccion_turno` — añadido sesión 10/09/2026.
 - `get_calidad_linea` — **nueva**, mismo concepto que
   `get_produccion_linea` pero de calidad (`calidad_linea_por_fecha`);
   siempre las dos métricas juntas (completa + oficial).
-- `get_incidencias_calidad`.
+- `get_incidencias_calidad` — trae también `creador.username` y,
+  dentro de `parte`, `operario.username` (las dos son FK directa, sin
+  lookup aparte) — añadido sesión 10/09/2026.
 
 Las 3 nuevas (`get_calidad_turno`, `get_produccion_linea`,
 `get_calidad_linea`) y las 2 versiones con fecha exacta
@@ -178,6 +189,47 @@ Todos verificados con SQL directo antes de dar el arreglo por bueno:
    **array** de `{ herramienta, argumentos, datos }`, uno por llamada
    real, nunca se sobreescribe.
 
+## Responsable y operario en incidencias/turnos (sesión 10/09/2026)
+
+Añadido para poder atribuir cada incidencia/turno a una persona, en
+Ceria y en el dashboard del jefe (`IncidenciasScreen.tsx`):
+
+- **Incidencias de producción**: `creador.username` (FK directa,
+  `created_by`) + `operario_username` — sin FK directa (la incidencia
+  cuelga de turno+línea, no de un parte), se resuelve con un lookup
+  aparte contra `asignacion_operario_linea`. `null` en las
+  incidencias generales (sin línea).
+- **Incidencias de calidad**: `creador.username` + `operario.username`
+  dentro de `parte` — las dos son FK directa, sin lookup aparte
+  (`incidencia_calidad.created_by` y `parte.operario_id`).
+- **`get_partes`**: se añadió `responsable.username` junto al
+  `operario.username` que ya traía.
+- **`get_produccion_turno` / `get_calidad_turno`**: se añadió
+  `responsable_username` — ninguna de las dos vistas lo expone (son
+  agregados por turno completo), se resuelve aparte contra
+  `turno.abierto_por`, mismo patrón que ya usaba
+  `obtenerUltimosTurnosKpi` en `pantalla-carrusel.ts`. A diferencia
+  del operario (que puede variar por línea dentro de un turno), el
+  responsable que abre el turno es siempre uno solo, así que aquí sí
+  tiene sentido exponerlo en un agregado.
+- Mismo dato reflejado en el dashboard del jefe
+  (`dashboard-incidencias.ts` + `IncidenciasScreen.tsx`), en los dos
+  bloques (producción y calidad).
+- **Bug encontrado al consolidar la migración**: el prompt en vivo de
+  `get_incidencias_produccion` se había quedado solo con la mención
+  de `creador.username` — la frase de `operario_username` nunca
+  llegó a aplicarse pese a estar en el código. Corregido en
+  `20260910190000_prompts_responsable_operario_turno.sql`.
+- Los 4 prompts tocados llevan además fragmentos de
+  `biblia-seccion_final.md` pegados a mano (máquinas,
+  `minutos_saturacion` vs `no_alimentada`, categoría `eco`) — se
+  dejan tal cual a propósito: cada uno es específico de las columnas
+  que expone esa herramienta, y como `get_identidad` (donde vive la
+  versión completa, ~58k caracteres) nunca se combina con las demás,
+  es la única forma de que el modelo lo tenga disponible al llamar
+  solo a esa herramienta. Revisar si la futura tool de diagnóstico de
+  máquinas (ver Pendiente) puede absorber esto y limpiar los 4
+  prompts.
 ## UI (`ceria/CeriaScreen.tsx`, `lib/ceria.ts`)
 
 - Chat con 5 accesos rápidos (Fin de semana, Ayer, Alertas calidad,
@@ -223,8 +275,31 @@ fechas de prueba.
 
 ## Pendiente
 
-- Exportación CSV/PDF (`exportar_datos`, diseño empezado 03/09,
-  sin implementar).
+- **Informe en PDF** (antes "Exportación CSV/PDF", diseño empezado
+  03/09, sin implementar) — decisión pendiente 10/09/2026 entre dos
+  caminos: reutilizar el patrón ya probado de
+  `_shared/pdf-informe-turno.ts` + Cloudinary (usado hoy solo al
+  cerrar turno) para plantillas fijas nuevas a 1 clic, o una tool
+  genérica que Ceria dispare para exportar lo último consultado. Sin
+  decidir cuál.
+- **`get_identidad` no muestra "Ver qué hizo Ceria"** — sí es una
+  tool real (elegida en Fase 1, registrada en `ceria_tool_logs`),
+  pero cuando es la única herramienta de la pregunta, `index.ts`
+  responde directo saltándose Fase 3 y nunca construye `filas_info`
+  — el desplegable del frontend solo pinta si ese array no está
+  vacío. Arreglo sencillo (construir un `filas_info` mínimo en esa
+  rama), sin aplicar aún.
+- **`tools.ts` e `index.ts` han crecido mucho** (10 herramientas +
+  orquestación de 3 fases + gestión de conversaciones/logs en un solo
+  archivo cada uno) — partirlos en módulos dentro de la misma carpeta
+  de la función (seguro en Deno, se empaqueta todo el directorio
+  junto) es puro refactor, sin cambio de comportamiento, planteado
+  pero no hecho.
+- **Nueva multi-tool "copiloto de diagnóstico"** (máquinas,
+  mantenimiento, reparación, ajustes), con tabla propia en BD — en
+  diseño (10/09/2026, a desarrollar en otro chat). Podría absorber el
+  contenido de `biblia-seccion_final.md` hoy duplicado en varios
+  prompts (ver sección de arriba) y dejarlos más ligeros.
 - `NULLS LAST` / filtro en modo ranking de `get_calidad_lote`.
 - Desajuste de 1 pieza en un producto entre `piezas_entradas` y la
   suma de categorías (dato de entrada, no de la vista) — sin revisar.
