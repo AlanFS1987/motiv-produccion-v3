@@ -394,6 +394,7 @@ export async function executeTool(
         turno:turno_id!inner ( fecha, tipo ),
         linea:linea_id ( nombre ),
         operario:operario_id ( username ),
+        responsable:responsable_id ( username ),
         lote:lote_id (
           numero_orden,
           producto:producto_id (
@@ -533,9 +534,10 @@ export async function executeTool(
       let base = supabase
         .from("incidencia_produccion")
         .select(
-          `id, descripcion, fotos, created_at,
-           turno:turno_id!inner ( fecha, tipo ),
-           linea:linea_id ( nombre )`,
+          `id, turno_id, linea_id, descripcion, fotos, created_at,
+          turno:turno_id!inner ( fecha, tipo ),
+          linea:linea_id ( nombre ),
+          creador:created_by ( username )`,
           { count: "exact" },
         )
         .gte("turno.fecha", args.fecha_desde as string)
@@ -555,9 +557,33 @@ export async function executeTool(
 
       const { data, error, count } = await base;
       if (error) throw new Error(`get_incidencias_produccion: ${error.message}`);
-      const filas = data?.length ?? 0;
+
+      const filasArray = (data ?? []) as any[];
+      const filas = filasArray.length;
       const filasTotales = count ?? filas;
-      return { datos: data, filas, filas_totales: filasTotales, limitado: filasTotales > filas };
+
+      // Operario de línea+turno: no hay FK directa, se resuelve aparte.
+      // Solo aplica a incidencias con línea (las generales no tienen operario).
+      const conLinea = filasArray.filter((f) => f.linea_id);
+      const operarioPorClave = new Map<string, string>();
+      if (conLinea.length > 0) {
+        const turnoIds = [...new Set(conLinea.map((f) => f.turno_id))];
+        const { data: asignaciones } = await supabase
+          .from("asignacion_operario_linea")
+          .select("turno_id, linea_id, operario:operario_id ( username )")
+          .in("turno_id", turnoIds);
+        for (const a of asignaciones ?? []) {
+          const op = Array.isArray(a.operario) ? a.operario[0] : a.operario;
+          if (op?.username) operarioPorClave.set(`${a.turno_id}_${a.linea_id}`, op.username);
+        }
+      }
+
+      const datos = filasArray.map((f) => ({
+        ...f,
+        operario_username: f.linea_id ? operarioPorClave.get(`${f.turno_id}_${f.linea_id}`) ?? null : null,
+      }));
+
+      return { datos, filas, filas_totales: filasTotales, limitado: filasTotales > filas };
     }
 
     case "get_incidencias_calidad": {
@@ -566,9 +592,11 @@ export async function executeTool(
         .from("incidencia_calidad")
         .select(
           `id, descripcion, fotos, created_at,
+           creador:created_by ( username ),
            parte:parte_id (
              linea:linea_id ( nombre ),
              turno:turno_id ( fecha, tipo ),
+             operario:operario_id ( username ),
              lote:lote_id (
                numero_orden,
                producto:producto_id ( modelo:modelo_id ( nombre ) )

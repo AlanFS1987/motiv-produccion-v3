@@ -39,6 +39,7 @@ function TarjetaIncidenciaProduccion({ inc, onFotoClick }: { inc: IncidenciaProd
         <span>· {NOMBRE_TURNO[inc.tipo_turno]}</span>
         <span>· {inc.linea_nombre ?? "General del turno"}</span>
         {inc.creado_por && <span>· {inc.creado_por}</span>}
+        {inc.operario_username && <span>· {inc.operario_username}</span>}
         <span className="ml-auto text-red-300">{formatearFechaHora(inc.created_at)}</span>
       </div>
       <p className="text-sm text-red-800">{inc.descripcion}</p>
@@ -67,6 +68,7 @@ function TarjetaIncidenciaCalidad({ inc, onFotoClick }: { inc: IncidenciaCalidad
         </span>
         <span>· orden {inc.numero_orden}</span>
         {inc.creado_por && <span>· {inc.creado_por}</span>}
+        {inc.operario_username && <span>· {inc.operario_username}</span>}
         <span className="ml-auto text-amber-300">{formatearFechaHora(inc.created_at)}</span>
       </div>
       <p className="text-sm text-amber-900">{inc.descripcion}</p>

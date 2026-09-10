@@ -15,6 +15,7 @@ export interface IncidenciaProduccionItem {
   tipo_turno: "M" | "T" | "N";
   linea_nombre: string | null; // null = incidencia general del turno
   creado_por: string | null;
+  operario_username: string | null; // null = incidencia general (sin línea, sin operario)
 }
 
 export interface IncidenciaCalidadItem {
@@ -29,6 +30,7 @@ export interface IncidenciaCalidadItem {
   formato_nombre: string;
   numero_orden: string;
   creado_por: string | null;
+  operario_username: string | null;
 }
 
 // deno-lint-ignore no-explicit-any
@@ -45,7 +47,7 @@ export async function obtenerIncidenciasProduccion(
   let query = supabase
     .from("incidencia_produccion")
     .select(
-      `id, descripcion, fotos, created_at,
+      `id, turno_id, linea_id, descripcion, fotos, created_at,
        turno:turno_id ( fecha, tipo ),
        linea:linea_id ( nombre ),
        creador:created_by ( username )`,
@@ -67,7 +69,26 @@ export async function obtenerIncidenciasProduccion(
   const { data, error } = await query;
   if (error) throw new Error(`incidencia_produccion: ${error.message}`);
 
-  return ((data ?? []) as any[])
+  const filas = (data ?? []) as any[];
+
+  // Operario de línea+turno: no hay FK directa en incidencia_produccion,
+  // se resuelve aparte contra asignacion_operario_linea (mismo patrón
+  // que en Ceria, tools.ts). Solo aplica a incidencias con línea.
+  const conLinea = filas.filter((f) => f.linea_id);
+  const operarioPorClave = new Map<string, string>();
+  if (conLinea.length > 0) {
+    const turnoIds = [...new Set(conLinea.map((f) => f.turno_id))];
+    const { data: asignaciones } = await supabase
+      .from("asignacion_operario_linea")
+      .select("turno_id, linea_id, operario:operario_id ( username )")
+      .in("turno_id", turnoIds);
+    for (const a of (asignaciones ?? []) as any[]) {
+      const op = Array.isArray(a.operario) ? a.operario[0] : a.operario;
+      if (op?.username) operarioPorClave.set(`${a.turno_id}_${a.linea_id}`, op.username);
+    }
+  }
+
+  return filas
     .map((row) => {
       const turno = uno<{ fecha: string; tipo: "M" | "T" | "N" }>(row.turno);
       const linea = uno<{ nombre: string }>(row.linea);
@@ -82,6 +103,7 @@ export async function obtenerIncidenciasProduccion(
         tipo_turno: turno.tipo,
         linea_nombre: linea?.nombre ?? null,
         creado_por: creador?.username ?? null,
+        operario_username: row.linea_id ? operarioPorClave.get(`${row.turno_id}_${row.linea_id}`) ?? null : null,
       };
     })
     .filter((x): x is IncidenciaProduccionItem => x !== null);
@@ -99,6 +121,7 @@ export async function obtenerIncidenciasCalidad(
        parte:parte_id (
          linea:linea_id ( nombre ),
          turno:turno_id ( fecha, tipo ),
+         operario:operario_id ( username ),
          lote:lote_id (
            numero_orden,
            producto:producto_id (
@@ -120,6 +143,7 @@ export async function obtenerIncidenciasCalidad(
       const parte = uno<any>(row.parte);
       const linea = uno<{ nombre: string }>(parte?.linea);
       const turno = uno<{ fecha: string; tipo: "M" | "T" | "N" }>(parte?.turno);
+      const operario = uno<{ username: string }>(parte?.operario);
       const lote = uno<any>(parte?.lote);
       const producto = uno<any>(lote?.producto);
       const modelo = uno<{ nombre: string }>(producto?.modelo);
@@ -137,6 +161,7 @@ export async function obtenerIncidenciasCalidad(
         formato_nombre: formato?.nombre ?? "—",
         numero_orden: lote?.numero_orden ?? "—",
         creado_por: creador?.username ?? null,
+        operario_username: operario?.username ?? null,
       };
     })
     .filter((x): x is IncidenciaCalidadItem => x !== null);
