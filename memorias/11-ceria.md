@@ -282,13 +282,6 @@ fechas de prueba.
   cerrar turno) para plantillas fijas nuevas a 1 clic, o una tool
   genérica que Ceria dispare para exportar lo último consultado. Sin
   decidir cuál.
-- **`get_identidad` no muestra "Ver qué hizo Ceria"** — sí es una
-  tool real (elegida en Fase 1, registrada en `ceria_tool_logs`),
-  pero cuando es la única herramienta de la pregunta, `index.ts`
-  responde directo saltándose Fase 3 y nunca construye `filas_info`
-  — el desplegable del frontend solo pinta si ese array no está
-  vacío. Arreglo sencillo (construir un `filas_info` mínimo en esa
-  rama), sin aplicar aún.
 - **`tools.ts` e `index.ts` han crecido mucho** (10 herramientas +
   orquestación de 3 fases + gestión de conversaciones/logs en un solo
   archivo cada uno) — partirlos en módulos dentro de la misma carpeta
@@ -322,3 +315,89 @@ despacho de Fase 3) · `frontend/src/components/ceria/CeriaScreen.tsx`,
 `lib/ceria.ts` · `lib/chat-acceso.ts`,
 `components/admin/ChatAccesoScreen.tsx` (acceso por rol + apagado de
 modelos, ver `15`).
+## Refactor de `index.ts`/`tools.ts` (10/09/2026)
+
+Ambos archivos habían crecido demasiado (540 y 651 líneas). Divididos
+en módulos dentro de la misma carpeta de función (Deno empaqueta todo
+el directorio junto) — puro refactor de organización, sin cambio de
+comportamiento:
+
+- `prompts.ts` — `buildSystemPrompt`, `MENU_ASK_USER`, `cargarPrompt`.
+- `conversaciones.ts` — `crearConversacion`, `guardarMensaje`,
+  `cargarHistorial`.
+- `openai-fase1.ts` — `llamarOpenAI` (Fase 1, fija en gpt-5-mini).
+- `tools/` — `TOOLS` + `executeTool`, divididos por eje:
+  `mecanismo.ts`, `produccion.ts`, `calidad.ts`, `incidencias.ts`,
+  más `limits.ts`/`helpers.ts` compartidos.
+- `modelos.ts` sin tocar (ya estaba bien organizado).
+- `index.ts` queda solo con el handler HTTP: auth, `chat_acceso`,
+  parseo del body, orquestación de las 3 fases, y `sanearRespuestaJSON`.
+
+De paso, arreglado el bug ya conocido de `get_identidad` sin
+`filas_info` (ver Pendiente, entrada borrada) — esa rama ahora
+construye un `filas_info` mínimo con los datos de `resultados[0]`
+(que ya existían, venían de Fase 2).
+
+## Documentación de máquinas (`ceria_documentacion_maquina`, 10/09/2026)
+
+Tabla nueva, pensada para alimentar la futura tool de
+documentación/diagnóstico de máquinas (ver Pendiente de sesiones
+anteriores). Mismo patrón de acceso que `ceria_prompts`: RLS
+activada, `jefe`+`administrador` leen, solo `administrador` escribe;
+sin UI de edición todavía, se rellena por migración a mano.
+
+**Esquema** (tabla larga, no ancha — decisión de diseño explícita
+para poder referenciar un elemento suelto sin traer una fila entera
+con listas dentro):
+
+```
+id uuid PK, clave text unique, maquina text, submaquina text (null),
+tipo text (check: proceso/parametro/sensor/actuador/pieza/alarma/
+mantenimiento/configuracion_inicial), nombre text, contenido text,
+activo boolean, created_at/updated_at
+```
+
+- `submaquina` es `null` para datos que describen la máquina en
+  conjunto (ej. lo de "Máquina → Datos constructivos" del HMI), no
+  ligados a un mecanismo concreto.
+- Los datos **constructivos** (fijos de fábrica, no se reajustan por
+  formato) no tienen `tipo` propio — viven dentro de `parametro`,
+  marcados como tales en su propia `contenido`.
+- Las **alarmas** solo llevan "qué es / qué la dispara" — el "cómo
+  resolver" queda fuera de esta tabla a propósito: es contenido de
+  `diagnostico-sintomas.md` (referenciado desde los `.md` originales
+  de la BS08, pero **sin escribir todavía** — ni una palabra). Cuando
+  exista contenido real, se diseña su propia tabla/tool, que podrá
+  referenciar una alarma de aquí por `clave`.
+- **EDA** se trata como `maquina` independiente de BS08, aunque en la
+  práctica sus parámetros se configuran desde la pantalla física del
+  Griffón (dato a tener en cuenta cuando se documente esa máquina).
+
+**Estado actual**: BS08 con 8 submáquinas capturadas — Divisor (30),
+Escuadrador (14), Elevador (14), Sacabandejas (19), Empujador de
+bandejas (22), Mandril (16), Jaula (20), Cabezales de impresión (15)
+— 150 filas en total. Fuente: los `.md` de `biblia-seccion.md`
+subidos a project knowledge (`bs08-00-indice.md`,
+`bs08-subsistema-carton.md`, `bs08-subsistema-impresion.md`,
+`bs08-eda.md`, `bs08-pantalla-maquina-datos-constructivos.md`,
+`bs08-pantalla-trac-pilas.md`) más aclaraciones directas del mecánico
+en sesión (sobre todo el Elevador, que no estaba documentado en los
+`.md` originales).
+
+### Pendiente (documentación de máquinas)
+
+- **Datos generales de la BS08** (`submaquina = null`): todavía sin
+  trasladar desde `bs08-pantalla-maquina-datos-constructivos.md`
+  (Nom. wrap, tipo de línea anterior, reset de alarmas, etc.).
+- **"Regulaciones"** (4 cotas fijas: lados abiertos, longitudinal
+  cerrada, apoyo bandejas, guía bandejas) — son los máximos/mínimos
+  de formato que puede trabajar la máquina (aprox. 20x20 teórico,
+  30x60 el más pequeño real, hasta 120x120 frecuente), pero sin
+  asignar todavía a qué submáquina pertenecen exactamente.
+- **EDA**: decidido como `maquina` independiente, sin ninguna fila
+  capturada todavía.
+- **Resto de máquinas de la sección** (Griffón/paletizador,
+  Qualitron...): sin empezar.
+- **Organización de herramientas de cara a Fase 1**: sin decidir
+  entre una herramienta parametrizada (`maquina='BS08'`) válida para
+  todas las máquinas, o una herramienta por máquina.

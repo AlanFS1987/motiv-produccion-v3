@@ -12,265 +12,36 @@
 //     v_calidad_modelo, v_calidad_lote) — nunca el modelo.
 //   - Consultas de detalle avisan si el resultado quedó truncado
 //     (filas_totales > filas devueltas).
-// (cabecera + fila --- + filas) que Ceria puede incluir — sin añadir
-// ninguna librería de markdown, solo regex/parseo simple para esos
-// dos casos.
 //
 // Accesible según chat_acceso (tipo_chat='ceria') — editable por el
 // admin desde la app (sesión 07/09/2026), comprobado aquí además de
 // la RLS de las tablas ceria_* y de las tablas de datos.
+//
+// Refactor 10/09/2026: index.ts y tools.ts habían crecido demasiado
+// (10 herramientas + orquestación de 3 fases + gestión de
+// conversaciones/logs en un solo archivo cada uno). Se dividió en
+// módulos dentro de esta misma carpeta de función (Deno empaqueta
+// todo el directorio junto, así que esto es seguro) — puro refactor
+// de organización, sin cambio de comportamiento:
+//   - prompts.ts        → buildSystemPrompt, MENU_ASK_USER, cargarPrompt
+//   - conversaciones.ts  → crearConversacion, guardarMensaje, cargarHistorial
+//   - openai-fase1.ts    → llamarOpenAI (Fase 1, fija en gpt-5-mini)
+//   - tools/             → TOOLS + executeTool, divididos por eje
+//     (mecanismo/producción/calidad/incidencias)
+//   - modelos.ts         → catálogo y despacho de Fase 3 (sin cambios)
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, jsonError, jsonOk } from "../_shared/cors.ts";
-import { TOOLS, executeTool } from "./tools.ts";
+import { TOOLS, executeTool } from "./tools/index.ts";
 import { resolverModeloFase3, llamarFase3 } from "./modelos.ts";
+import { buildSystemPrompt, MENU_ASK_USER, cargarPrompt } from "./prompts.ts";
+import { crearConversacion, guardarMensaje, cargarHistorial } from "./conversaciones.ts";
+import { OPENAI_API_KEY, llamarOpenAI } from "./openai-fase1.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 
-// Modelo: gpt-5-mini (decisión de sesión — la empresa confía en GPT
-// sobre otros proveedores). Cambiar aquí si se quiere comparar.
-const MODEL = "gpt-5-mini";
-
-function buildSystemPrompt(fechaActual: string): string {
-  return `Eres CERIA, asistente de producción para el jefe de planta de MOTIV. Hablas siempre en español.
-
-Hoy es: ${fechaActual}
-
-═══════════════════════════════════════════
-REGLA ABSOLUTA — USO OBLIGATORIO DE HERRAMIENTA
-═══════════════════════════════════════════
-SIEMPRE debes usar una herramienta. Nunca respondas directamente sin
-llamar a ninguna. Si no tienes claro cuál usar, usa ask_user. Si
-preguntan por ti, usa get_identidad.
-
-═══════════════════════════════════════════
-DOS EJES QUE NUNCA SE MEZCLAN
-═══════════════════════════════════════════
-- PRODUCCIÓN: m², piezas totales, tiempos de máquina, % rendimiento,
-  incidencias operativas (paros, fallos). Herramientas: get_produccion_turno,
-  get_produccion_linea, get_incidencias_produccion.
-- CALIDAD: 1ª/comercial/eco/contenedor, defectos de producto. Herramientas:
-  get_calidad_modelo, get_calidad_lote, get_calidad_turno, get_calidad_linea,
-  get_incidencias_calidad.
-- get_partes trae ambos bloques del mismo parte. Puedes y DEBES mostrarlos
-  juntos en la misma tabla o frase cuando ayude a entender el dato — una
-  cantidad sin su calidad al lado, o al revés, es un dato pobre. Lo único
-  PROHIBIDO es la causalidad: nunca digas que un paro de máquina "explicó"
-  o "causó" una calidad baja de ese mismo parte, ni al revés. Son
-  independientes en cuanto a CAUSA, no en cuanto a poder mostrarse juntos.
-- ANTES de elegir get_partes, comprueba si existe una herramienta agregada
-  que ya cubra la pregunta (get_produccion_turno/get_produccion_linea,
-  get_calidad_modelo/get_calidad_lote/get_calidad_turno/get_calidad_linea).
-  get_partes es SOLO para inspección puntual de filas sueltas — nunca para
-  totales, agregados, ni para comparar dos periodos, líneas o modelos.
-
-═══════════════════════════════════════════
-CALIDAD: DOS MÉTRICAS, MUÉSTRALAS SIEMPRE JUNTAS
-═══════════════════════════════════════════
-- Completa: cada categoría (1ª/comercial/eco/contenedor) sobre el TOTAL de
-  piezas entradas.
-- Oficial (métrica empresa): SOLO 1ª y comercial, recalculadas entre sí
-  (eco y contenedor se excluyen, como si fueran descarte). Siempre más alta
-  que la completa. No las confundas ni elijas una sola — indica cuál es cuál.
-
-═══════════════════════════════════════════
-SIN GAMIFICACIÓN
-═══════════════════════════════════════════
-Nunca menciones puntos, ranking, niveles ni ciclos — el jefe no usa esa
-parte de la app. Si preguntan por ranking de operarios, usa ask_user para
-aclarar que no tienes esa información aquí.
-
-═══════════════════════════════════════════
-FECHAS RELATIVAS
-═══════════════════════════════════════════
-- "ayer" → día anterior a hoy. "hoy" → hoy. "esta semana" → lunes hasta hoy.
-- "semana pasada" → lunes a domingo de la semana anterior.
-- "fin de semana" → sábado y domingo MÁS RECIENTES ya transcurridos (nunca
-  incluye el lunes).
-- "este mes" → día 1 del mes actual hasta hoy. "último mes" → mes natural
-  anterior completo.
-
-═══════════════════════════════════════════
-TRANSPARENCIA EN DATOS TRUNCADOS
-═══════════════════════════════════════════
-Si una herramienta devuelve "limitado": true, dilo explícitamente ("he
-analizado los X más recientes de un total de Y — si quieres, acota el
-rango de fechas para verlos todos"). Nunca des una cifra como si fuera el
-total completo cuando no lo es.
-
-═══════════════════════════════════════════
-NUNCA DIGAS "SIN DATOS" SI HAY FILAS
-═══════════════════════════════════════════
-Antes de concluir que "no hay datos" o "sin resultados" para un periodo,
-COMPRUEBA si esa llamada concreta trajo filas (filas > 0). Si una de
-varias llamadas trajo datos reales y otra no, repórtalo con precisión:
-el periodo sin filas no tiene datos, pero el periodo CON filas debe
-mostrarse con sus valores reales — nunca agrupes ambos bajo un único
-"sin resultados en ninguno de los periodos" cuando alguno sí los tiene.
-Los datos que recibes vienen en una LISTA — cada elemento trae
-"argumentos" (fecha_desde, fecha_hasta, linea_nombre, etc.) y "datos".
-Si una misma herramienta aparece varias veces en la lista, usa
-"argumentos" de cada una para saber a qué periodo/filtro corresponde,
-nunca asumas que son la misma llamada repetida.
-
-═══════════════════════════════════════════
-SUMAS
-═══════════════════════════════════════════
-Todos los totales que ves en los datos YA vienen sumados por la base de
-datos. No re-sumes filas tú mismo ni inventes un total que no esté en los
-datos recibidos.
-
-═══════════════════════════════════════════
-TABLAS
-═══════════════════════════════════════════
-Cuando la pregunta implique varias filas comparables — varias líneas,
-varios periodos, un ranking, "comparativa", "cada línea", "por
-turno/semana/mes" — usa SIEMPRE una tabla markdown en tu primera
-respuesta, no esperes a que te lo pidan explícitamente. Formato:
-cabecera, fila separadora de guiones (---), filas de datos, separado
-por "|". Ejemplo:
-
-| Línea | m² | % rendimiento |
-|---|---|---|
-| Línea 1 | 320 | 87% |
-
-Para una respuesta de una sola cifra o un texto narrativo, sigue en
-prosa normal.
-
-═══════════════════════════════════════════
-FORMATO DE RESPUESTA — SIEMPRE TEXTO NATURAL
-═══════════════════════════════════════════
-Tu respuesta final es SIEMPRE texto natural en español, para que la lea
-una persona. NUNCA devuelvas JSON, código ni estructuras de datos crudas
-como respuesta — eso es un fallo grave, aunque internamente estés
-decidiendo qué preguntar o qué herramienta usar. Si necesitas presentar
-datos estructurados, usa una lista o texto plano, nunca un objeto {}.
-
-═══════════════════════════════════════════
-NO ABUSES DE LAS PREGUNTAS DE ACLARACIÓN
-═══════════════════════════════════════════
-Si la petición ya tiene información suficiente para dar una respuesta
-razonable — aunque no sea exactamente como la habría pedido el jefe—,
-respóndela directamente con una interpretación sensata por defecto, e
-indica brevemente qué asumiste. Por defecto, cuando pidan "por lotes" o
-"agrupado": agrupa por número de orden, suma piezas, y muestra SIEMPRE
-las dos métricas de calidad (completa y oficial) juntas. Pregunta SOLO
-cuando la petición sea genuinamente ambigua y cualquier respuesta que
-des sin preguntar sería inútil o claramente equivocada — nunca para
-matices de formato que puedes decidir tú mismo con un criterio razonable.
-Ejemplo real: si piden "dame por lote la cantidad y calidad, todo junto",
-agrupa por lote directamente y responde con la tabla de una vez — NO
-preguntes "¿agrupado o por partes?", esa petición ya especificó "por
-lote", no hay nada que aclarar.
-
-═══════════════════════════════════════════
-CONTEXTO BÁSICO
-═══════════════════════════════════════════
-6 líneas de producción. Turnos: M (06-14), T (14-22), N (22-06). Si hay
-fotos en incidencias, muéstralas: ![descripción](url). Al inicio de una
-respuesta con datos, indica cuántos registros analizaste. Si usas varias
-herramientas, separa la respuesta en secciones con encabezado por cada una.
-
-Si el historial contiene bloques [DATOS_DISPONIBLES:herramienta]...[/DATOS_DISPONIBLES],
-y la pregunta puede responderse con eso, usa get_datos_historial en vez de
-repetir la consulta.`;
-}
-
-const MENU_ASK_USER = `No tengo claro qué información necesitas. ¿Cuál de estas opciones se acerca más?
-
-1. 📊 Producción de turnos (m², rendimiento)
-2. 👷 Partes por operario o línea
-3. 🧱 Calidad de un modelo (histórico)
-4. 📦 Calidad de un lote/orden concreto
-5. 🛑 Incidencias operativas (paros, fallos)
-6. ⚠️ Incidencias de calidad (defectos de producto)`;
-
-async function cargarPrompt(clave: string, supabase: SupabaseClient): Promise<string> {
-  const { data } = await supabase
-    .from("ceria_prompts")
-    .select("contenido")
-    .eq("clave", clave)
-    .eq("activo", true)
-    .maybeSingle();
-  return (data?.contenido as string) ?? "";
-}
-
-async function crearConversacion(userId: string, primerMensaje: string, supabase: SupabaseClient): Promise<string> {
-  const titulo = primerMensaje.length <= 60 ? primerMensaje : primerMensaje.slice(0, 57) + "...";
-  const { data, error } = await supabase
-    .from("ceria_conversaciones")
-    .insert({ user_id: userId, titulo })
-    .select("id")
-    .single();
-  if (error || !data) throw new Error(`No se pudo crear la conversación: ${error?.message}`);
-  return data.id as string;
-}
-
-async function guardarMensaje(
-  conversacionId: string,
-  role: "user" | "assistant",
-  contenido: string,
-  toolUsada: string | null,
-  supabase: SupabaseClient,
-  datos: unknown = null,
-): Promise<void> {
-  const { error } = await supabase
-    .from("ceria_mensajes")
-    .insert({ conversacion_id: conversacionId, role, contenido, tool_usada: toolUsada, datos });
-  if (error) console.error(`[ceria] error guardando mensaje (${role}):`, error);
-}
-
-async function cargarHistorial(
-  conversacionId: string,
-  supabase: SupabaseClient,
-): Promise<{ role: string; content: string }[]> {
-  const { data, error } = await supabase
-    .from("ceria_mensajes")
-    .select("role, contenido, tool_usada, datos")
-    .eq("conversacion_id", conversacionId)
-    .order("created_at", { ascending: true })
-    .limit(20);
-  if (error || !data) return [];
-  return data.map((m) => {
-    if (m.role === "assistant" && m.datos) {
-      return {
-        role: m.role,
-        content: `${m.contenido}\n\n[DATOS_DISPONIBLES:${m.tool_usada}]\n${JSON.stringify(m.datos)}\n[/DATOS_DISPONIBLES]`,
-      };
-    }
-    return { role: m.role, content: m.contenido as string };
-  });
-}
-
-// deno-lint-ignore no-explicit-any
-async function llamarOpenAI(body: Record<string, unknown>): Promise<{ ok: true; data: any } | { ok: false; error: string }> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60_000);
-  try {
-    const res = await fetch(OPENAI_URL, {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${OPENAI_API_KEY}` },
-      body: JSON.stringify({ model: MODEL, ...body }),
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      const errText = await res.text();
-      return { ok: false, error: `OpenAI (${res.status}): ${errText}` };
-    }
-    return { ok: true, data: await res.json() };
-  } catch (err) {
-    if (err instanceof Error && err.name === "AbortError") {
-      return { ok: false, error: "OpenAI no respondió a tiempo (timeout de 60s)" };
-    }
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
 /**
  * Red de seguridad: pese a la instrucción del prompt de nunca
  * devolver JSON crudo, el modelo lo ha hecho en la práctica (visto
@@ -292,6 +63,7 @@ function sanearRespuestaJSON(texto: string): string {
   }
   return texto;
 }
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonError("Método no permitido, usa POST", 405);
@@ -466,7 +238,25 @@ Deno.serve(async (req: Request) => {
       : "No pude responder ahora mismo.";
     await guardarMensaje(conversacionId, "user", pregunta, null, supabase);
     await guardarMensaje(conversacionId, "assistant", respuesta, "get_identidad", supabase);
-    return jsonOk({ respuesta, tool_usada: "get_identidad", conversacion_id: conversacionId });
+
+    // Antes: no se construía filas_info en esta rama → el desplegable
+    // "Ver qué hizo Ceria" del frontend no pintaba nada (solo se
+    // muestra si filas_info llega y no está vacío), aunque la llamada
+    // ya se había registrado en ceria_tool_logs durante Fase 2.
+    const filasInfo = [{
+      herramienta: resultados[0].nombre,
+      filas: resultados[0].filas,
+      filas_totales: resultados[0].filas_totales,
+      limitado: resultados[0].limitado ?? false,
+      duracion_ms: resultados[0].duracion_ms,
+    }];
+
+    return jsonOk({
+      respuesta,
+      tool_usada: "get_identidad",
+      filas_info: filasInfo,
+      conversacion_id: conversacionId,
+    });
   }
 
   // ══════════════════════════════ FASE 3 — redactar respuesta ═════
