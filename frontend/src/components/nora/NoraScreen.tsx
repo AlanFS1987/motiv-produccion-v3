@@ -99,10 +99,9 @@ export function NoraScreen() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 p-6 text-center">
-      <h1 className="text-xl font-semibold text-slate-900">NORA (experimento)</h1>
-      <p className="max-w-sm text-sm text-slate-500">
-        Navegación, Orientación y Resolución de Averías — prueba de voz, sin pantalla definitiva todavía.
+    <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+      <p className="max-w-sm text-sm text-[var(--texto-secundario)]">
+        Navegación, Orientación y Resolución de Averías — prueba de voz, sin historial todavía.
       </p>
 
       {estado === "desconectado" && (

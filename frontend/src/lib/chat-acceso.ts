@@ -13,7 +13,8 @@ export type TipoChat =
   | "resumen_turno"
   | "resumen_calidad"
   | "general"
-  | "ceria";
+  | "ceria"
+  | "nora";
 
 export const TIPOS_CHAT: TipoChat[] = [
   "incidencia_calidad",
@@ -23,6 +24,7 @@ export const TIPOS_CHAT: TipoChat[] = [
   "resumen_calidad",
   "general",
   "ceria",
+  "nora",
 ];
 
 export const ETIQUETA_CHAT: Record<TipoChat, string> = {
@@ -33,6 +35,7 @@ export const ETIQUETA_CHAT: Record<TipoChat, string> = {
   resumen_calidad: "Resumen de calidad",
   general: "Chat general",
   ceria: "Ceria",
+  nora: "NORA",
 };
 
 /** Solo 'general' distingue ver de escribir — en el resto es un único interruptor (ver = participar). */
