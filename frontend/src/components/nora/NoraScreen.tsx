@@ -5,8 +5,16 @@
 // hablar, y comprobar si Realtime + tool calling contra
 // ceria_documentacion_maquina funciona con la latencia que buscamos
 // (ver memorias/16-copiloto-averias.md). Si esto convence, se monta
-// alrededor el resto (esquema de logging, integración en la pestaña
-// Chat vía chat_acceso, pantalla definitiva).
+// alrededor el resto (esquema de logging, pantalla definitiva).
+//
+// Importante: las instrucciones (tono, brevedad, despedida), la voz y
+// la sensibilidad al detectar turnos vienen del backend
+// (obtenerTokenNora(), que llama a supabase/functions/nora) -- este
+// archivo no las construye. Para ajustar cómo se comporta NORA, edita
+// supabase/functions/nora/index.ts y despliega esa función; no hace
+// falta tocar ni volver a publicar la web. Lo único que sí vive aquí
+// es la propia tool (su ejecución real contra Supabase), porque tiene
+// que correr en el navegador.
 //
 // Requiere `npm install @openai/agents zod` en frontend/ (ver nota
 // en la respuesta del chat sobre el nombre exacto del paquete de
@@ -17,34 +25,9 @@
 import { useRef, useState } from "react";
 import { RealtimeAgent, RealtimeSession, tool } from "@openai/agents/realtime";
 import { z } from "zod";
-import { obtenerDocumentacionNora, obtenerTokenNora, INDICE_MAQUINAS } from "../../lib/nora";
+import { obtenerDocumentacionNora, obtenerTokenNora } from "../../lib/nora";
 
 type Estado = "desconectado" | "conectando" | "escuchando" | "error";
-
-const indiceTexto = Object.entries(INDICE_MAQUINAS)
-  .map(([maquina, submaquinas]) => `${maquina}: ${submaquinas.join(", ")}`)
-  .join("\n");
-
-const INSTRUCCIONES = `Eres NORA (Navegación, Orientación y Resolución de Averías), \
-copiloto de voz para un mecánico que está delante de la máquina, con \
-las manos ocupadas. Hablas español, con frases cortas -- esto es una \
-conversación de voz, no un informe escrito.
-
-Máquinas y submáquinas disponibles hoy:
-${indiceTexto}
-
-Cuando el mecánico describa un problema, identifica tú mismo la \
-máquina/submáquina más probable (pregunta UNA cosa corta solo si de \
-verdad no puedes deducirlo) y llama a la herramienta \
-obtener_documentacion con esos datos ANTES de intentar diagnosticar \
-nada -- nunca inventes procedimientos, alarmas o piezas que no estén \
-en lo que te devuelva la herramienta. Puedes llamar a la herramienta \
-varias veces si el problema resulta estar en otra submáquina distinta \
-a la que pensabas al principio, o si hace falta cruzar información de \
-más de una -- no descartes lo ya consultado, sigue teniéndolo en \
-cuenta. Una vez tengas la documentación, guía al mecánico con \
-preguntas cortas, una detrás de otra (estilo socrático), hasta llegar \
-a una causa y una solución concreta.`;
 
 const herramientaDocumentacion = tool({
   name: "obtener_documentacion",
@@ -73,15 +56,34 @@ export function NoraScreen() {
     setError(null);
     setEstado("conectando");
     try {
-      const { clientSecret, modelo } = await obtenerTokenNora();
+      const { clientSecret, modelo, instrucciones, voz } = await obtenerTokenNora();
 
       const agente = new RealtimeAgent({
         name: "NORA",
-        instructions: INSTRUCCIONES,
+        instructions: instrucciones,
         tools: [herramientaDocumentacion],
       });
 
-      const sesion = new RealtimeSession(agente, { model: modelo });
+      const sesion = new RealtimeSession(agente, {
+        model: modelo,
+        config: {
+          audio: {
+            input: {
+              // Coherente con lo que ya se pidió al crear el token en
+              // el backend -- si alguna de las dos capas no lo
+              // reconoce, la sesión sigue funcionando con los valores
+              // por defecto de OpenAI, no rompe la conexión.
+              turnDetection: {
+                type: "semantic_vad",
+                interruptResponse: true,
+                createResponse: true,
+              },
+              transcription: { model: "gpt-4o-mini-transcribe" },
+            },
+            output: { voice: voz },
+          },
+        },
+      });
       await sesion.connect({ apiKey: clientSecret });
 
       sesionRef.current = sesion;
