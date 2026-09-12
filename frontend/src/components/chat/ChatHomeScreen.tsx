@@ -1,5 +1,6 @@
 // frontend/src/components/chat/ChatHomeScreen.tsx
-// Lista maestra de la pestaña "Chat" — sesión 07/09/2026. Muestra
+// Lista maestra de la pestaña "Chat" — sesión 07/09/2026, NORA
+// añadida el 12/09/2026 (ver memorias/16-copiloto-averias.md). Muestra
 // solo los chats a los que el rol del usuario tiene acceso (tabla
 // chat_acceso, editable por el admin), con último mensaje/no-leídas
 // donde aplica. Tocas uno y entras a pantalla completa:
@@ -8,12 +9,15 @@
 //  - 'general': la pantalla de chat humano ya existente, tal cual.
 //  - 'ceria': la pantalla de Ceria ya existente, tal cual (sin
 //    contador de no-leídas — no le pega, solo tú le hablas).
+//  - 'nora': la pantalla de NORA (voz), mismo criterio que Ceria —
+//    sin contador de no-leídas, sin historial en esta lista.
 
 import { useEffect, useState } from "react";
-import { ChevronLeft, Bot } from "lucide-react";
+import { ChevronLeft, Bot, Mic } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { ChatScreen } from "./ChatScreen";
 import { CeriaScreen } from "../ceria/CeriaScreen";
+import { NoraScreen } from "../nora/NoraScreen";
 import {
   ETIQUETA_TIPO,
   listarNotificacionesPorTipo,
@@ -26,7 +30,7 @@ import {
 import { obtenerEstadoGeneral, marcarGeneralLeido, suscribirseAChat } from "../../lib/chat";
 import { listarAccesoPropio, type Rol } from "../../lib/chat-acceso";
 
-type ClaveChat = TipoNotificacion | "general" | "ceria";
+type ClaveChat = TipoNotificacion | "general" | "ceria" | "nora";
 
 interface FilaLista {
   clave: ClaveChat;
@@ -105,6 +109,18 @@ export function ChatHomeScreen() {
         });
       }
 
+      // NORA — mismo criterio que Ceria: fila fija, sin fecha ni
+      // no-leídas (aquí no hay historial que resumir todavía).
+      if (tiposAccesibles.has("nora")) {
+        nuevasFilas.push({
+          clave: "nora",
+          etiqueta: "NORA",
+          subtitulo: "Copiloto de averías por voz",
+          fecha: null,
+          noLeidas: 0,
+        });
+      }
+
       setFilas(nuevasFilas);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo cargar la lista de chats");
@@ -164,7 +180,9 @@ export function ChatHomeScreen() {
       setFilas((prev) => (prev ? prev.map((f) => (f.clave === "general" ? { ...f, noLeidas: 0 } : f)) : prev));
       return;
     }
-    if (clave === "ceria") return;
+    // Ceria y NORA no tienen historial que cargar aquí — cada una
+    // gestiona su propia conversación por dentro.
+    if (clave === "ceria" || clave === "nora") return;
 
     setCargandoCanal(true);
     try {
@@ -187,7 +205,14 @@ export function ChatHomeScreen() {
 
   // --- Vista: conversación abierta ---
   if (abierto) {
-    const etiqueta = abierto === "general" ? "Chat general" : abierto === "ceria" ? "Ceria" : ETIQUETA_TIPO[abierto];
+    const etiqueta =
+      abierto === "general"
+        ? "Chat general"
+        : abierto === "ceria"
+          ? "Ceria"
+          : abierto === "nora"
+            ? "NORA"
+            : ETIQUETA_TIPO[abierto];
 
     return (
       <div className="flex h-[calc(100vh-8rem)] flex-col">
@@ -203,6 +228,8 @@ export function ChatHomeScreen() {
             <ChatScreen />
           ) : abierto === "ceria" ? (
             <CeriaScreen />
+          ) : abierto === "nora" ? (
+            <NoraScreen />
           ) : cargandoCanal ? (
             <p className="p-4 text-center text-sm text-[var(--texto-tenue)]">Cargando...</p>
           ) : mensajesCanal.length === 0 ? (
@@ -257,9 +284,9 @@ export function ChatHomeScreen() {
             className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left hover:bg-[var(--superficie-alt)]"
           >
             <div className="flex min-w-0 items-center gap-3">
-              {f.clave === "ceria" && (
+              {(f.clave === "ceria" || f.clave === "nora") && (
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--acento)] text-[var(--acento-texto)]">
-                  <Bot size={16} aria-hidden />
+                  {f.clave === "ceria" ? <Bot size={16} aria-hidden /> : <Mic size={16} aria-hidden />}
                 </div>
               )}
               <div className="min-w-0">

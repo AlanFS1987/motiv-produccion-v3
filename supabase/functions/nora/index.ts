@@ -42,7 +42,7 @@ const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!;
 // velocidad. Si la calidad razonando el árbol de diagnóstico no
 // convence, probar "gpt-realtime" (más caro) antes de descartar
 // Realtime del todo — cambiar solo esta constante.
-const MODELO_REALTIME = "gpt-realtime-mini";
+const MODELO_REALTIME = "Realtime-2.1 mini";
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
