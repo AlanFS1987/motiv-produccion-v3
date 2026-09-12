@@ -401,3 +401,108 @@ en sesión (sobre todo el Elevador, que no estaba documentado en los
 - **Organización de herramientas de cara a Fase 1**: sin decidir
   entre una herramienta parametrizada (`maquina='BS08'`) válida para
   todas las máquinas, o una herramienta por máquina.
+
+  # Parche para memorias/11-ceria.md — sección "Documentación de máquinas"
+
+Reemplazar el bloque completo de esa sección por lo siguiente
+(actualiza esquema, estado y pendientes; el resto de `11-ceria.md`
+no cambia).
+
+---
+
+## Documentación de máquinas (`ceria_documentacion_maquina`, 10/09/2026 — ampliado 11/09/2026)
+
+Tabla pensada para alimentar la futura tool de documentación/
+diagnóstico de máquinas. Mismo patrón de acceso que `ceria_prompts`:
+RLS activada, `jefe`+`administrador` leen, solo `administrador`
+escribe; sin UI de edición todavía, se rellena por migración a mano.
+
+**Esquema** (tabla larga, no ancha — decisión de diseño explícita
+para poder referenciar un elemento suelto sin traer una fila entera
+con listas dentro):
+
+```
+id uuid PK, clave text unique, maquina text, submaquina text (null),
+tipo text (check: proceso/parametro/sensor/actuador/pieza/alarma/
+mantenimiento/configuracion_inicial/diagnostico), nombre text,
+contenido text, activo boolean, created_at/updated_at
+```
+
+- `submaquina` es `null` para datos que describen la máquina en
+  conjunto (ej. "Máquina → Datos constructivos" del HMI, o los
+  sensores MC/PNP que aplican a toda la BS08), no ligados a un
+  mecanismo concreto.
+- Los datos **constructivos** (fijos de fábrica, no se reajustan por
+  formato) no tienen `tipo` propio — viven dentro de `parametro`,
+  marcados como tales en su propia `contenido`.
+- **Cambio de criterio (11/09/2026)**: las alarmas documentadas
+  directamente por el mecánico en sesión (a diferencia de las que
+  venían solo de los `.md` originales) llevan significado **y**
+  solución en la misma fila `alarma` — ya no se separa "qué es" de
+  "cómo resolver". Esto sustituye, para las alarmas trabajadas así,
+  la idea original de un `diagnostico-sintomas.md`/tabla aparte:
+  ese contenido no llegó a escribirse nunca, y en su lugar se creó
+  el `tipo = 'diagnostico'` (ver abajo) dentro de esta misma tabla.
+  Las alarmas antiguas que aún solo tienen "qué es" (heredadas de
+  los `.md`) se revisarán una a una, según se vaya volviendo a cada
+  submáquina.
+- **Nuevo `tipo = 'diagnostico'` (11/09/2026)**: filas pensadas para
+  que el copiloto entre directamente por la descripción vaga de un
+  síntoma ("divide mal", "se le escapa una pieza"...) sin tener que
+  reconstruir el árbol de preguntas leyendo varias filas de
+  `parametro`/`alarma`. `nombre` = las formas coloquiales del
+  síntoma; `contenido` = el árbol de preguntas → causa, enlazando
+  por nombre a las filas de detalle ya existentes. Primer caso real:
+  `bs08.divisor.diagnostico.divide_mal`.
+- **EDA** se trata como `maquina` independiente de BS08, aunque en la
+  práctica sus parámetros se configuran desde la pantalla física del
+  Griffón (dato a tener en cuenta cuando se documente esa máquina).
+
+**Estado actual**: Escuadrador (14), Elevador (14), Sacabandejas (19),
+Empujador de bandejas (22), Mandril (16), Jaula (20), Cabezales de
+impresión (15) sin cambios desde el 10/09. El **Divisor** se amplió
+mucho el 11/09/2026 (partía de 30 filas) — ahora cubre proceso
+completo (con geometría y sistema de referencia de alturas), árbol
+de diagnóstico paramétrico completo, criterio mecánico-vs-parámetro,
+procedimiento de ajuste desde cero, dinámica (velocidades/tiempos), y
+sus 10 alarmas con solución. Se toma como **caso de referencia** para
+el resto de submáquinas. Recontar filas reales con una query — no se
+lleva la cuenta exacta fila a fila en esta sesión.
+
+Fuente añadida el 11/09: aclaraciones directas del mecánico en una
+sesión larga dedicada solo al Divisor (proceso, mecánica, ajuste,
+dinámica) más una primera tanda de 10 alarmas (de ~100 totales de la
+empaquetadora, organizadas por el mecánico por submáquina, a
+procesar en tandas de 8-10).
+
+### Pendiente (documentación de máquinas)
+
+- **Datos generales de la BS08** (`submaquina = null`): todavía sin
+  trasladar desde `bs08-pantalla-maquina-datos-constructivos.md`
+  (Nom. wrap, tipo de línea anterior, reset de alarmas, etc.) — salvo
+  el dato de sensores MC/PNP, ya añadido el 11/09.
+- **"Regulaciones"** (4 cotas fijas de formato) — sin asignar
+  todavía a qué submáquina pertenecen exactamente.
+- **EDA**: decidido como `maquina` independiente, sin ninguna fila
+  capturada todavía.
+- **Resto de máquinas de la sección** (Griffón/paletizador,
+  Qualitron...): sin empezar.
+- **~90 alarmas restantes de la empaquetadora** (de las ~100 totales,
+  organizadas por el mecánico por submáquina), pendientes de procesar
+  en tandas de 8-10, con resumen de confirmación por tanda.
+- **Divisor — cabos sueltos concretos**:
+  - Alarmas "No calibrado" y "Fuera de posición" tienen texto
+    idéntico en lo entregado; sin confirmar si hay un matiz real.
+  - "Escuadra pila" cuando la pila llega muy torcida y el mecanismo
+    "no tiene fuerza suficiente para moverla" — fallo conocido, sin
+    diagnóstico ni solución cerrada todavía.
+  - Pantalla "Divisor" (formato): confirmados los campos "Altura
+    pila" y "Tolerancia altura pila"; "Altura medida" (lectura en
+    vivo) sigue sin fila propia y el resto de la pantalla sigue sin
+    detallar.
+- **Organización de herramientas de cara a Fase 1**: sin decidir
+  entre una herramienta parametrizada (`maquina='BS08'`) válida para
+  todas las máquinas, o una herramienta por máquina — **posiblemente
+  ya no aplica a Ceria**: ver decisión de separar el copiloto de
+  averías como asistente independiente (nuevo archivo de memoria,
+  número por asignar — pendiente de decidir cuál está libre).
