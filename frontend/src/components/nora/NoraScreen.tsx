@@ -56,7 +56,7 @@ export function NoraScreen() {
     setError(null);
     setEstado("conectando");
     try {
-      const { clientSecret, modelo, instrucciones, voz } = await obtenerTokenNora();
+      const { clientSecret, modelo, instrucciones, audioConfig } = await obtenerTokenNora();
 
       const agente = new RealtimeAgent({
         name: "NORA",
@@ -66,23 +66,12 @@ export function NoraScreen() {
 
       const sesion = new RealtimeSession(agente, {
         model: modelo,
-        config: {
-          audio: {
-            input: {
-              // Coherente con lo que ya se pidió al crear el token en
-              // el backend -- si alguna de las dos capas no lo
-              // reconoce, la sesión sigue funcionando con los valores
-              // por defecto de OpenAI, no rompe la conexión.
-              turnDetection: {
-                type: "semantic_vad",
-                interruptResponse: true,
-                createResponse: true,
-              },
-              transcription: { model: "gpt-4o-mini-transcribe" },
-            },
-            output: { voice: voz },
-          },
-        },
+        // No sabemos ni nos importa qué hay dentro de audioConfig --
+        // viene entero del backend (supabase/functions/nora), que es
+        // donde vive de verdad la configuración de voz, ruido y
+        // sensibilidad al hablar. Cambiar cualquiera de esos valores
+        // no requiere tocar este archivo.
+        config: { audio: audioConfig },
       });
       await sesion.connect({ apiKey: clientSecret });
 

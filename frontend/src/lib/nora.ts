@@ -18,7 +18,7 @@ export interface TokenNora {
   clientSecret: string;
   modelo: string;
   instrucciones: string;
-  voz: string;
+  audioConfig: Record<string, unknown>;
 }
 
 export async function obtenerTokenNora(): Promise<TokenNora> {
@@ -31,7 +31,7 @@ export async function obtenerTokenNora(): Promise<TokenNora> {
     clientSecret: data.client_secret,
     modelo: data.modelo,
     instrucciones: data.instrucciones,
-    voz: data.voz,
+    audioConfig: data.audioConfig,
   };
 }
 

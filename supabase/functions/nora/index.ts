@@ -47,12 +47,73 @@ const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!;
 // solo esta constante.
 const MODELO_REALTIME = "gpt-realtime-2.1-mini";
 
-// Voz de salida. Opciones actuales de OpenAI: alloy, ash, ballad,
-// coral, echo, sage, shimmer, verse, marin, cedar -- marin y cedar
-// son las recomendadas por calidad (pensadas específicamente para
-// Realtime). "marin" = clara y profesional; "cedar" = más cercana y
-// conversacional. Cambiar aquí para probar la otra.
-const VOZ = "marin";
+// Configuración de audio -- ÚNICA fuente de verdad. Se usa dos veces:
+// (1) al crear el token efímero, para que quede fijada desde el
+// primer instante, y (2) se manda tal cual al frontend, que la
+// reenvía a la sesión sin conocer ni repetir ninguno de estos
+// valores -- así, cambiar cualquier cosa de aquí (voz, sensibilidad
+// al ruido, al hablar...) solo requiere tocar este archivo y
+// desplegar la función, nunca el frontend.
+const AUDIO_CONFIG = {
+  input: {
+    // Filtra el ruido de fondo (máquinas de la nave) ANTES de que
+    // llegue al detector de turnos -- sin esto, cualquier ruido
+    // ambiente se puede confundir con "el mecánico ha empezado a
+    // hablar" y corta a NORA a media frase. near_field porque el
+    // móvil está normalmente cerca de la boca (far_field es para
+    // micros de sala o portátil, más alejados).
+    noiseReduction: { type: "near_field" },
+    // semantic_vad: intenta entender si la frase "suena terminada" en
+    // vez de solo medir silencio -- mejor que el clásico server_vad
+    // en una nave con ruido de fondo, donde el silencio puro es un
+    // mal indicador. Si el ruido sigue interrumpiendo con esto,
+    // probar server_vad con threshold 0.7-0.8 en su lugar.
+    turnDetection: {
+      type: "semantic_vad",
+      // "low" = menos impaciente decidiendo que alguien ha
+      // empezado/terminado de hablar.
+      eagerness: "low",
+      // El mecánico puede cortar a NORA a mitad de frase si ya sabe
+      // la respuesta.
+      interruptResponse: true,
+      // Responde sola en cuanto detecta que el turno terminó, sin
+      // que el frontend tenga que pedirlo.
+      createResponse: true,
+    },
+    // Necesario para poder guardar más adelante "qué dijo el
+    // mecánico" en un historial (ver logging pendiente).
+    transcription: { model: "gpt-4o-mini-transcribe" },
+  },
+  output: {
+    // Opciones actuales de OpenAI: alloy, ash, ballad, coral, echo,
+    // sage, shimmer, verse, marin, cedar -- marin y cedar son las
+    // recomendadas por calidad (pensadas específicamente para
+    // Realtime). "marin" = clara y profesional; "cedar" = más cercana
+    // y conversacional.
+    voice: "marin",
+  },
+};
+
+// Convierte claves camelCase a snake_case, recursivamente -- la API
+// REST de OpenAI para crear el token quiere snake_case
+// (noise_reduction, turn_detection...), pero el SDK del frontend
+// quiere camelCase (noiseReduction, turnDetection...). En vez de
+// mantener el mismo objeto escrito dos veces con dos formatos
+// distintos, se escribe una sola vez (arriba, en camelCase, que es lo
+// que de verdad viaja al frontend) y esta función lo adapta solo para
+// la llamada a OpenAI.
+function aSnakeCase(valor: unknown): unknown {
+  if (Array.isArray(valor)) return valor.map(aSnakeCase);
+  if (valor !== null && typeof valor === "object") {
+    return Object.fromEntries(
+      Object.entries(valor as Record<string, unknown>).map(([clave, v]) => [
+        clave.replace(/[A-Z]/g, (letra) => `_${letra.toLowerCase()}`),
+        aSnakeCase(v),
+      ]),
+    );
+  }
+  return valor;
+}
 
 // Índice de máquinas/submáquinas disponible hoy (ver 11-ceria.md,
 // "Documentación de máquinas") -- fijo en código. Cuando se
@@ -77,11 +138,21 @@ function construirInstrucciones(): string {
     .join("\n");
 
   const partes = [
-    "Eres NORA (Navegación, Orientación y Resolución de Averías), copiloto de voz para un mecánico que está delante de la máquina, con las manos ocupadas. Hablas español, con frases cortas -- esto es una conversación de voz, no un informe escrito.",
+    "Eres NORA (Navegación, Orientación y Resolución de Averías), copiloto de voz para un mecánico que está delante de la máquina, con las manos ocupadas. Hablas español, con frases cortas y naturales: esto es una conversación de voz, no un informe escrito.",
     `Máquinas y submáquinas disponibles hoy:\n${indiceTexto}`,
-    "Cuando el mecánico describa un problema, identifica tú mismo la máquina/submáquina más probable (pregunta UNA cosa corta solo si de verdad no puedes deducirlo) y llama a la herramienta obtener_documentacion con esos datos ANTES de intentar diagnosticar nada -- nunca inventes procedimientos, alarmas o piezas que no estén en lo que te devuelva la herramienta. Puedes llamar a la herramienta varias veces si el problema resulta estar en otra submáquina distinta a la que pensabas al principio, o si hace falta cruzar información de más de una -- no descartes lo ya consultado, sigue teniéndolo en cuenta. Una vez tengas la documentación, guía al mecánico con preguntas cortas, una detrás de otra (estilo socrático), hasta llegar a una causa y una solución concreta.",
-    "Sé MUY breve en cada turno -- una o dos frases como mucho, nunca un párrafo largo ni una lista de pasos leída de corrido. Da un solo paso o una sola pregunta cada vez, espera la respuesta del mecánico, y continúa desde ahí. Si la solución tiene varios pasos, dilos de uno en uno, confirmando que ha hecho cada uno antes de pasar al siguiente -- nunca los enumeres todos de golpe.",
-    'En cuanto el mecánico diga que el problema ya está resuelto (o algo equivalente: "ya funciona", "ya está", "solucionado"...), no sigas la conversación ni ofrezcas nada más -- despídete en una frase corta y pídele explícitamente que cuelgue él mismo (tú no puedes colgar la llamada, solo él tiene el botón). Por ejemplo: "Perfecto, me alegro. Puedes colgar cuando quieras." Nunca preguntes "¿algo más en lo que pueda ayudarte?" en ese momento -- la despedida cierra la conversación, no la reabre.',
+    "Cuando el mecánico describa un problema, identifica tú mismo la máquina/submáquina más probable. Pregunta UNA cosa corta solo si realmente no puedes deducirla. La identificación inicial es provisional y puede cambiar durante el diagnóstico.",
+    "Llama a la herramienta obtener_documentacion con la máquina/submáquina identificada ANTES de intentar diagnosticar. No inventes procedimientos, alarmas, piezas, valores ni causas que no estén respaldados por la documentación disponible o por información confirmada durante la conversación.",
+    "Puedes llamar a la herramienta varias veces si el problema resulta estar en otra submáquina distinta a la inicialmente identificada, o si necesitas cruzar información de varias submáquinas. Si cambias de hipótesis, no descartes automáticamente lo consultado anteriormente: conserva y utiliza la información relevante ya obtenida.",
+    "Una vez tengas la documentación necesaria, guía al mecánico mediante preguntas cortas y progresivas, una detrás de otra, siguiendo un razonamiento socrático. Prioriza las preguntas que permitan diferenciar entre varias causas posibles.",
+    "No intentes adivinar la solución demasiado pronto. Primero recopila la evidencia necesaria. Distingue internamente entre hechos confirmados, hipótesis y comprobaciones pendientes -- esta distinción es para tu propio razonamiento, no la verbalices ante el mecánico (nunca digas cosas como \"esto es una hipótesis\" o \"esto es un hecho confirmado\"): simplemente pregunta o actúa en consecuencia.",
+    "No repitas preguntas que el mecánico ya haya respondido ni comprobaciones que ya haya confirmado, salvo que exista una razón técnica para repetirlas.",
+    "Sé MUY breve en cada turno: una o dos frases como mucho. Nunca produzcas un párrafo largo ni una lista de pasos leída de corrido.",
+    "Da un solo paso o una sola pregunta cada vez y espera la respuesta del mecánico antes de continuar.",
+    "Si una comprobación física es necesaria, indica exactamente qué debe comprobarse, pero de forma breve. No des varias comprobaciones a la vez.",
+    "Si la solución tiene varios pasos, indícalos de uno en uno, confirmando que el mecánico ha realizado cada paso antes de pasar al siguiente. Nunca enumeres todos los pasos de una reparación de golpe.",
+    "Si la información disponible no permite establecer una causa con suficiente evidencia, dilo claramente y solicita la comprobación o el dato que falta. Nunca inventes una respuesta para cerrar el diagnóstico.",
+    "Cuando exista evidencia suficiente, proporciona una causa probable y una acción concreta para resolver la avería.",
+    'En cuanto el mecánico diga que el problema ya está resuelto (o algo equivalente: "ya funciona", "ya está", "solucionado"...), no sigas la conversación ni ofrezcas nada más. Despídete en una frase corta y pídele explícitamente que cuelgue él mismo. Tú no puedes colgar la llamada; solo el mecánico tiene el botón. Por ejemplo: "Perfecto, me alegro. Puedes colgar cuando quieras." Nunca preguntes "¿algo más en lo que pueda ayudarte?" en ese momento. La despedida cierra la conversación, no la reabre.',
   ];
 
   return partes.join("\n\n");
@@ -150,27 +221,7 @@ async function mintToken(): Promise<Response> {
           type: "realtime",
           model: MODELO_REALTIME,
           instructions: construirInstrucciones(),
-          audio: {
-            input: {
-              // semantic_vad: intenta entender si la frase "suena
-              // terminada" en vez de solo medir silencio -- mejor que
-              // el clásico server_vad en una nave con ruido de fondo,
-              // donde el silencio puro es un mal indicador.
-              turn_detection: {
-                type: "semantic_vad",
-                // El mecánico puede cortar a NORA a mitad de frase si
-                // ya sabe la respuesta.
-                interrupt_response: true,
-                // Responde sola en cuanto detecta que el turno
-                // terminó, sin que el frontend tenga que pedirlo.
-                create_response: true,
-              },
-              // Necesario para poder guardar más adelante "qué dijo
-              // el mecánico" en un historial (ver logging pendiente).
-              transcription: { model: "gpt-4o-mini-transcribe" },
-            },
-            output: { voice: VOZ },
-          },
+          audio: aSnakeCase(AUDIO_CONFIG),
         },
         // TTL corto — solo lo justo para que el navegador abra la
         // conexión WebRTC nada más recibirlo. Según la documentación
@@ -211,7 +262,7 @@ async function mintToken(): Promise<Response> {
     client_secret: clientSecret,
     modelo: MODELO_REALTIME,
     instrucciones: construirInstrucciones(),
-    voz: VOZ,
+    audioConfig: AUDIO_CONFIG,
   });
 }
 
