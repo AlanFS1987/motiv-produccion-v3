@@ -144,7 +144,9 @@ function construirInstrucciones(): string {
     "Llama a la herramienta obtener_documentacion con la máquina/submáquina identificada ANTES de intentar diagnosticar. No inventes procedimientos, alarmas, piezas, valores ni causas que no estén respaldados por la documentación disponible o por información confirmada durante la conversación.",
     "Puedes llamar a la herramienta varias veces si el problema resulta estar en otra submáquina distinta a la inicialmente identificada, o si necesitas cruzar información de varias submáquinas. Si cambias de hipótesis, no descartes automáticamente lo consultado anteriormente: conserva y utiliza la información relevante ya obtenida.",
     "Una vez tengas la documentación necesaria, guía al mecánico mediante preguntas cortas y progresivas, una detrás de otra, siguiendo un razonamiento socrático. Prioriza las preguntas que permitan diferenciar entre varias causas posibles.",
-    "No intentes adivinar la solución demasiado pronto. Primero recopila la evidencia necesaria. Distingue internamente entre hechos confirmados, hipótesis y comprobaciones pendientes -- esta distinción es para tu propio razonamiento, no la verbalices ante el mecánico (nunca digas cosas como \"esto es una hipótesis\" o \"esto es un hecho confirmado\"): simplemente pregunta o actúa en consecuencia.",
+    "Recomienda siempre antes de cambiar un parametro, la revision mecanica del estado de la maquina si la tienes documentada",
+    "Si para el síntoma descrito ya existe una acción provisional segura y documentada que permita al usuario seguir trabajando sin conocer aún la causa exacta (por ejemplo, un ajuste sin riesgo que la propia documentación indique que no tiene tope y que solo requiere avisar a mantenimiento a partir de cierto punto), ofrécela cuanto antes (si soluciona el problema, no hace falta seguir haciendo mas preguntas) -- en cuanto identifiques el síntoma, sin esperar a que el mecánico la pida explícitamente ni a completar el resto del diagnóstico. Dila explícitamente como lo que es: un remedio temporal para seguir produciendo, no la reparación de fondo, y menciona cuándo o por qué habría que avisar a un mecánico para revisarlo con calma. Después de ofrecerla, si el mecánico quiere seguir profundizando en la causa real, continúa el razonamiento socrático con normalidad; si no, puedes terminar ahí.",
+    'No intentes adivinar la solución demasiado pronto. Primero recopila la evidencia necesaria. Distingue internamente entre hechos confirmados, hipótesis y comprobaciones pendientes -- esta distinción es para tu propio razonamiento, no la verbalices ante el mecánico (nunca digas cosas como "esto es una hipótesis" o "esto es un hecho confirmado"): simplemente pregunta o actúa en consecuencia. Esto no se aplica a la acción provisional segura mencionada arriba: esa sí puedes ofrecerla de inmediato, aunque la causa exacta todavía no esté confirmada.',
     "No repitas preguntas que el mecánico ya haya respondido ni comprobaciones que ya haya confirmado, salvo que exista una razón técnica para repetirlas.",
     "Sé MUY breve en cada turno: una o dos frases como mucho. Nunca produzcas un párrafo largo ni una lista de pasos leída de corrido.",
     "Da un solo paso o una sola pregunta cada vez y espera la respuesta del mecánico antes de continuar.",
@@ -265,7 +267,28 @@ async function mintToken(): Promise<Response> {
     audioConfig: AUDIO_CONFIG,
   });
 }
+// Orden lógico de lectura para el modelo -- no alfabético. Primero
+// cómo funciona la máquina (proceso, piezas, sensores, actuadores),
+// luego los ajustes (parámetro), y al final lo que se apoya en todo
+// lo anterior para diagnosticar (diagnóstico, alarma, mantenimiento).
+// Cualquier tipo que no esté en esta lista (por si se amplía el check
+// constraint de la tabla) se añade al final, sin romper nada.
+const ORDEN_TIPO = [
+  "proceso",
+  "pieza",
+  "sensor",
+  "actuador",
+  "configuracion_inicial",
+  "parametro",
+  "diagnostico",
+  "alarma",
+  "mantenimiento",
+];
 
+function posicionTipo(tipo: string): number {
+  const i = ORDEN_TIPO.indexOf(tipo);
+  return i === -1 ? ORDEN_TIPO.length : i;
+}
 // ══════════════════════════ accion: documentacion ═══════════════════
 async function obtenerDocumentacion(
   // deno-lint-ignore no-explicit-any
@@ -305,10 +328,14 @@ async function obtenerDocumentacion(
     porTipo.set(fila.tipo, lista);
   }
 
+  const tiposOrdenados = [...porTipo.keys()].sort(
+    (a, b) => posicionTipo(a) - posicionTipo(b),
+  );
+
   const bloques: string[] = [];
-  for (const [tipo, filas] of porTipo) {
+  for (const tipo of tiposOrdenados) {
     bloques.push(`## ${tipo.toUpperCase()}`);
-    for (const f of filas) {
+    for (const f of porTipo.get(tipo)!) {
       bloques.push(`### ${f.nombre}\n${f.contenido}`);
     }
   }

@@ -44,7 +44,7 @@ export interface Podio {
  * archivo. Una sola consulta por carga de podio (~30 usuarios como
  * mucho), no una por operario.
  */
-async function obtenerAvataresActivos(): Promise<Map<string, string>> {
+export async function obtenerAvataresActivos(): Promise<Map<string, string>> {
   const { data, error } = await supabase.from("v_avatar_activo_operario").select("usuario_id, imagen_url");
   if (error) throw new Error(error.message);
   return new Map((data ?? []).map((f: any) => [f.usuario_id as string, f.imagen_url as string]));
