@@ -31,6 +31,16 @@ propias pestañas de gestión.
   igual que ya hacía el propio responsable al corregirse a sí mismo.
   Tono y calibre son editables al corregir (campos con
   `esTonoCalibreValido`, corregido 21/08/2026 para admin y responsable).
+
+  Como este panel comparte formulario con el responsable, hereda las
+  dos validaciones bloqueantes de `validarParte` (`piezas_entradas` y
+  `minutos_total` no pueden ser 0) — el botón normal "Guardar
+  corrección" no permite dejar un parte a cero. Para corregir un parte
+  que se cerró por error con producción real cuando en realidad no
+  hubo ninguna, hay un botón aparte, **"Corregir a sin producción
+  (todo a 0)"**, que pide confirmación y salta esas dos validaciones
+  solo en modo corrección — sigue siendo un INSERT vía `corregirParte`
+  (`corrige_a_parte_id`), nunca una edición del parte original.
 - **Añadir parte a un turno ya cerrado**
   (`admin/AdminNuevoParteScreen.tsx`) — pestaña "Añadir parte".
   Complementa a la anterior: esa permite EDITAR partes que ya

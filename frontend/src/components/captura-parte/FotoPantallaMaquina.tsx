@@ -202,8 +202,9 @@ export function FotoPantallaMaquina(props: FotoPantallaMaquinaProps) {
     });
   }, [datos]);
 
-  async function guardar() {
-    if (!datos || !validacion?.puedeGuardar) return;
+  async function guardar(forzarSinProduccion = false) {
+    if (!datos) return;
+    if (!forzarSinProduccion && !validacion?.puedeGuardar) return;
     setFase("guardando");
     setErrorGuardado(null);
     try {
@@ -220,34 +221,35 @@ export function FotoPantallaMaquina(props: FotoPantallaMaquinaProps) {
           calibreStdPct: null,
         });
       } else {
+        const cero = forzarSinProduccion;
         await corregirParte(props.parteOriginalId, props.contexto, {
           tono: tonoEditado,
           calibre: calibreEditado || null,
           verificacionCajaEstado: props.valoresIniciales.verificacionCajaEstado,
-          piezas1a: datos.piezas_1a,
-          piezasComercial: datos.piezas_comercial,
-          piezasEco: datos.piezas_eco,
-          piezasDescuadreCom: datos.piezas_descuadre_com,
-          piezasPlanarCom: datos.piezas_planar_com,
-          piezasContenedor: datos.piezas_contenedor,
-          piezasEntradas: datos.piezas_entradas,
-          cal1: datos.cal_1,
-          cal2: datos.cal_2,
-          cal3: datos.cal_3,
-          cal4: datos.cal_4,
-          cal5: datos.cal_5,
-          cal6: datos.cal_6,
-          cal7: datos.cal_7,
-          cal8: datos.cal_8,
-          minutosTotal: datos.minutos_total,
-          minutosPlena: datos.minutos_plena,
-          minutosNoAlimentada: datos.minutos_no_alimentada,
-          minutosSaturacion: datos.minutos_saturacion,
-          minutosBanco: datos.minutos_banco,
-          minutosMaquina: datos.minutos_maquina,
+          piezas1a: cero ? 0 : datos.piezas_1a,
+          piezasComercial: cero ? 0 : datos.piezas_comercial,
+          piezasEco: cero ? 0 : datos.piezas_eco,
+          piezasDescuadreCom: cero ? 0 : datos.piezas_descuadre_com,
+          piezasPlanarCom: cero ? 0 : datos.piezas_planar_com,
+          piezasContenedor: cero ? 0 : datos.piezas_contenedor,
+          piezasEntradas: cero ? 0 : datos.piezas_entradas,
+          cal1: cero ? 0 : datos.cal_1,
+          cal2: cero ? 0 : datos.cal_2,
+          cal3: cero ? 0 : datos.cal_3,
+          cal4: cero ? 0 : datos.cal_4,
+          cal5: cero ? 0 : datos.cal_5,
+          cal6: cero ? 0 : datos.cal_6,
+          cal7: cero ? 0 : datos.cal_7,
+          cal8: cero ? 0 : datos.cal_8,
+          minutosTotal: cero ? 0 : datos.minutos_total,
+          minutosPlena: cero ? 0 : datos.minutos_plena,
+          minutosNoAlimentada: cero ? 0 : datos.minutos_no_alimentada,
+          minutosSaturacion: cero ? 0 : datos.minutos_saturacion,
+          minutosBanco: cero ? 0 : datos.minutos_banco,
+          minutosMaquina: cero ? 0 : datos.minutos_maquina,
           horaCapturaPantallaIso,
           horaCapturaPantallaTextoCrudo: horaTextoCrudo,
-          calibreComPct,
+          calibreComPct: cero ? null : calibreComPct,
         });
       }
 
@@ -400,12 +402,28 @@ export function FotoPantallaMaquina(props: FotoPantallaMaquinaProps) {
       <button
         type="button"
         disabled={!validacion.puedeGuardar || fase === "guardando" || (esCorreccion && !esTonoCalibreValido(tonoEditado))}
-        onClick={guardar}
+        onClick={() => guardar(false)}
         className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-4 text-base font-medium text-white disabled:opacity-40"
       >
         <Save size={20} aria-hidden />
         {fase === "guardando" ? "Guardando..." : esCorreccion ? "Guardar corrección" : "Guardar parte"}
       </button>
+
+      {esCorreccion && (
+        <button
+          type="button"
+          disabled={fase === "guardando" || !esTonoCalibreValido(tonoEditado)}
+          onClick={() => {
+            if (window.confirm("¿Seguro que este parte no tuvo producción real? Se sustituirá por un parte corregido con piezas y minutos a 0.")) {
+              guardar(true);
+            }
+          }}
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-red-300 px-4 py-3 text-sm font-medium text-red-700 disabled:opacity-40"
+        >
+          <AlertTriangle size={16} aria-hidden />
+          Corregir a sin producción (todo a 0)
+        </button>
+      )}
 
       <button type="button" onClick={props.onCancelar} className="mt-3 w-full text-center text-sm text-slate-400 underline">
         Cancelar

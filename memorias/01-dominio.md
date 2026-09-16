@@ -161,6 +161,20 @@ partes que se creen a partir de ese momento.
    `completado_at` (política RLS); después, solo el administrador,
    sin límite de tiempo (pantalla y permisos en `09`).
 
+   El formulario de corrección (`FotoPantallaMaquina` modo
+   `"corregir"`) aplica las mismas dos reglas bloqueantes que la
+   captura inicial (`piezas_entradas > 0`, `minutos_total > 0`) — por
+   eso no se puede guardar una corrección con todo a 0 usando el botón
+   normal "Guardar corrección". Para el caso real "este parte no debió
+   tener producción, hay que corregirlo a cero" existe un botón
+   separado, **"Corregir a sin producción (todo a 0)"**, visible solo
+   en modo corrección: pide confirmación explícita y salta esas dos
+   validaciones, pero sigue insertando la corrección igual que
+   siempre (`corrige_a_parte_id`, nunca un UPDATE). No aplica a la
+   captura inicial (`modo="completar"`): un parte pendiente sin
+   producción real se cierra con **Cerrar sin producción** (punto 3),
+   no con este botón.
+
 ## Validaciones antes de completar un parte (cliente)
 
 - Bloqueante: `piezas_entradas > 0` y
