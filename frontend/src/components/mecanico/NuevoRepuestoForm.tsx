@@ -14,6 +14,7 @@ import {
   listarCategorias,
   listarProveedores,
   crearProveedor,
+  crearCategoria,
   crearRepuesto,
   type AlmacenCategoria,
   type AlmacenProveedor,
@@ -49,6 +50,9 @@ export function NuevoRepuestoForm({ onCreado, onCancelar }: NuevoRepuestoFormPro
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
+  const [nuevaMaquina, setNuevaMaquina] = useState("");
+  const [nuevaSubmaquina, setNuevaSubmaquina] = useState("");
+  const [nuevaCategoriaNombre, setNuevaCategoriaNombre] = useState("");
   const [foto, setFoto] = useState<FotoSubida[]>([]);
   const [referencias, setReferencias] = useState<FilaReferencia[]>([nuevaFila()]);
 
@@ -75,13 +79,21 @@ export function NuevoRepuestoForm({ onCreado, onCancelar }: NuevoRepuestoFormPro
     setReferencias((prev) => prev.filter((f) => f.clave !== clave));
   }
 
-  const valido = nombre.trim() !== "" && categoriaId !== "";
+  const categoriaNuevaValida = categoriaId !== "__nueva__" || (nuevaMaquina.trim() !== "" && nuevaCategoriaNombre.trim() !== "");
+  const valido = nombre.trim() !== "" && categoriaId !== "" && categoriaNuevaValida;
 
   async function guardar() {
     if (!valido || !usuario) return;
     setGuardando(true);
     setError(null);
     try {
+      // Resolver categoría nueva antes de crear el repuesto, igual
+      // que ya se hace con proveedores nuevos más abajo.
+      let categoriaFinal = categoriaId;
+      if (categoriaId === "__nueva__") {
+        categoriaFinal = await crearCategoria(nuevaMaquina, nuevaSubmaquina.trim() || null, nuevaCategoriaNombre);
+      }
+
       // Resolver proveedores nuevos antes de crear el repuesto —
       // cada fila "__nuevo__" con nombre se crea primero y se
       // sustituye por su id real.
@@ -98,7 +110,7 @@ export function NuevoRepuestoForm({ onCreado, onCancelar }: NuevoRepuestoFormPro
       const id = await crearRepuesto({
         nombre,
         descripcion: descripcion.trim() || null,
-        categoriaId,
+        categoriaId: categoriaFinal,
         imagenUrl: foto[0]?.url ?? null,
         createdBy: usuario.id,
         referencias: referenciasResueltas,
@@ -153,8 +165,33 @@ export function NuevoRepuestoForm({ onCreado, onCancelar }: NuevoRepuestoFormPro
               {c.clave === "por_catalogar" ? "Por catalogar" : `${c.maquina} — ${c.nombre}`}
             </option>
           ))}
+          <option value="__nueva__">+ Categoría nueva</option>
         </select>
-        <p className="mt-1 text-xs text-slate-400">Si no sabes dónde encaja, déjalo en "Por catalogar" — se puede cambiar después.</p>
+
+        {categoriaId === "__nueva__" ? (
+          <div className="mt-2 space-y-1.5 rounded-lg border border-slate-200 p-2">
+            <input
+              value={nuevaMaquina}
+              onChange={(e) => setNuevaMaquina(e.target.value)}
+              placeholder="Máquina (ej. BS08)"
+              className="w-full rounded border border-slate-300 p-1.5 text-xs"
+            />
+            <input
+              value={nuevaSubmaquina}
+              onChange={(e) => setNuevaSubmaquina(e.target.value)}
+              placeholder="Submáquina (opcional)"
+              className="w-full rounded border border-slate-300 p-1.5 text-xs"
+            />
+            <input
+              value={nuevaCategoriaNombre}
+              onChange={(e) => setNuevaCategoriaNombre(e.target.value)}
+              placeholder="Nombre de la categoría (ej. Divisor)"
+              className="w-full rounded border border-slate-300 p-1.5 text-xs"
+            />
+          </div>
+        ) : (
+          <p className="mt-1 text-xs text-slate-400">Si no sabes dónde encaja, déjalo en "Por catalogar" — se puede cambiar después.</p>
+        )}
       </div>
 
       <div>

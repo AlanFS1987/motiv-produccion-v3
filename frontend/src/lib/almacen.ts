@@ -225,3 +225,32 @@ export async function registrarMovimiento(
   });
   if (error) throw new Error(`No se pudo registrar el movimiento: ${error.message}`);
 }
+function slug(texto: string): string {
+  return texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+/**
+ * Crea una categoría (máquina/submáquina) del árbol al vuelo, desde
+ * el formulario de alta de repuesto. `clave` se genera sola (slug +
+ * sufijo aleatorio para garantizar unicidad sin tener que consultar
+ * antes) — no la escribe el mecánico, no hace falta que siga el
+ * patrón punteado de Ceria al pie de la letra, solo ser única.
+ */
+export async function crearCategoria(maquina: string, submaquina: string | null, nombre: string): Promise<string> {
+  const sufijo = Math.random().toString(36).slice(2, 6);
+  const clave = [slug(maquina), submaquina ? slug(submaquina) : null, sufijo].filter(Boolean).join(".");
+
+  const { data, error } = await supabase
+    .from("almacen_categoria")
+    .insert({ clave, maquina: maquina.trim(), submaquina: submaquina?.trim() || null, nombre: nombre.trim(), orden: 0 })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(`No se pudo crear la categoría: ${error.message}`);
+  return data.id as string;
+}
