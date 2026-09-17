@@ -10,6 +10,7 @@ import { cerrarSesion } from "../../lib/auth";
 import { ThemeSwitcher } from "../ThemeSwitcher";
 import { NotificacionesBell } from "../notificaciones/NotificacionesBell";
 import { IncidenciasScreen } from "./IncidenciasScreen";
+import { EngraseScreen } from "./EngraseScreen";
 
 type PestanaMecanico = "incidencias" | "almacen" | "engrase" | "unidades";
 
@@ -91,7 +92,7 @@ export function MecanicoApp({ username }: { username: string }) {
       <main className="mx-auto max-w-6xl p-4">
         {pestana === "incidencias" && <IncidenciasScreen />}
         {pestana === "almacen" && <Proximamente nombre="Almacén" />}
-        {pestana === "engrase" && <Proximamente nombre="Engrase" />}
+        {pestana === "engrase" && <EngraseScreen />}
         {pestana === "unidades" && <Proximamente nombre="Unidades" />}
       </main>
     </div>
