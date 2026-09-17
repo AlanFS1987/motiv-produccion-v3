@@ -93,7 +93,6 @@ export async function responderIncidencia(
     .eq("id", incidenciaId);
 
   // Si la incidencia ya estaba contestada, la política RLS bloquea el
-  // UPDATE (0 filas afectadas) y Supabase no lo trata como error — no
   // hace falta comprobarlo aparte, la fila simplemente no cambia.
   if (error) throw new Error(`No se pudo guardar la respuesta: ${error.message}`);
 }
