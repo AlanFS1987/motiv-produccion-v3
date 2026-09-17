@@ -24,8 +24,9 @@ import { PruebaCamaraScreen } from "./PruebaCamaraScreen";
 import { CierreFabricaScreen } from "./CierreFabricaScreen";
 import { ChecklistScreen } from "./ChecklistScreen";
 import { GamificacionScreen } from "./GamificacionScreen";
+import { PuntosEngraseScreen } from "./PuntosEngraseScreen";
 
-type PestanaAdmin = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "ceria" | "rotacion" | "partes" | "nuevo-parte" | "prueba-camara" | "cierre-fabrica" | "checklist" | "gamificacion" | "gestion-usuarios" | "chat" | "accesos";
+type PestanaAdmin = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "ceria" | "rotacion" | "partes" | "nuevo-parte" | "prueba-camara" | "cierre-fabrica" | "checklist" | "gamificacion" | "gestion-usuarios" | "chat" | "accesos" | "engrase";
 function BotonPestana({
   activa,
   onClick,
@@ -118,6 +119,9 @@ export function AdminApp({ username }: { username: string }) {
           <BotonPestana activa={pestana === "accesos"} onClick={() => setPestana("accesos")}>
             Accesos
           </BotonPestana>
+          <BotonPestana activa={pestana === "engrase"} onClick={() => setPestana("engrase")}>
+            Engrase
+          </BotonPestana>
         </div>
       </div>
 
@@ -137,6 +141,7 @@ export function AdminApp({ username }: { username: string }) {
         {pestana === "gamificacion" && <GamificacionScreen />}
         {pestana === "gestion-usuarios" && <GestionUsuariosScreen />}
         {pestana === "accesos" && <ChatAccesoScreen />}
+        {pestana === "engrase" && <PuntosEngraseScreen />}
       </div>
     </div>
   );

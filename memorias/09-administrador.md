@@ -143,3 +143,11 @@ propias pestañas de gestión.
   `admin-usuarios.ts`) — en la misma pantalla de Rotación, además de
   la letra, se puede cambiar el rol de cualquier usuario entre
   responsable/suplente/operario/jefe/producción/calidad.
+  - **Puntos de engrase** (`admin/PuntosEngraseScreen.tsx`, `lib/admin-engrase.ts`)
+  — alta/edición/baja lógica de los puntos de la checklist que usa el
+  rol mecánico (`10-rol-mecanico-frontend.md`). Guardado inmediato por
+  fila (`onBlur`), mismo patrón que `AjustarLetrasScreen.tsx`. Baja
+  lógica (`activo`), nunca `DELETE`: un punto desactivado no rompe los
+  partes de engrase antiguos que ya lo tenían marcado. Sin migración
+  nueva — la política `engrase_punto_admin_todo` (`for all`, solo
+  admin) ya lo permitía desde que se creó la tabla.

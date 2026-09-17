@@ -14,7 +14,8 @@ import { AdminApp } from "./components/admin/AdminApp";
 import { MecanicoApp } from "./components/mecanico/MecanicoApp";
 import { PantallaCarrusel } from "./components/pantalla/PantallaCarrusel";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
-import { NotificacionesBell } from "./components/notificaciones/NotificacionesBell"
+import { NotificacionesBell } from "./components/notificaciones/NotificacionesBell";
+import { RecargarAppBoton } from "./components/RecargarAppBoton";
 import { RolSinInterfaz } from "./components/RolSinInterfaz";
 import { HistorialResponsableScreen } from "./components/responsable/HistorialResponsableScreen";
 import { RelevoScreen } from "./components/responsable/RelevoScreen";
@@ -110,6 +111,7 @@ function AppAutenticada({ username }: { username: string }) {
           <div className="flex items-center gap-3">
             <ThemeSwitcher />
             <NotificacionesBell />
+            <RecargarAppBoton />
             <button
               onClick={() => cerrarSesion()}
               className="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-[var(--texto-secundario)] hover:bg-[var(--superficie-alt)]"
