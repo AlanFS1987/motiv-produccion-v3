@@ -15,6 +15,7 @@ import {
   type RepuestoFicha,
 } from "../../lib/almacen";
 import { NuevoRepuestoForm } from "./NuevoRepuestoForm";
+import { MovimientoRepuestoForm } from "./MovimientoRepuestoForm";
 
 const NOMBRE_TIPO_MOVIMIENTO: Record<string, string> = {
   entrada: "Entrada",
@@ -37,15 +38,18 @@ function FichaRepuesto({ repuestoId, onVolver }: { repuestoId: string; onVolver:
   const [ficha, setFicha] = useState<RepuestoFicha | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mostrandoMovimiento, setMostrandoMovimiento] = useState(false);
 
-  useEffect(() => {
+  function cargar() {
     setCargando(true);
     setError(null);
     obtenerFichaRepuesto(repuestoId)
       .then(setFicha)
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setCargando(false));
-  }, [repuestoId]);
+  }
+
+  useEffect(cargar, [repuestoId]);
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -67,8 +71,28 @@ function FichaRepuesto({ repuestoId, onVolver }: { repuestoId: string; onVolver:
                 <BadgeStock stock={ficha.stock} />
               </div>
               {ficha.descripcion && <p className="text-sm text-slate-500">{ficha.descripcion}</p>}
+              {!mostrandoMovimiento && (
+                <button
+                  type="button"
+                  onClick={() => setMostrandoMovimiento(true)}
+                  className="mt-2 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700"
+                >
+                  Registrar movimiento
+                </button>
+              )}
             </div>
           </div>
+
+          {mostrandoMovimiento && (
+            <MovimientoRepuestoForm
+              repuestoId={repuestoId}
+              onGuardado={() => {
+                setMostrandoMovimiento(false);
+                cargar();
+              }}
+              onCancelar={() => setMostrandoMovimiento(false)}
+            />
+          )}
 
           <section>
             <h4 className="mb-2 text-sm font-semibold text-[var(--texto)]">Referencias</h4>

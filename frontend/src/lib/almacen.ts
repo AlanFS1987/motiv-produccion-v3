@@ -12,6 +12,7 @@
 
 import { supabase } from "./supabase-client";
 
+
 export interface AlmacenCategoria {
   id: string;
   clave: string;
@@ -207,4 +208,20 @@ export async function crearRepuesto(datos: {
   }
 
   return repuesto.id as string;
+}
+export async function registrarMovimiento(
+  repuestoId: string,
+  tipo: "salida" | "ajuste",
+  cantidad: number, // ya con el signo correcto, resuelto por el formulario
+  mecanicoId: string,
+  nota: string | null,
+): Promise<void> {
+  const { error } = await supabase.from("almacen_movimiento").insert({
+    repuesto_id: repuestoId,
+    tipo,
+    cantidad,
+    mecanico_id: mecanicoId,
+    nota,
+  });
+  if (error) throw new Error(`No se pudo registrar el movimiento: ${error.message}`);
 }
