@@ -11,6 +11,7 @@ import { ThemeSwitcher } from "../ThemeSwitcher";
 import { NotificacionesBell } from "../notificaciones/NotificacionesBell";
 import { IncidenciasScreen } from "./IncidenciasScreen";
 import { EngraseScreen } from "./EngraseScreen";
+import { AlmacenScreen } from "./AlmacenScreen";
 
 type PestanaMecanico = "incidencias" | "almacen" | "engrase" | "unidades";
 

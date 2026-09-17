@@ -16,7 +16,8 @@ export type CategoriaCloudinary =
   | "incidencias-produccion"
   | "limpieza"
   | "personajes"
-  | "chat";
+  | "chat"
+  | "almacen-repuestos";
 
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined;
 
@@ -30,6 +31,7 @@ const PRESETS: Record<CategoriaCloudinary, string | undefined> = {
   "limpieza": import.meta.env.VITE_CLOUDINARY_PRESET_LIMPIEZA as string | undefined,
   "personajes": import.meta.env.VITE_CLOUDINARY_PRESET_PERSONAJES as string | undefined,
   "chat": import.meta.env.VITE_CLOUDINARY_PRESET_CHAT as string | undefined,
+  "almacen-repuestos": import.meta.env.VITE_CLOUDINARY_PRESET_ALMACEN_REPUESTOS as string | undefined,
 };
 
 export interface ResultadoSubidaCloudinary {
