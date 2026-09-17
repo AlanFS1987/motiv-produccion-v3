@@ -393,3 +393,140 @@ descartado — el real es con login (`10`). La migración no se edita.
   historia del vaivén de `fn_notificar_telegram`, pantallas).
 - `11-ceria.md` — `ceria_modelo_activo` y `fn_chat_acceso` aplicado a
   `tipo_chat='ceria'`.
+
+## Rol mecánico (sesión 16/09/2026)
+
+`rol_usuario` gana el valor `mecanico` (migración propia, `alter type
+... add value`, separada de las políticas que lo usan — mismo cuidado
+que con `jefe_rectificado`).
+
+### Tablas
+
+**incidencia_produccion** — ampliada con respuesta del mecánico:
+`respuesta_texto`, `respuesta_fotos text[]`, `respuesta_sin_intervencion
+boolean default false`, `respuesta_mecanico_id → usuario`,
+`respuesta_fecha`. `estado` es columna **generada**
+(`generated always as ... stored`, `'pendiente'`/`'contestada'` según
+`respuesta_fecha`) — nunca editable a mano. Sin tabla de respuesta
+aparte: es 1:1 y sin reapertura (la propia RLS de UPDATE lo impide,
+ver tabla de políticas).
+
+**almacen_categoria** — árbol máquina/submáquina para el almacén de
+repuestos: `clave` (única, patrón punteado tipo
+`ceria_documentacion_maquina`), `maquina`, `submaquina`, `nombre`,
+`orden`. Fila sembrada `clave = 'por_catalogar'` como categoría
+comodín — nunca un estado especial ni un campo nulo en `almacen_repuesto`.
+
+**almacen_proveedor** — proveedores de repuestos: `nombre` (único),
+`contacto`.
+
+**almacen_repuesto** — `categoria_id → almacen_categoria` (**not
+null**, siempre), `nombre`, `descripcion`, `imagen_url`, `created_by`.
+Sin columna de stock — se lee de `v_almacen_stock`.
+
+**almacen_repuesto_referencia** — una fila por proveedor/fabricante
+que vende el repuesto con su propio código: `repuesto_id`,
+`proveedor_id`, `codigo`. Hace también de relación repuesto↔proveedor
+(no hay tabla ni columna separada para "proveedor(es) del repuesto").
+
+**almacen_movimiento** — histórico de stock, nunca se pisa un número:
+`repuesto_id`, `tipo` (`entrada`/`salida`/`ajuste`), `cantidad`
+(entero con signo, `check (cantidad <> 0)`), `fecha`, `mecanico_id`,
+`pedido_linea_id` (nullable, FK a `almacen_pedido_linea` — añadida
+después de crear esa tabla por dependencia circular en la migración),
+`nota`. Índice único parcial
+`almacen_movimiento_pedido_linea_unico` sobre `pedido_linea_id where
+not null`: garantiza en esquema que la recepción de una línea de
+pedido nunca duplica el movimiento de entrada.
+
+**almacen_pedido** — cabecera: `proveedor_id`, `fecha`, `created_by`.
+Sin columna de estado — se deriva en `v_almacen_pedido_estado`.
+
+**almacen_pedido_linea** — `pedido_id`, `repuesto_id`,
+`cantidad_pedida` (`check > 0`), `recibido boolean default false`,
+`fecha_recepcion`. Trigger `trg_almacen_pedido_linea_recibida`
+(`before update`, ver Funciones) genera el movimiento de entrada
+automáticamente al marcar `recibido = true`.
+
+**engrase_punto** — lista editable (solo admin) de puntos a
+engrasar/revisar, **la misma para todas las líneas**: `nombre`,
+`orden`, `activo` (baja lógica — nunca se borra de verdad para no
+romper `engrase_parte` históricos que lo referencian).
+
+**engrase_parte** — un "parte" de revisión, mismo espíritu que `parte`
+de producción: `linea_id`, `fecha`, `mecanico_id` (not null).
+
+**engrase_parte_punto** — qué puntos se marcaron en ese parte:
+`(parte_id, punto_id)` como PK compuesta. Marcado parcial = solo se
+insertan filas de los puntos hechos; no hay columna `marcado boolean`
+por punto.
+
+**unidad_intercambiable** — piezas concretas e identificables (no
+fungibles como el almacén de repuestos): `tipo` (`check in
+('cabezal_flejado', 'calderin_cola_cera')`), `identificador`,
+`nombre`, `activo`; `unique (tipo, identificador)`.
+
+**unidad_movimiento** — historial de eventos, nunca un campo de
+ubicación actual que se sobrescribe: `unidad_id`, `tipo_evento`
+(`check in ('sale_a_reparar', 'vuelve_montada')`), `fecha`, `linea_id`
+(nullable, pero `check (tipo_evento <> 'vuelve_montada' or linea_id is
+not null)` — obliga a línea cuando vuelve montada), `nota`,
+`mecanico_id`. Sin coste/factura en ninguna columna — fuera de alcance
+a propósito.
+
+### Vistas
+
+**v_almacen_stock** — `repuesto_id, stock` = suma de
+`almacen_movimiento.cantidad` por repuesto (`left join` desde
+`almacen_repuesto`, para que un repuesto sin movimientos salga con
+stock 0 en vez de no aparecer).
+
+**v_almacen_pedido_estado** — `pedido_id, estado`:
+`'recibido_completo'` si todas las líneas están recibidas,
+`'parcial'` si alguna sí y alguna no, `'pendiente'` si ninguna —
+tercer valor añadido por decisión propia al construir, sin
+confirmación explícita de sesión; revisar si en la práctica solo hacen
+falta los dos estados originales del plan.
+
+**v_unidad_ubicacion_actual** — `distinct on (unidad_id)` sobre
+`unidad_movimiento` ordenado por `fecha desc`: `estado`
+(`'montada'`/`'en_reparacion'`) + `linea_id` + `desde`, siempre a
+partir del último movimiento — nunca columna propia en
+`unidad_intercambiable`.
+
+### Funciones
+
+| Función | Notas |
+|---|---|
+| `fn_almacen_pedido_linea_recibida()` | trigger `before update` en `almacen_pedido_linea`: si `recibido` pasa de `false` a `true`, fija `fecha_recepcion` (si no venía) e inserta el movimiento de `entrada` en `almacen_movimiento` con `pedido_linea_id = new.id`. El índice único parcial de `almacen_movimiento` es la barrera real contra duplicados, no la lógica del trigger. |
+
+### Políticas RLS — filas nuevas para la tabla de `06`
+
+| Tabla | SELECT | INSERT | UPDATE | DELETE |
+|---|---|---|---|---|
+| incidencia_produccion | (se SUMA) `mecanico` | — | `mecanico` solo si `respuesta_fecha is null` (`using`), y solo puede dejar `respuesta_mecanico_id = auth.uid()` (`with check`) — la propia policy impide reabrir: tras la respuesta, `respuesta_fecha` deja de ser null y ningún mecánico puede volver a hacer `update` | — |
+| almacen_categoria, almacen_proveedor, almacen_repuesto, almacen_repuesto_referencia, almacen_movimiento, almacen_pedido, almacen_pedido_linea | `mecanico`, `administrador` | `mecanico`, `administrador` | `mecanico`, `administrador` | `mecanico`, `administrador` |
+| engrase_punto | `mecanico`, `administrador` | — | `administrador` (`for all`) | `administrador` (`for all`) |
+| engrase_parte | `mecanico`, `administrador` | `mecanico` con `mecanico_id = auth.uid()` | — | — |
+| engrase_parte_punto | hereda de `engrase_parte` vía join en la app; sin RLS propia (⚠️ pendiente de revisar si hace falta una policy directa, hoy no tiene) | | | |
+| unidad_intercambiable, unidad_movimiento | `mecanico`, `administrador` | `mecanico`, `administrador` | `mecanico`, `administrador` | `mecanico`, `administrador` |
+
+Todas las políticas son aditivas (`create policy` envuelta en `do $$
+... exception when duplicate_object then null; end $$;`), como el
+resto del proyecto — ninguna migración anterior se tocó.
+
+**`jefe` queda fuera a propósito** de almacén, engrase y unidades
+(decisión 16/09/2026) — a diferencia de incidencias, donde `jefe` ya
+tenía SELECT desde antes y lo conserva.
+
+### Pendiente de esta sesión
+
+- `engrase_parte_punto` sin política RLS propia — confirmar si hace
+  falta antes de que el frontend la consulte directamente en vez de
+  vía `engrase_parte`.
+- Estado `'pendiente'` de `v_almacen_pedido_estado` para pedidos con
+  cero líneas recibidas: confirmar si es el comportamiento deseado o
+  si debe colapsar a `'parcial'`.
+- Vistas exactas de producción para que el mecánico detecte anomalías
+  de máquina (`v_produccion_turno`, `get_partes`...) — sin resolver,
+  ver `17-rol-mecanico-plan.md`.

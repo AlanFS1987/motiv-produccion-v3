@@ -205,3 +205,121 @@ del nombre del formato. Existe en dos sitios que deben dar lo mismo:
   % Abs de la pantalla de la máquina.
 - Sin descarte (u "oficial"): `1ª / (1ª + comercial)`.
 - `eco` queda fuera de ambos mientras no se use en producción.
+## Rol mecánico (sesión 16/09/2026)
+
+Nuevo rol `mecanico`. Solo 2 personas cubren el rol — no hay turnos de
+mecánico (a diferencia de operario/responsable); la identificación de
+quién hizo cada cosa es simplemente cuál de los 2 la hizo, capturado
+porque es gratis, no porque haya cuadrante que respetar.
+
+### Incidencias de producción — respuesta
+
+`incidencia_produccion` (`01`, hasta ahora solo creación por
+responsable/jefe y lectura por jefe/Ceria) gana concepto de respuesta:
+
+- El mecánico contesta con texto libre + imágenes, igual que se crea
+  la incidencia.
+- **Sin reapertura**: el flujo es `pendiente → contestada`, lineal. Si
+  el problema vuelve a ocurrir, se crea una incidencia nueva — nunca
+  se reabre la contestada. No hay histórico de varias respuestas por
+  incidencia.
+- Una incidencia que no requiere intervención física se marca como tal
+  **en la propia respuesta** (campo, no un tipo de incidencia distinto
+  ni un caso aparte).
+- Queda registrado qué mecánico contestó — útil más adelante ("¿quién
+  tocó esto la última vez?"), aunque no haya turnos formales.
+- Quien ya podía ver la incidencia sigue viendo la respuesta junto a
+  ella (misma fila, sin política de visibilidad separada).
+
+### Almacén de repuestos
+
+Submódulo propio, más grande que el resto de bloques.
+
+- **Árbol**: máquina → submáquina → repuesto, con el mismo patrón
+  jerárquico que `ceria_documentacion_maquina` (claves punteadas), en
+  tabla propia (no la misma tabla — es un catálogo distinto). "Por
+  catalogar" es una categoría real del árbol, no un estado especial ni
+  un campo nulo: un repuesto **siempre** pertenece a una categoría.
+- **Referencias, no proveedor(es) como campo separado**: un repuesto
+  puede tener varias referencias, una por proveedor/fabricante que lo
+  vende con su propio código. La lista de proveedores de un repuesto
+  es la lista de proveedores distintos de sus referencias — no se
+  duplica en ningún otro sitio.
+- **Stock siempre calculado**, nunca editable a mano: suma de sus
+  movimientos (entrada / salida / ajuste). Cada movimiento es una fila
+  propia, nunca se pisa un número.
+- **Negativos permitidos** — mismo tratamiento tanto si el stock real
+  era más bajo de lo que la BD creía como si el repuesto se da de alta
+  al vuelo al usarlo (nace en 0, la primera salida lo deja en -1). Un
+  repuesto en negativo simplemente aparece marcado hasta que un pedido
+  lo compensa; no son dos flujos separados.
+- **Pedidos**: cabecera (fecha, proveedor) + líneas (repuesto,
+  cantidad pedida, recibido sí/no, fecha de recepción). El estado de
+  la cabecera (parcial / recibido completo) es **derivado de sus
+  líneas, nunca editable a mano** — los pedidos llegan por fascículos,
+  así que un estado manual acabaría desincronizado. Marcar una línea
+  como recibida genera automáticamente el movimiento de entrada; no se
+  registra por duplicado en dos sitios.
+- **Alta "sobre la marcha"**: un único formulario de "nuevo repuesto",
+  reutilizado desde el almacén o desde un pedido — no dos versiones.
+  La categoría (máquina/submáquina) es obligatoria siempre; si no se
+  sabe con certeza, se asigna "por catalogar" y se reclasifica después
+  (reclasificar = simple cambio de categoría).
+
+### Mantenimiento preventivo — checklist de engrase
+
+Digitalización literal de un proceso hoy mental (cada ~3 meses,
+engrase + revisión visual de ciertos puntos por línea):
+
+- La checklist es **la misma para todas las líneas**.
+- La lista de puntos vive en tabla propia, editable solo por el admin
+  — hoy provisional, se espera que se estabilice pronto.
+- El registro de una revisión es un **"parte" más**, al mismo estilo
+  que los partes de producción (`01`): línea + fecha + qué mecánico +
+  qué puntos se marcaron esa vez.
+- **Marcado parcial permitido**: si de N puntos solo da tiempo a
+  marcar algunos, el parte se guarda igual; los demás quedan sin
+  marcar en ese registro concreto. No hay seguimiento independiente
+  por punto — el seguimiento es por parte completo.
+- **Sin disparador**: no hay alertas de "toca revisión". La
+  periodicidad de 3 meses la gestionan los mecánicos de memoria; el
+  sistema solo deja registro de cuándo se hizo cada vez.
+
+### Unidades intercambiables (cabezales de flejado, calderines de cola-cera)
+
+Distinto del almacén de repuestos (bloque anterior): un repuesto
+normal es *fungible* (no importa cuál de las N idénticas se usa);
+estas unidades son *concretas e identificables* — cada una tiene su
+propia identidad e historial, aunque varias sean del mismo modelo.
+
+- Piezas de quita-y-pon: cuando el fabricante repara una, se monta la
+  unidad de repuesto del almacén y la estropeada se manda fuera; al
+  volver, pasa a ocupar el lugar de repuesto (o se monta en otra
+  línea).
+- Volumen real: 7 cabezales de flejado (6 montados + 1 de repuesto),
+  20 calderines de cola-cera (18 montados + 2 de repuesto) — volumen
+  bajo, cada unidad merece ficha propia, no stock genérico.
+- **No maneja dinero**: sin coste ni factura de reparación, en ningún
+  punto de la app.
+- **Historial de movimientos**, no un campo de "ubicación actual" que
+  se sobrescribe — necesario para poder calcular cuánto duró cada
+  reparación restando fechas entre el evento de salida y el de vuelta.
+  La ubicación actual se calcula siempre a partir del último
+  movimiento, nunca se guarda como campo aparte.
+- Solo hace falta que quede registrado (consulta/historial); no hace
+  falta alerta ni que NORA/Ceria sepan en tiempo real qué unidad
+  concreta está montada.
+
+### Reglas transversales del rol mecánico
+
+- Nada de lo anterior maneja dinero.
+- Donde hace falta saber "cuánto duró algo" (reparación externa), se
+  registra como historial de eventos con fecha — nunca un campo que se
+  sobrescribe.
+- Donde un valor se puede derivar de otros datos ya registrados
+  (estado de un pedido, stock de un repuesto, ubicación actual de una
+  unidad), se calcula — no se guarda ni edita a mano por separado.
+- Visibilidad, por ahora: **solo `mecanico` + `administrador`** ven
+  almacén, engrase y unidades intercambiables — `jefe` queda fuera a
+  propósito (decisión 16/09/2026, a diferencia del resto de bloques
+  del proyecto donde `jefe` suele tener SELECT amplio).

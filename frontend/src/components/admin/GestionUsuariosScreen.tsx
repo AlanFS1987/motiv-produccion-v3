@@ -25,8 +25,8 @@ const ROLES: { valor: RolAsignable; etiqueta: string }[] = [
   { valor: "produccion", etiqueta: "Producción" },
   { valor: "calidad", etiqueta: "Calidad" },
   { valor: "jefe_rectificado", etiqueta: "Jefe rectificado" },
+  { valor: "mecanico", etiqueta: "Mecánico" },
 ];
-
 const ROLES_CON_LETRA: RolAsignable[] = ["responsable", "operario"];
 
 // ═══════════════════════════ Crear usuario ═══════════════════════════

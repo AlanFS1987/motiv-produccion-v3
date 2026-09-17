@@ -13,9 +13,7 @@ import { supabase } from "./supabase-client";
 
 export type Letra = "A" | "B" | "C" | "D";
 
-export type RolAsignable =
-  | "responsable" | "suplente" | "operario"
-  | "jefe" | "produccion" | "calidad" | "jefe_rectificado";
+export type RolAsignable = "responsable" | "suplente" | "operario" | "jefe" | "produccion" | "calidad" | "jefe_rectificado" | "mecanico";
 
 const ROLES_CON_LETRA: RolAsignable[] = ["responsable", "operario"];
 
