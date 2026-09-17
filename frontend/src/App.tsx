@@ -11,6 +11,7 @@ import { JefeApp } from "./components/jefe/JefeApp";
 import { RectificadoApp } from "./components/rectificado/RectificadoApp";
 import { CalidadApp } from "./components/calidad/CalidadApp";
 import { AdminApp } from "./components/admin/AdminApp";
+import { MecanicoApp } from "./components/mecanico/MecanicoApp";
 import { PantallaCarrusel } from "./components/pantalla/PantallaCarrusel";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { NotificacionesBell } from "./components/notificaciones/NotificacionesBell"
@@ -68,6 +69,10 @@ function AppAutenticada({ username }: { username: string }) {
 
   if (usuario?.rol === "administrador") {
     return <AdminApp username={username} />;
+  }
+
+  if (usuario?.rol === "mecanico") {
+    return <MecanicoApp username={username} />;
   }
   
   if (usuario?.rol === "jefe") {
