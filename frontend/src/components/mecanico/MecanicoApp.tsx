@@ -92,7 +92,7 @@ export function MecanicoApp({ username }: { username: string }) {
 
       <main className="mx-auto max-w-6xl p-4">
         {pestana === "incidencias" && <IncidenciasScreen />}
-        {pestana === "almacen" && <Proximamente nombre="Almacén" />}
+        {pestana === "almacen" && <AlmacenScreen />}
         {pestana === "engrase" && <EngraseScreen />}
         {pestana === "unidades" && <Proximamente nombre="Unidades" />}
       </main>
