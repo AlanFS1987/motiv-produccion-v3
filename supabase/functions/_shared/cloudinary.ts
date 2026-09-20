@@ -142,3 +142,16 @@ export function construirPublicIdInformeTurno(fechaISO: string, tipo: string): s
   const sufijo = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
   return `informe_turno_${fechaCompacta}_${tipo}_${sufijo}`;
 }
+
+/**
+ * Nombre de archivo legible para los informes por periodo (20/09/2026):
+ * informe_diario_20260912_ab12cd34 / informe_semanal_20260907_ab12cd34
+ * (la fecha es la de inicio del periodo). Reutilizan el mismo preset y
+ * carpeta que los informes de turno — no hace falta ninguna
+ * configuración nueva en Cloudinary.
+ */
+export function construirPublicIdInformePeriodo(tipo: "diario" | "semanal", desdeISO: string): string {
+  const fechaCompacta = desdeISO.replace(/-/g, "");
+  const sufijo = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+  return `informe_${tipo}_${fechaCompacta}_${sufijo}`;
+}

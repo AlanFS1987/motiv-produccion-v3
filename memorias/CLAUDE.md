@@ -21,20 +21,23 @@ No tiene acceso a PLCs ni a ningún sistema en tiempo real: todo dato
 nace de una foto o de un formulario. No hay modo offline (decisión
 cerrada: el OCR necesita red igualmente y la fábrica tiene wifi).
 
-Usuarios: **24 reales cargados** (4 responsables A/B/C/D, 17 operarios
-4/5/4/4, jefe, administrador, pantalla), máximo 30. No hay ni habrá
+Usuarios: **32 reales cargados** (4 responsables A/B/C/D, 19 operarios
+4/5/4/4, jefe, administrador, pantalla), máximo 40. No hay ni habrá
 cuenta `suplente`: decisión cerrada (sesión 25/08/2026) de no usar una
 cuenta compartida para cubrir turnos — se cubre siempre con las
 credenciales del titular (`01`). El rol se queda en el enum, sin uso.
 Roles del enum: `responsable`,
 `suplente`, `operario`, `jefe`, `produccion`, `calidad`,
-`administrador`, `pantalla`, `jefe_rectificado`. Solo responsables y
-operarios llevan letra de rotación; el resto no. `jefe_rectificado` es
+`administrador`, `pantalla`, `jefe_rectificado`, `mecanico`. Solo
+responsables y operarios llevan letra de rotación; el resto no. `jefe_rectificado` es
 la sección de rectificado (anterior a clasificación, no una variante
 de `jefe`) — shell propio, ver `13-rectificado.md`. `calidad` tiene
 shell propio de solo lectura (últimos 15 lotes + incidencias), ver
 `14-calidad.md`. `produccion` sigue sin shell — solo tiene permisos
 RLS de lectura sobre `incidencia_produccion`, sin pantalla que los use.
+`mecanico` (2 personas, sin turnos ni letra) tiene shell propio:
+Incidencias (contesta las de producción), Almacén, Engrase y
+Unidades — ver `17` y `18`.
 
 ## Stack
 
@@ -48,6 +51,11 @@ RLS de lectura sobre `incidencia_produccion`, sin pantalla que los use.
   formato del prompt que GPT-4o-mini en prueba real (`07`).
 - **Generación de imagen (personaje RPG)**: GPT Image 2 (`gpt-image-2`)
   vía `images/edits`; historia del personaje con DeepSeek. Ver `04`.
+- **NORA** (copiloto de averías por voz): OpenAI Realtime vía WebRTC
+  con `@openai/agents` + `zod` en el frontend, Edge Function `nora`.
+  Requiere `microphone=(self)` en `Permissions-Policy` y
+  `https://api.openai.com` en `connect-src` de `frontend/vercel.json`.
+  Ver `16`.
 - **Imágenes**: Cloudinary, cloud `dugiquak1`, 5 presets unsigned con
   carpeta fija cada uno. Ver `05`.
 - **Notificaciones**: un bot de Telegram, 5 grupos. Ver `05`.
@@ -84,12 +92,16 @@ RLS de lectura sobre `incidencia_produccion`, sin pantalla que los use.
 | Gamificación responsable: puntos (metros+rendimiento), niveles, cierre de ciclo (tabla propia `historial_ciclo_responsable`), pestaña "Progreso" (Ranking, Ranking resp., Stats, Equipo, Logros), 18 logros propios, historial de partes propio | **Construido** (`04`) |
 | Dashboard del jefe (Vista Rápida, Detallada, Incidencias, Calidad) | Construido (`08`) |
 | Panel de administrador | Construido (`09`); faltan fusión de catálogo, vista de usuarios con bonus de nivel y botón "recalcular ciclo" |
-| Pantalla de fábrica (carrusel, rol `pantalla`) | Construido parcialmente: 3 de 5 diapositivas reales (`10`) |
+| Pantalla de fábrica (carrusel, rol `pantalla`) | Construido: 5 de 5 diapositivas reales (`10`) |
 | Ceria | Construido (`11`) |
 | Sistema de temas (5 temas) | Construido en arquitectura y marcos; interior de la mayoría de pantallas sin migrar (`12`) |
 | App de `jefe_rectificado` (Vista Rápida, Detallada) | Construido (`13`), sin verificar con datos reales |
 | App de `calidad` (últimos 15 lotes, incidencias, tonos) | Construido (`14`), sin verificar con datos reales |
-| Base de conocimiento de averías | No construido |
+| Copiloto de averías (NORA, por voz) + `ceria_documentacion_maquina` | Experimento funcionando de punta a punta; solo BS08 documentada (8 submáquinas, 150 filas), probado solo con el Divisor (`16`, `11`) |
+| Rol mecánico: Incidencias, Engrase, Almacén (árbol, alta de repuesto, movimientos manuales) | Construido (`17`, `18`); faltan Pedidos y Unidades |
+| Alta de usuarios desde el panel admin (pestaña Gestión) | Construido 27/08/2026 (`09`) |
+| Notificaciones in-app y chat con acceso por rol (`chat_acceso`) | Construido 07/09/2026 (`15`) |
+| Pantalla de fábrica en tiempo real (Supabase Realtime) | Construido 13/09/2026 (`10`) |
 
 ## Fechas clave
 
@@ -204,9 +216,14 @@ memorias/                      esta carpeta
 
 ## Cómo se crean usuarios hoy
 
-Dashboard → Authentication → Add user (email sintético) → INSERT en
-`usuario` con el mismo UUID, `username`, `rol`, `letra`. No hay
-pantalla para ello (descartado a propósito, ver `09`).
+Desde el panel de administrador, pestaña **Gestión**
+(`admin/GestionUsuariosScreen.tsx` → Edge Function
+`admin-crear-usuario`, service_role). Solo el administrador puede
+llamarla; whitelist de roles asignables (nunca `administrador`, ni
+`pantalla`); si falla el INSERT en `usuario` se hace rollback de la
+cuenta de Auth. La cuenta `administrador` solo se crea por SQL a mano
+(el trigger `fn_bloquear_ascenso_admin` impide ascender a nadie desde
+la app). Ver `09`.
 
 ## Lo que hay que saber antes de tocar algo
 

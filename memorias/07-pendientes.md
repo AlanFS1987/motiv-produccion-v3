@@ -94,7 +94,26 @@ ambigüedad `nivel_id` en `fn_otorgar_bonus_nivel`).
    dependía de ellas. Listo para ejecutar en cuanto se confirme el
    punto 11 de arriba (mejor squashear con el esquema de seguridad ya
    verificado en real, no a medias).
-11. Base de conocimiento de averías — no empezado.
+11. Base de conocimiento de averías — en curso: NORA (copiloto por voz)
+    y `ceria_documentacion_maquina` (solo BS08). Pendientes propios en
+    `16` y `11`.
+
+
+## Pendientes que viven en su propio archivo
+
+Cada área lleva su lista abierta en su archivo; aquí solo se remite
+(un tema, un archivo).
+
+- **Rol mecánico**: Almacén pieza 4 (Pedidos), Unidades
+  intercambiables, vistas de producción para detectar anomalías de
+  máquina, RLS de `engrase_parte_punto`, estado `'pendiente'` de
+  `v_almacen_pedido_estado`, revisar `v_almacen_stock` bajo RLS →
+  `18`.
+- **NORA**: logging de conversaciones (`nora_conversaciones` /
+  `nora_mensajes`) → `16`.
+- **Ceria**: informe en PDF, pruebas de los 7 modelos de Fase 3,
+  "calidad de modelos de pulido vs. el resto", terminología de
+  `minutos_saturacion` → `11`.
 
 
 ## Ideas futuras sin decidir

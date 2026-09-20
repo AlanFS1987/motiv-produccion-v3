@@ -1,7 +1,7 @@
 # 06 — Esquema de base de datos
 
-Contrastado con la BD real el 19/08/2026 y actualizado con cada
-migración hasta `20260826` (sesión 26/08/2026: limpieza de tablas
+Contrastado con la BD real el 16/09/2026 y actualizado con cada
+migración hasta `20260916` (sesión 26/08/2026: limpieza de tablas
 temporales de la migración v2, y endurecimiento de seguridad — RPCs
 `security definer` expuestas de más y `search_path` fijo en todas las
 funciones, a raíz del linter de Supabase), más las migraciones de
@@ -15,8 +15,9 @@ Extensiones: `pg_trgm`, `pgcrypto`, `pg_cron`, `pg_net`.
 ## Enums
 
 - `rol_usuario`: responsable, jefe, produccion, calidad, operario,
-  administrador, suplente, pantalla, jefe_rectificado (los 9 cubiertos
-  por migración).
+  administrador, suplente, pantalla, jefe_rectificado, mecanico (los 10
+  cubiertos por migración; `mecanico` se añadió el 16/09/2026, ver
+  sección "Rol mecánico").
 - `letra_turno`: A, B, C, D. `tipo_turno`: M, T, N.
 - `estado_lote`: iniciado, finalizado.
 

@@ -23,6 +23,10 @@ solo remite a él con el número (`ver 04`).
 | `12-temas.md` | Sistema de temas: los 5 temas, qué pantallas están migradas |
 | `13-rectificado.md` | App de `jefe_rectificado`: Vista Rápida, Vista Detallada, vistas SQL propias |
 | `14-calidad.md` | App de `calidad`: últimos 15 lotes, desglose por tono, incidencias |
+| `15-notificaciones-chat.md` | Notificaciones in-app, chat y acceso por rol (`chat_acceso`) |
+| `16-copiloto-averias.md` | NORA: copiloto de averías por voz, documentación de máquina |
+| `17-rol-mecanico-plan.md` | Rol mecánico: decisiones de producto (sesión 16/09/2026) |
+| `18-rol-mecanico-frontend.md` | Rol mecánico: pantallas construidas y pendientes |
 
 Marcas usadas:
 - `[VERIFICAR]` — descrito a partir de migraciones/código, no contrastado con la BD real.

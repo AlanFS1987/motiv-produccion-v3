@@ -58,3 +58,12 @@ equivalente.
 minutos crudos de `v_produccion_turno` — no hizo falta vista SQL
 nueva para esto) + `components/pantalla/PantallaCarrusel.tsx`
 (las 5 diapositivas, donut SVG propio sin librería externa).
+## Actualización en tiempo real (13/09/2026)
+
+La pantalla ya no refresca por el remontaje del carrusel (~60 s): usa
+Supabase Realtime sobre `parte`, `turno` e `historial_ciclos`
+(`RefrescoPantalla.tsx`, migración `20260913150000_realtime_pantalla.sql`).
+`parte_select_todos` se amplió al rol `pantalla` porque Realtime
+respeta la RLS de SELECT. `personaje_rpg` queda fuera a propósito
+(RLS más estricta): los avatares de Ranking/Reyes se refrescan con la
+siguiente recarga o refresco relevante.

@@ -12,6 +12,7 @@ import {
   calcularTurnoActualSuplente,
   proximoCambioEstado,
   proximaMedianocheLocal,
+  MARGEN_REVISION_MS,
   type TurnoActual,
   type TipoTurno,
 } from "../lib/rotacion";
@@ -480,7 +481,10 @@ useEffect(() => {
         </span>
         {turnoInfo.estado === "en_revision" && (
           <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-800">
-            En revisión — no se pueden abrir partes nuevos, solo corregir
+            En revisión — puedes seguir registrando partes
+            {turnoInfo.finFranja
+              ? ` hasta las ${formatearHora(new Date(turnoInfo.finFranja.getTime() + MARGEN_REVISION_MS))}, cuando el turno se cierra solo`
+              : ""}
           </span>
         )}
         <span className="text-sm text-slate-500">
@@ -508,7 +512,7 @@ useEffect(() => {
               <select
                 value={asignacion?.operario_id ?? ""}
                 onChange={(e) => manejarCambioOperario(linea.id, e.target.value)}
-                disabled={guardandoLinea === linea.id || turnoInfo.estado === "en_revision"}
+                disabled={guardandoLinea === linea.id}
                 className="w-full rounded-lg border border-slate-300 p-2 text-sm disabled:opacity-50"
               >
                 <option value="">— Sin asignar (fuera de producción) —</option>
@@ -544,8 +548,7 @@ useEffect(() => {
                 <button
                   type="button"
                   onClick={() => setLineaEnCaptura(linea)}
-                  disabled={turnoInfo.estado === "en_revision"}
-                  className="mt-2 w-full rounded-lg border border-slate-300 py-2 text-xs font-medium text-slate-600 disabled:opacity-50"
+                  className="mt-2 w-full rounded-lg border border-slate-300 py-2 text-xs font-medium text-slate-600"
                 >
                   Nueva orden
                 </button>
@@ -577,8 +580,7 @@ useEffect(() => {
                         <button
                           type="button"
                           onClick={() => setContinuarOrigen({ linea, sugerencia: sugerenciasContinuar[linea.id] })}
-                          disabled={turnoInfo.estado === "en_revision"}
-                          className="flex flex-1 items-center justify-center rounded-md bg-blue-600 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                          className="flex flex-1 items-center justify-center rounded-md bg-blue-600 py-1.5 text-xs font-medium text-white"
                         >
                           Continuar
                         </button>
@@ -592,8 +594,7 @@ useEffect(() => {
                               calibreAnterior: sugerenciasContinuar[linea.id].calibre,
                             })
                           }
-                          disabled={turnoInfo.estado === "en_revision"}
-                          className="flex flex-1 items-center justify-center rounded-md bg-orange-500 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                          className="flex flex-1 items-center justify-center rounded-md bg-orange-500 py-1.5 text-xs font-medium text-white"
                         >
                           Nuevo tono/calibre
                         </button>
@@ -626,8 +627,7 @@ useEffect(() => {
                             onClick={() =>
                               setNuevoTonoOrigen({ linea, loteId: p.loteId, tonoAnterior: p.tono, calibreAnterior: p.calibre })
                             }
-                            disabled={turnoInfo.estado === "en_revision"}
-                            className="flex flex-1 items-center justify-center gap-1 rounded-md bg-orange-500 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                            className="flex flex-1 items-center justify-center gap-1 rounded-md bg-orange-500 py-1.5 text-xs font-medium text-white"
                           >
                             <Palette size={12} aria-hidden />
                             Nuevo tono/calibre

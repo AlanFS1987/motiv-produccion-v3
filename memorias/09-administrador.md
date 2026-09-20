@@ -2,9 +2,9 @@
 
 Shell propio (`admin/AdminApp.tsx`), se muestra cuando `usuario.rol =
 'administrador'`. El admin ve **todo** lo que ve el jefe (Vista
-Rápida, Vista Detallada, Incidencias, Ceria — reutilizando
-literalmente los componentes de `jefe/`, no duplicados) más sus
-propias pestañas de gestión.
+Rápida, Vista Detallada, Incidencias, Calidad, Ceria — reutilizando
+literalmente los componentes de `jefe/` y `calidad/`, no duplicados)
+más sus propias pestañas de gestión.
 
 ## Construido
 
@@ -143,11 +143,34 @@ propias pestañas de gestión.
   `admin-usuarios.ts`) — en la misma pantalla de Rotación, además de
   la letra, se puede cambiar el rol de cualquier usuario entre
   responsable/suplente/operario/jefe/producción/calidad.
-  - **Puntos de engrase** (`admin/PuntosEngraseScreen.tsx`, `lib/admin-engrase.ts`)
-  — alta/edición/baja lógica de los puntos de la checklist que usa el
-  rol mecánico (`10-rol-mecanico-frontend.md`). Guardado inmediato por
-  fila (`onBlur`), mismo patrón que `AjustarLetrasScreen.tsx`. Baja
-  lógica (`activo`), nunca `DELETE`: un punto desactivado no rompe los
-  partes de engrase antiguos que ya lo tenían marcado. Sin migración
-  nueva — la política `engrase_punto_admin_todo` (`for all`, solo
-  admin) ya lo permitía desde que se creó la tabla.
+  `[VERIFICAR]` si la lista ya incluye `jefe_rectificado` y
+  `mecanico`. Nunca a `administrador`: lo impide
+  `fn_bloquear_ascenso_admin` (ese rol solo se asigna por SQL a mano).
+- **Gestión de usuarios** (`admin/GestionUsuariosScreen.tsx`,
+  `lib/admin-gestion-usuarios.ts`, 27/08/2026) — pestaña "Gestión":
+  crear cuentas nuevas (no-admin) y cambiar la contraseña de cualquier
+  cuenta que no sea administrador. La creación pasa por la Edge
+  Function `admin-crear-usuario` (service_role): valida que quien
+  llama es administrador, aplica una whitelist de roles asignables
+  (`administrador` y `pantalla` nunca; `mecanico` y `jefe_rectificado`
+  sí), y si falla el INSERT en `usuario` borra la cuenta de Auth
+  recién creada para no dejarla huérfana. Los errores que llegan al
+  cliente son mensajes propios, no el error crudo de Postgres/Auth.
+  Sustituye al flujo manual anterior (Dashboard → Authentication →
+  Add user + INSERT en `usuario`), que ya no es el camino normal.
+- **Vista de usuarios con gamificación** — puntos, nivel y botón
+  "otorgar generaciones" (`fn_otorgar_bonus_nivel`,
+  `v_admin_usuarios_gamificacion`). Detalle de la mecánica en `04`.
+  `[VERIFICAR]` nombre del componente y añadirlo aquí.
+- **Acceso a los chats** (`admin/ChatAccesoScreen.tsx`) — qué roles
+  ven Ceria y NORA (`chat_acceso`, sin tocar código ni desplegar) y
+  qué modelos de Fase 3 de Ceria quedan apagados. Ver `15` y `11`.
+- **Puntos de engrase** (`admin/PuntosEngraseScreen.tsx`,
+  `lib/admin-engrase.ts`) — alta/edición/baja lógica de los puntos de
+  la checklist que usa el rol mecánico
+  (`18-rol-mecanico-frontend.md`). Guardado inmediato por fila
+  (`onBlur`), mismo patrón que `AjustarLetrasScreen.tsx`. Baja lógica
+  (`activo`), nunca `DELETE`: un punto desactivado no rompe los partes
+  de engrase antiguos que ya lo tenían marcado. Sin migración nueva —
+  la política `engrase_punto_admin_todo` (`for all`, solo admin) ya lo
+  permitía desde que se creó la tabla.
