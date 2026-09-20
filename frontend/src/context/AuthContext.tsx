@@ -66,7 +66,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Estado inicial al cargar la app
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    async function iniciar() {
+      let session: Session | null = null;
+      try {
+        const res = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("timeout_getSession")), 8000),
+          ),
+        ]);
+        session = res.data.session;
+      } catch (e) {
+        // Sesión rota o bloqueada: se limpia lo local y se muestra el Login
+        // en vez de dejar "Cargando..." para siempre.
+        console.error("Auth: getSession no respondió o falló", e);
+        Object.keys(localStorage)
+          .filter((k) => k.startsWith("sb-"))
+          .forEach((k) => localStorage.removeItem(k));
+        if (activo) {
+          setSesion(null);
+          setUsuario(null);
+          setCargando(false);
+        }
+        return;
+      }
+
       if (!activo) return;
       setSesion(session);
       if (session) {
@@ -74,7 +98,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setCargando(false);
       }
-    });
+    }
+    iniciar();
 
     // Se mantiene sincronizado ante login/logout/refresco de token
 const { data: suscripcion } = supabase.auth.onAuthStateChange((evento, nuevaSesion) => {

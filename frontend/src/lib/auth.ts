@@ -24,18 +24,31 @@ export async function iniciarSesion(username: string, password: string): Promise
     return { ok: false, error: "Escribe usuario y contraseña" };
   }
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email: emailSinteticoDeUsername(username),
-    password,
-  });
+  try {
+    const { error } = await Promise.race([
+      supabase.auth.signInWithPassword({
+        email: emailSinteticoDeUsername(username),
+        password,
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("timeout_login")), 15000),
+      ),
+    ]);
 
-  if (error) {
-    // No revelamos si el fallo es "usuario no existe" vs "contraseña
-    // incorrecta" — mismo mensaje genérico, práctica habitual de login.
-    return { ok: false, error: "Usuario o contraseña incorrectos" };
+    if (error) {
+      // No revelamos si el fallo es "usuario no existe" vs "contraseña
+      // incorrecta" — mismo mensaje genérico, práctica habitual de login.
+      return { ok: false, error: "Usuario o contraseña incorrectos" };
+    }
+
+    return { ok: true };
+  } catch (e) {
+    console.error("Login sin respuesta:", e);
+    return {
+      ok: false,
+      error: "No se pudo conectar. Cierra la app del todo y vuelve a abrirla.",
+    };
   }
-
-  return { ok: true };
 }
 
 export async function cerrarSesion(): Promise<void> {
