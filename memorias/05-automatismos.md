@@ -10,6 +10,11 @@
 | `ceria` | Frontend (jefe/admin) | JWT validado | Asistente de producción sobre GPT-5-mini, 3 fases + 9 herramientas. Ver `11`. |
 | `notificar-telegram` | BD vía `pg_net` | header `x-webhook-secret` | `tipo` ∈ incidencia_calidad / incidencia_produccion / nuevo_lote. Enriquece con consulta y envía al grupo correspondiente, con fotos si hay. |
 | `generar-resumen-turno` | BD vía `pg_net` | `x-webhook-secret` | Compila el informe del turno (misma estructura que la pestaña Resumen), lo parte en mensajes < 3.500 caracteres, envía, marca `turno.resumen_enviado_at`. |
+| `generar-informe-periodo` | `generar-resumen-turno` (con service_role, `enviar:false`), cron de respaldo vía `pg_net` y a mano (ver `19`) | `x-webhook-secret` o service_role como Bearer | Informe DIARIO o SEMANAL en PDF: recoge partes e incidencias de la ventana, sube el PDF a Cloudinary, lo registra en `informe_periodo` y, solo en el envío de respaldo, avisa por Telegram una sola vez (el envío se reclama con un UPDATE atómico sobre `enviado_at`). Ver `19`. |
+
+Y en la fila de `generar-resumen-turno`, **añadir** al final de su
+descripción: "Si el turno es el de noche, añade al final del mensaje los
+enlaces a los informes diario (y semanal, en domingo) — ver `19`."
 | `notificar-telegram-resumen-calidad` | BD vía `pg_net` | `x-webhook-secret` | Digest de lotes `finalizado` con `resumen_calidad_enviado_at null`: m² 1ª / comercial / contenedor, calidad oficial y completa, tonos; marca cada lote justo tras confirmarse su mensaje. Si no hay lotes, no envía. |
 
 Secrets de Edge Functions (contrastados con `supabase secrets list` el
@@ -22,10 +27,10 @@ Secrets de Edge Functions (contrastados con `supabase secrets list` el
 `SUPABASE_*` (URL, SERVICE_ROLE_KEY, ANON_KEY, JWKS, DB_URL y las
 claves publicables/secretas nuevas) los inyecta Supabase.
 
-Las tres funciones llamadas desde la BD se despliegan con
+Las cuatro funciones llamadas desde la BD se despliegan con
 `--no-verify-jwt`. La URL de cada una está escrita literalmente en las
 funciones SQL `fn_notificar_telegram`, `fn_disparar_resumen_turno`,
-`fn_disparar_resumen_calidad`.
+`fn_disparar_resumen_calidad` y `fn_disparar_informe_periodo`.
 
 ## Telegram — un bot, cinco grupos
 
@@ -95,3 +100,10 @@ Cada preset con `Allowed formats` (jpg/png/webp, sin SVG), tamaño
 máximo de archivo, y `Overwrite` desactivado. `[VERIFICAR]` que
 `motiv_v3_personajes` (creado después de esta revisión) tiene los
 mismos ajustes.
+- Cron `informes-periodo-pendientes`, minuto 30 de cada hora →
+  `fn_encolar_informes_periodo_pendientes()`: red de seguridad que manda
+  como mensaje suelto los informes diario/semanal que no fueron dentro
+  del resumen de turno (ventanas de 30 h y 4 días). Al cerrarse un turno N,
+  `generar-resumen-turno` pide el diario (y, en domingo, el semanal) a
+  `generar-informe-periodo` y añade sus enlaces al final del mensaje;
+  no hay trigger propio (se eliminó en `20260921100000`). Ver `19`.

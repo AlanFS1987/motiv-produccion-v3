@@ -5,12 +5,15 @@
 //
 // Estructura (idéntica en los dos):
 //   1. Cabecera: periodo, turnos incluidos, totales.
-//   2. Producción por línea (1ª / comercial / contenedor) — una fila
+//   2. Producción y tiempos por TURNO (diario: 3 filas M/T/N) o por DÍA
+//      (semanal: 7 filas lunes…domingo) — añadido el 21/09/2026. Dos
+//      tablas, igual que las de por línea, + fila TOTAL.
+//   3. Producción por línea (1ª / comercial / contenedor) — una fila
 //      por línea + fila TOTAL.
-//   3. Tiempos por línea — una fila por línea + fila TOTAL.
-//   4. Producción por lote — una fila por lote con producción en el
+//   4. Tiempos por línea — una fila por línea + fila TOTAL.
+//   5. Producción por lote — una fila por lote con producción en el
 //      periodo (tonos y calibres combinados solo como recuento).
-//   5. Incidencias — diario con fotos, semanal solo texto.
+//   6. Incidencias — diario con fotos, semanal solo texto.
 //
 // No hay detalle parte a parte: eso vive en el informe de turno.
 
@@ -34,6 +37,7 @@ import {
   minConPct,
   totalMinutos,
   type ColumnaTabla,
+  type Contexto,
   type TiemposAgregadosPdf,
 } from "./pdf-comun.ts";
 
@@ -56,6 +60,16 @@ export interface LineaPeriodoPdf extends AcumuladoPeriodoPdf {
   nombre: string;
 }
 
+/**
+ * Una fila del desglose temporal: un TURNO (Mañana/Tarde/Noche) en el
+ * informe diario, un DÍA (lun 07/09…) en el semanal.
+ */
+export interface FilaDesglosePdf extends AcumuladoPeriodoPdf {
+  etiqueta: string;
+  /** "sin turno registrado", "sin cerrar", "2 de 3 turnos"… — null si está completo. */
+  nota: string | null;
+}
+
 export interface LotePeriodoPdf {
   numeroOrden: string;
   modeloNombre: string;
@@ -71,6 +85,23 @@ export interface LotePeriodoPdf {
   numTonos: number;
   /** Nº de calibres distintos (0 si ningún parte lo informó). */
   numCalibres: number;
+}
+
+/**
+ * Tiempo registrado frente al tiempo máximo posible del periodo
+ * (turnos esperados × líneas × 480 min). Solo a nivel de día/semana, no
+ * por línea, para absorber pequeños descuadres de tiempos entre partes.
+ */
+export interface TiempoRegistroPdf {
+  turnos: number;
+  lineas: number;
+  maximo: number;
+  /** Suma de las 5 categorías de tiempo de todos los partes. */
+  registrado: number;
+  /** max(0, maximo - registrado). */
+  sinRegistrar: number;
+  /** Parte de `sinRegistrar` que corresponde a turnos que no llegaron a registrarse. */
+  sinRegistrarPorTurnosFaltantes: number;
 }
 
 export interface IncidenciaPeriodoPdf {
@@ -97,6 +128,9 @@ export interface DatosInformePeriodoPdf {
   turnosFaltantes: string[];
   /** Solo en el diario: quién abrió cada turno. */
   responsables: { tipoTurno: TipoTurnoLetra; username: string }[];
+  /** Diario: 3 filas (M/T/N). Semanal: 7 filas (lunes…domingo). */
+  desglose: FilaDesglosePdf[];
+  tiempoRegistro: TiempoRegistroPdf;
   lineas: LineaPeriodoPdf[];
   totales: AcumuladoPeriodoPdf;
   lotes: LotePeriodoPdf[];
@@ -179,6 +213,69 @@ const COLUMNAS_TIEMPOS_LINEA: ColumnaTabla[] = [
   { titulo: "Banco", ancho: 90, alinearDerecha: true },
   { titulo: "Máquina", ancho: 90, alinearDerecha: true },
 ];
+
+// Desglose por turno / día: mismas columnas que las tablas por línea, con
+// la primera más ancha para etiquetas como "Tarde (sin turno)" o
+// "mar 08/09 (2/3)".
+function columnasDesgloseProduccion(primera: string): ColumnaTabla[] {
+  return [
+    { titulo: primera, ancho: 80 },
+    { titulo: "1ª", ancho: 109, alinearDerecha: true },
+    { titulo: "Comercial", ancho: 109, alinearDerecha: true },
+    { titulo: "Contenedor", ancho: 109, alinearDerecha: true },
+    { titulo: "m² total", ancho: 108, alinearDerecha: true },
+  ];
+}
+
+function columnasDesgloseTiempos(primera: string): ColumnaTabla[] {
+  return [
+    { titulo: primera, ancho: 80 },
+    { titulo: "Plena", ancho: 87, alinearDerecha: true },
+    { titulo: "No aliment.", ancho: 87, alinearDerecha: true },
+    { titulo: "Saturación", ancho: 87, alinearDerecha: true },
+    { titulo: "Banco", ancho: 87, alinearDerecha: true },
+    { titulo: "Máquina", ancho: 87, alinearDerecha: true },
+  ];
+}
+
+/** "8.640 min" — con punto de millares también en 4 cifras (es-ES no lo pone por defecto). */
+function minutos(valor: number): string {
+  return `${String(Math.round(valor)).replace(/\B(?=(\d{3})+(?!\d))/g, ".")} min`;
+}
+
+/**
+ * Bloque bajo la tabla de tiempos por turno/día: tiempo registrado y
+ * sin registrar sobre el máximo del periodo. Va aparte de las tablas
+ * (otra base de porcentaje: el tiempo máximo, no el registrado).
+ */
+function dibujarTiempoRegistro(ctx: Contexto, t: TiempoRegistroPdf): void {
+  asegurarEspacio(ctx, 50);
+  dibujarTexto(
+    ctx,
+    `Tiempo registrado: ${minutos(t.registrado)} (${formatearPorcentaje(t.registrado, t.maximo)})`,
+    { tamano: 10, negrita: true },
+  );
+  const faltantes =
+    t.sinRegistrarPorTurnosFaltantes > 0
+      ? ` — de ellos ${minutos(t.sinRegistrarPorTurnosFaltantes)} por turnos sin registrar`
+      : "";
+  dibujarTexto(
+    ctx,
+    `Tiempo sin registrar: ${minutos(t.sinRegistrar)} (${formatearPorcentaje(t.sinRegistrar, t.maximo)})${faltantes}`,
+    { tamano: 10, negrita: true },
+  );
+  dibujarTexto(
+    ctx,
+    `Sobre el tiempo máximo del periodo: ${minutos(t.maximo)} (${t.turnos} turnos × ${t.lineas} líneas × 480 min). ` +
+      "Incluye las líneas paradas sin producción y los turnos sin registrar.",
+    { tamano: 8, color: COLOR_TEXTO_SUAVE },
+  );
+  ctx.y -= 6;
+}
+
+function etiquetaDesglose(f: FilaDesglosePdf): string {
+  return f.nota ? `${f.etiqueta} (${f.nota})` : f.etiqueta;
+}
 
 const COLUMNAS_LOTES: ColumnaTabla[] = [
   { titulo: "Orden", ancho: 48 },
@@ -276,7 +373,31 @@ export async function generarPdfInformePeriodo(datos: DatosInformePeriodoPdf): P
   );
   ctx.y -= 6;
 
-  // ---- 2. Producción por línea ----
+  // ---- 2. Desglose por turno (diario) o por día (semanal) ----
+  const unidad = datos.tipo === "diario" ? "turno" : "día";
+  const primeraColumna = datos.tipo === "diario" ? "Turno" : "Día";
+  asegurarEspacio(ctx, 90); // el título de sección nunca queda solo al final de una página
+  dibujarBarra(ctx, `Producción por ${unidad}`);
+  dibujarTabla(ctx, columnasDesgloseProduccion(primeraColumna), [
+    ...datos.desglose.map((f) => filaProduccion(etiquetaDesglose(f), f)),
+    filaProduccion("TOTAL", datos.totales),
+  ]);
+  asegurarEspacio(ctx, 90);
+  dibujarBarra(ctx, `Tiempos por ${unidad}`);
+  dibujarTabla(ctx, columnasDesgloseTiempos(primeraColumna), [
+    ...datos.desglose.map((f) => filaTiemposLinea(etiquetaDesglose(f), f.tiempos)),
+    filaTiemposLinea("TOTAL", datos.totales.tiempos),
+  ]);
+  if (datos.tipo === "semanal" && datos.desglose.some((f) => f.nota)) {
+    dibujarTexto(ctx, "(n/3): turnos registrados ese día, de los 3 esperados.", {
+      tamano: 8,
+      color: COLOR_TEXTO_SUAVE,
+    });
+    ctx.y -= 4;
+  }
+  dibujarTiempoRegistro(ctx, datos.tiempoRegistro);
+
+  // ---- 3. Producción por línea ----
   asegurarEspacio(ctx, 90); // el título de sección nunca queda solo al final de una página
   dibujarBarra(ctx, "Producción por línea");
   dibujarTabla(ctx, COLUMNAS_PRODUCCION_LINEA, [
@@ -284,7 +405,7 @@ export async function generarPdfInformePeriodo(datos: DatosInformePeriodoPdf): P
     filaProduccion("TOTAL", datos.totales),
   ]);
 
-  // ---- 3. Tiempos por línea ----
+  // ---- 4. Tiempos por línea ----
   asegurarEspacio(ctx, 90); // el título de sección nunca queda solo al final de una página
   dibujarBarra(ctx, "Tiempos por línea");
   dibujarTabla(ctx, COLUMNAS_TIEMPOS_LINEA, [
@@ -292,7 +413,7 @@ export async function generarPdfInformePeriodo(datos: DatosInformePeriodoPdf): P
     filaTiemposLinea("TOTAL", datos.totales.tiempos),
   ]);
 
-  // ---- 4. Producción por lote ----
+  // ---- 5. Producción por lote ----
   asegurarEspacio(ctx, 90); // el título de sección nunca queda solo al final de una página
   dibujarBarra(ctx, `Producción por lote (${datos.lotes.length})`);
   if (datos.lotes.length === 0) {
@@ -323,7 +444,7 @@ export async function generarPdfInformePeriodo(datos: DatosInformePeriodoPdf): P
     ctx.y -= 6;
   }
 
-  // ---- 5. Incidencias ----
+  // ---- 6. Incidencias ----
   ctx.y -= 2;
   asegurarEspacio(ctx, 90); // el título de sección nunca queda solo al final de una página
   dibujarBarra(ctx, `Incidencias (${datos.incidencias.length})`);

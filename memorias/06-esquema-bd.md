@@ -1,15 +1,7 @@
 # 06 — Esquema de base de datos
 
 Contrastado con la BD real el 16/09/2026 y actualizado con cada
-migración hasta `20260916` (sesión 26/08/2026: limpieza de tablas
-temporales de la migración v2, y endurecimiento de seguridad — RPCs
-`security definer` expuestas de más y `search_path` fijo en todas las
-funciones, a raíz del linter de Supabase), más las migraciones de
-notificaciones in-app / chat / `ceria_modelo_activo` del `20260907`
-(sesión 07/09/2026, ver `15`). **Tramo 27/08→06/09 pendiente de
-repasar** (temas, rectificado, calidad, Ceria 03-05/09). No hay
-ninguna migración con fecha 08/09/2026 todavía.
-
+migración hasta `20260916`
 Extensiones: `pg_trgm`, `pgcrypto`, `pg_cron`, `pg_net`.
 
 ## Enums
@@ -336,6 +328,30 @@ correctamente); `fn_notificar_telegram`, `fn_marcar_corregido_no_vigente`
 y `fn_bloquear_ascenso_admin` (funciones de trigger, `returns trigger`
 — Postgres no permite ejecutarlas fuera de un trigger real, así que
 el linter las marca pero no son explotables vía RPC).
+### `informe_periodo` (20260920130000)
+
+Un informe PDF por periodo. Único por `(tipo, desde)`.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | |
+| `tipo` | text | `diario` / `semanal` (CHECK) |
+| `desde`, `hasta` | date | fechas de TURNO (el N de la fecha D acaba a las 06:00 de D+1). Diario: `desde = hasta`. Semanal: lunes y domingo. CHECK `hasta >= desde` |
+| `pdf_url` | text | Cloudinary; NULL solo si la generación falló a medias |
+| `resumen` | jsonb | totales compactos: m² por calidad, turnos registrados/esperados/faltantes/sin cerrar, nº de lotes e incidencias |
+| `generado_at`, `enviado_at` | timestamptz | `enviado_at` es también el "candado" que evita el doble envío |
+| `created_at` | timestamptz | |
+
+RLS: escritura solo `service_role` (Edge Function). Lectura:
+`informe_periodo_select_jefe_admin` (`fn_rol_actual() in ('jefe',
+'administrador')`, migración `20260920150000`).
+
+Funciones (`20260920140000`), con `REVOKE EXECUTE` a
+`public/anon/authenticated`: `fn_disparar_informe_periodo(tipo, desde)` y
+`fn_encolar_informes_periodo_pendientes()` (cron de respaldo). El trigger
+`trg_turno_informe_periodo_cierre` y su función se crearon ahí y se
+**eliminaron** en `20260921100000` (los informes van dentro del resumen
+de turno).
 
 ## Políticas RLS (permisivas, se combinan con OR)
 

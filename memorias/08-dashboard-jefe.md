@@ -1,8 +1,9 @@
 # 08 — Dashboard del jefe
 
 Shell propio (`jefe/JefeApp.tsx`), se muestra cuando `usuario.rol =
-'jefe'`. Cinco pestañas: **Vista Rápida**, **Vista Detallada**,
-**Incidencias**, **Calidad**, **Ceria** (ver `11-ceria.md`). Sin
+'jefe'`. Siete pestañas: **Vista Rápida**, **Vista Detallada**,
+**Incidencias**, **Calidad**, **Informes** (20/09/2026), **Ceria** (ver
+`11-ceria.md`) y **Chat** (ver `15`). Sin
 gamificación — el jefe no quiere ver puntos/ranking/niveles, esa
 parte no aparece aquí bajo ningún concepto.
 
@@ -85,9 +86,17 @@ limitación del filtro de fecha). No hizo falta tocar RLS: el jefe ya
 tenía SELECT sobre `parte`/`incidencia_calidad`/`modelo` desde el
 diseño original.
 
+## Informes (`jefe/InformesScreen.tsx`, `lib/informes.ts`)
+
+Lista de los PDF ya generados, para abrirlos desde la app: Diarios,
+Semanales y Por turno (uno por turno). Tarjeta con m² totales, % de 1ª,
+turnos incluidos, lotes e incidencias, y aviso en ámbar si faltaba
+algún turno. Solo lectura; lectura de `informe_periodo` permitida a
+jefe y administrador. Diseño y automatización completos en `19`.
+
 ## Panel de administrador
 
-Ve las mismas 5 pestañas del jefe (`admin/AdminApp.tsx` reutiliza los
+Ve las mismas pestañas del jefe (`admin/AdminApp.tsx` reutiliza los
 componentes de `jefe/` y `calidad/`, no los duplica) más sus propias
 pestañas de gestión — ver `09-administrador.md`.
 

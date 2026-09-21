@@ -39,6 +39,16 @@ ambigüedad `nivel_id` en `fn_otorgar_bonus_nivel`).
     del 26/08/2026 siguen funcionando: generar personaje/avatar,
     botón "otorgar generaciones" del admin, y el cierre de ciclo (vía
     cron, la próxima vez que corra).
+    12. Cambio de la hora de revisión (20/09/2026): comprobar en una
+    revisión real que el responsable ve el aviso con la hora de cierre y
+    puede abrir "Nueva orden", "Continuar" y "Nuevo tono/calibre".
+
+13. Posible notificación duplicada del resumen de turno: la versión de
+    `fn_disparar_resumen_turno` de `20260907130000` inserta una fila en
+    `notificaciones` y `generar-resumen-turno` inserta otra. Si esa
+    función no se actualizó después, cada resumen aparece dos veces en la
+    campana. Comprobar con
+    `select prosrc from pg_proc where proname = 'fn_disparar_resumen_turno';`
 
 ## Decisiones por tomar
 
@@ -49,6 +59,12 @@ ambigüedad `nivel_id` en `fn_otorgar_bonus_nivel`).
   filtradas (HaveIBeenPwned) desactivada en Supabase Auth. Toggle en
   el panel, sin código — pendiente decidir si se activa (lint de
   seguridad 26/08/2026, ver `06`).
+- Cierre de turno con partes pendientes activos: el cron de la hora en
+  punto completa "sin producción" los partes pendientes, también el que
+  el responsable esté rellenando en ese momento. Ahora que en revisión
+  se pueden abrir partes nuevos es más probable. Opciones: dejarlo (el
+  aviso con la hora exacta lo mitiga) o que el cron no toque partes con
+  actividad reciente. Ver `02`.
 
 ## Seguridad — pendiente de un refactor concreto
 
@@ -114,6 +130,10 @@ Cada área lleva su lista abierta en su archivo; aquí solo se remite
 - **Ceria**: informe en PDF, pruebas de los 7 modelos de Fase 3,
   "calidad de modelos de pulido vs. el resto", terminología de
   `minutos_saturacion` → `11`.
+- **Informes diario/semanal** (otros roles con acceso, botón
+  "Regenerar", aviso en la campana, respuesta del mecánico en las
+  incidencias, PDF huérfanos tras `regenerar`, comparar m² con el
+  dashboard) → `19`.
 
 
 ## Ideas futuras sin decidir

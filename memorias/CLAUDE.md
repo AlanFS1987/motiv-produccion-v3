@@ -102,6 +102,8 @@ Unidades — ver `17` y `18`.
 | Alta de usuarios desde el panel admin (pestaña Gestión) | Construido 27/08/2026 (`09`) |
 | Notificaciones in-app y chat con acceso por rol (`chat_acceso`) | Construido 07/09/2026 (`15`) |
 | Pantalla de fábrica en tiempo real (Supabase Realtime) | Construido 13/09/2026 (`10`) |
+| Informes diario y semanal (PDF, enlaces dentro del resumen del turno N + cron de respaldo) y pestaña Informes del jefe/admin | Construido; verificado en real 21/09/2026 como mensajes sueltos, pendiente de ver la primera noche "dentro del resumen" (`19`) |
+| Hora de revisión del turno: se pueden abrir partes nuevos | Construido 20/09/2026, pendiente de probar en una revisión real (`02`, `07`) |
 
 ## Fechas clave
 

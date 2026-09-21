@@ -27,6 +27,7 @@ solo remite a él con el número (`ver 04`).
 | `16-copiloto-averias.md` | NORA: copiloto de averías por voz, documentación de máquina |
 | `17-rol-mecanico-plan.md` | Rol mecánico: decisiones de producto (sesión 16/09/2026) |
 | `18-rol-mecanico-frontend.md` | Rol mecánico: pantallas construidas y pendientes |
+| `19-informes-periodo.md` | Informes diario y semanal en PDF: diseño, automatización (trigger + cron), pestaña Informes del jefe/admin |
 
 Marcas usadas:
 - `[VERIFICAR]` — descrito a partir de migraciones/código, no contrastado con la BD real.

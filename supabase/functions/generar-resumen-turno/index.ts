@@ -35,12 +35,22 @@
 // Telegram. Si la generación/subida del PDF falla, NO se aborta el
 // envío del resumen — se registra el error y el turno se queda con
 // informe_pdf_url = null (ver paso 7b).
+//
+// INFORMES DIARIO/SEMANAL (21/09/2026): si el turno cerrado es el de
+// NOCHE, se añaden al final del mensaje los enlaces al informe del día
+// y, si esa noche es de domingo, al de la semana (ver 19-informes-
+// periodo.md y _shared/informes-en-resumen.ts). Se piden a
+// generar-informe-periodo EN PARALELO con el PDF del propio turno y
+// nunca son fatales: si fallan, el resumen sale igual sin ese enlace y
+// el cron de respaldo de informes los manda como mensaje suelto. Al
+// salir bien el mensaje, se marcan como enviados en informe_periodo.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, jsonError, jsonOk } from "../_shared/cors.ts";
 import { m2DePiezas } from "../_shared/formato.ts";
 import { generarPdfInformeTurno, type DatosInformeTurnoPdf } from "../_shared/pdf-informe-turno.ts";
 import { subirInformePdfACloudinary, construirPublicIdInformeTurno } from "../_shared/cloudinary.ts";
+import { pedirInformesDelCierre, type InformePeriodoIncluido } from "../_shared/informes-en-resumen.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -296,6 +306,15 @@ Deno.serve(async (req: Request) => {
       tiemposTotales.maquina += p.minutos_maquina;
     }
 
+    // 7a) Informes diario/semanal (solo al cerrar el turno de NOCHE).
+    // Se lanzan YA, sin esperar, para que se generen a la vez que el PDF
+    // del turno (7b); se recogen justo antes de construir el mensaje.
+    // Esta promesa nunca rechaza: pedirInformesDelCierre captura todo.
+    const informesPeriodoPromesa: Promise<InformePeriodoIncluido[]> =
+      turnoRow.tipo === "N"
+        ? pedirInformesDelCierre(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, turnoRow.fecha)
+        : Promise.resolve([]);
+
     // 7b) Generar el PDF con estos mismos datos y subirlo a
     // Cloudinary, ANTES de construir el texto de Telegram — así el
     // enlace ya está listo para meterlo en el último bloque. No es
@@ -333,6 +352,8 @@ Deno.serve(async (req: Request) => {
     } catch (err) {
       console.error("No se pudo generar/subir el PDF del informe de turno:", err);
     }
+
+    const informesPeriodo = await informesPeriodoPromesa;
 
     // 8) Construir el texto en bloques (HTML, mismo parse_mode que
     // notificar-telegram) — un bloque por nivel del informe, para
@@ -391,6 +412,18 @@ Deno.serve(async (req: Request) => {
       bloques.push(`📄 <a href="${pdfUrl}">Informe completo en PDF</a>`);
     }
 
+    if (informesPeriodo.length > 0) {
+      bloques.push(
+        informesPeriodo
+          .map((inf) =>
+            inf.tipo === "diario"
+              ? `📊 <a href="${inf.pdfUrl}">Informe del día ${formatearFecha(inf.desde)} en PDF</a> — ${formatearM2(inf.m2Total)}`
+              : `📅 <a href="${inf.pdfUrl}">Informe de la semana ${formatearFecha(inf.desde)} al ${formatearFecha(inf.hasta)} en PDF</a> — ${formatearM2(inf.m2Total)}`,
+          )
+          .join("\n"),
+      );
+    }
+
     const textoCompleto = bloques.join("\n\n");
 
     // Guarda el mismo contenido completo también en el feed in-app —
@@ -447,6 +480,22 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // 10b) Los informes diario/semanal que han ido dentro del mensaje
+    // cuentan como enviados: así el cron de respaldo de informes no los
+    // vuelve a mandar como mensaje suelto. Solo se marcan los que aún no
+    // lo estaban, y solo aquí (tras salir bien TODOS los mensajes).
+    for (const inf of informesPeriodo) {
+      const { error: marcarInfErr } = await supabase
+        .from("informe_periodo")
+        .update({ enviado_at: new Date().toISOString() })
+        .eq("tipo", inf.tipo)
+        .eq("desde", inf.desde)
+        .is("enviado_at", null);
+      if (marcarInfErr) {
+        console.error(`Informe ${inf.tipo} de ${inf.desde} enviado, pero no se pudo marcar enviado_at:`, marcarInfErr);
+      }
+    }
+
     // 11) Marcar el turno como "ya enviado" — SOLO si todos los
     // mensajes salieron bien. Esto es lo que evita que el cron de
     // seguridad (20260816230000_resumen_turno_automatico.sql) lo
@@ -468,7 +517,12 @@ Deno.serve(async (req: Request) => {
       console.error("Resumen enviado, pero no se pudo marcar resumen_enviado_at:", marcarErr);
     }
 
-    return jsonOk({ texto: textoCompleto, mensajes_enviados: mensajes.length, informe_pdf_url: pdfUrl });
+    return jsonOk({
+      texto: textoCompleto,
+      mensajes_enviados: mensajes.length,
+      informe_pdf_url: pdfUrl,
+      informes_periodo: informesPeriodo.map((i) => i.tipo),
+    });
   } catch (err) {
     console.error("Error en generar-resumen-turno:", err);
     return jsonError(

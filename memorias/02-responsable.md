@@ -39,7 +39,17 @@ que perdían el turno cargado en pantalla cada vez que se cerraban.
 | `descanso` | Mensaje "hoy es tu descanso" | Nada de gestión. Si hace falta cubrir el turno de otro: con las credenciales del titular que le toca (`01`). |
 | `antes` | Cuándo empieza el turno | Nada |
 | `abierto` | Tarjeta de refuerzo + 6 tarjetas de línea + incidencias generales + Cerrar turno | Todo |
-| `en_revision` | Igual, con aviso | Continuar partes ya abiertos, corregir partes cerrados, cerrar turno. **No** crear partes nuevos (nuevo lote / nuevo tono / continuar del turno anterior deshabilitados). |
+| `en_revision` | Igual, con aviso de la hora de cierre automático | Todo lo del estado `abierto`: nuevo lote, nuevo tono/calibre, continuar del turno anterior, asignar operarios, corregir, cerrar turno. Desde el 20/09/2026 (antes solo se podía continuar y corregir). El aviso dice "puedes seguir registrando partes hasta las HH:MM, cuando el turno se cierra solo". |
+Motivo del cambio (20/09/2026): tres veces el responsable no llegó a
+registrarlo todo a tiempo y la hora de revisión solo dejaba continuar
+y corregir. El bloqueo era solo de interfaz (`TurnoScreen.tsx`): la
+política `parte_insert_responsable` nunca comprobó hora ni estado del
+turno, así que no hizo falta migración.
+
+Riesgo conocido: a la hora en punto el cron cierra el turno y completa
+"sin producción" los partes que sigan pendientes (`20260820123000`).
+Un parte que se empiece justo antes de ese momento puede cerrarse a
+cero mientras se rellena. Ver `07`.
 | `cerrado` | Vista de solo lectura | Nada |
 
 **Operarios de refuerzo** (tarjeta arriba de las líneas): alta/baja de

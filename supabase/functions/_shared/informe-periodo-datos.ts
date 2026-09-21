@@ -24,8 +24,10 @@ import { m2DePiezas } from "./formato.ts";
 import type {
   AcumuladoPeriodoPdf,
   DatosInformePeriodoPdf,
+  FilaDesglosePdf,
   IncidenciaPeriodoPdf,
   LotePeriodoPdf,
+  TiempoRegistroPdf,
   TipoInformePeriodo,
   TipoTurnoLetra,
 } from "./pdf-informe-periodo.ts";
@@ -288,6 +290,18 @@ export async function cargarFilasPeriodo(
 // ---------------------------------------------------------------
 
 const ORDEN_TURNO: Record<TipoTurnoLetra, number> = { M: 0, T: 1, N: 2 };
+const NOMBRE_TURNO: Record<TipoTurnoLetra, string> = { M: "Mañana", T: "Tarde", N: "Noche" };
+// Minutos que dura un turno por línea (8 h): el mismo suelo de 480 que
+// usan las vistas de rendimiento (v_produccion_turno).
+const MINUTOS_LINEA_TURNO = 480;
+const DIAS_SEMANA = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+
+/** "lun 07/09" — con tabla propia en vez de toLocaleDateString para no depender del ICU del servidor. */
+function etiquetaDia(fechaISO: string): string {
+  const [y, m, d] = fechaISO.split("-").map(Number);
+  const dia = DIAS_SEMANA[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  return `${dia} ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}`;
+}
 
 function acumuladoVacio(): AcumuladoPeriodoPdf {
   return {
@@ -377,6 +391,13 @@ export function construirDatosInformePeriodo(
   const totales = acumuladoVacio();
   const porLote = new Map<string, AcumuladorLote>();
 
+  // Desglose temporal: diario -> una fila por turno (M/T/N); semanal ->
+  // una por día. Se crean SIEMPRE todas las filas (aunque no haya
+  // producción ni turno) para que los huecos se vean, no se omitan.
+  const claves: string[] = tipo === "diario" ? ["M", "T", "N"] : listarFechas(desde, hasta);
+  const claveDeTurno = (t: FilaTurno): string => (tipo === "diario" ? t.tipo : t.fecha);
+  const porClave = new Map<string, AcumuladoPeriodoPdf>(claves.map((c) => [c, acumuladoVacio()]));
+
   for (const p of filas.partes) {
     const m2: ParteCalculada = {
       m2_1a: m2DePiezas(p.piezas_1a, p.formato_nombre),
@@ -387,6 +408,10 @@ export function construirDatosInformePeriodo(
     const linea = porLinea.get(p.linea_id);
     if (linea) sumarEn(linea, p, m2);
     sumarEn(totales, p, m2);
+
+    const turnoDelParte = turnoPorId.get(p.turno_id);
+    const fila = turnoDelParte ? porClave.get(claveDeTurno(turnoDelParte)) : undefined;
+    if (fila) sumarEn(fila, p, m2);
 
     let lote = porLote.get(p.lote_id);
     if (!lote) {
@@ -405,6 +430,41 @@ export function construirDatosInformePeriodo(
     const cal = normalizarCalibre(p.calibre);
     if (cal) lote.calibres.add(cal);
   }
+
+  const desglose: FilaDesglosePdf[] = claves.map((clave) => {
+    let nota: string | null = null;
+    if (tipo === "diario") {
+      const turno = filas.turnos.find((t) => t.tipo === clave);
+      nota = !turno ? "sin turno" : !turno.cerrado_at ? "sin cerrar" : null;
+    } else {
+      // "2/3" = turnos registrados ese día de los 3 esperados (el PDF
+      // lo explica en una nota al pie de la tabla).
+      const n = filas.turnos.filter((t) => t.fecha === clave).length;
+      nota = n < 3 ? `${n}/3` : null;
+    }
+    return {
+      etiqueta: tipo === "diario" ? NOMBRE_TURNO[clave as TipoTurnoLetra] : etiquetaDia(clave),
+      nota,
+      ...(porClave.get(clave) ?? acumuladoVacio()),
+    };
+  });
+
+  // Tiempo máximo = turnos esperados × líneas × 480 (8.640 al día, 60.480 a
+  // la semana con 6 líneas). Se calcula solo a nivel de periodo, no por
+  // línea: así los pequeños descuadres entre partes se compensan.
+  const numLineas = filas.lineas.length;
+  const maximo = turnosEsperados * numLineas * MINUTOS_LINEA_TURNO;
+  const t5 = totales.tiempos;
+  const registrado = t5.plena + t5.noAlimentada + t5.saturacion + t5.banco + t5.maquina;
+  const sinRegistrar = Math.max(0, maximo - registrado);
+  const tiempoRegistro: TiempoRegistroPdf = {
+    turnos: turnosEsperados,
+    lineas: numLineas,
+    maximo,
+    registrado,
+    sinRegistrar,
+    sinRegistrarPorTurnosFaltantes: Math.min(sinRegistrar, turnosFaltantes.length * numLineas * MINUTOS_LINEA_TURNO),
+  };
 
   const lineas = filas.lineas.map((l) => ({ nombre: l.nombre, ...(porLinea.get(l.id) ?? acumuladoVacio()) }));
 
@@ -472,6 +532,8 @@ export function construirDatosInformePeriodo(
     turnosSinCerrar,
     turnosFaltantes,
     responsables,
+    desglose,
+    tiempoRegistro,
     lineas,
     totales,
     lotes,

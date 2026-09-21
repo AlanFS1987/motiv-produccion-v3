@@ -2,7 +2,7 @@
 
 Shell propio (`admin/AdminApp.tsx`), se muestra cuando `usuario.rol =
 'administrador'`. El admin ve **todo** lo que ve el jefe (Vista
-Rápida, Vista Detallada, Incidencias, Calidad, Ceria — reutilizando
+Rápida, Vista Detallada, Incidencias, Calidad, Informes, Ceria, Chat — reutilizando
 literalmente los componentes de `jefe/` y `calidad/`, no duplicados)
 más sus propias pestañas de gestión.
 
