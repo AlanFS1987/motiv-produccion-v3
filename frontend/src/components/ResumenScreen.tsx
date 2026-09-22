@@ -5,8 +5,10 @@ import { calcularTurnoActual, calcularTurnoActualSuplente, type TipoTurno } from
 import {
   obtenerTurnoPorFechaTipo,
   generarResumenTurno,
+  obtenerInformesPeriodoDeTurno,
   formatearResumenTurnoTexto,
   type ResumenTurno,
+  type InformePeriodoEnResumen,
 } from "../lib/resumen-turno";
 
 const NOMBRE_TIPO: Record<TipoTurno, string> = {
@@ -28,6 +30,13 @@ const NOMBRE_TIPO: Record<TipoTurno, string> = {
  * informePdfUrl se queda en null mientras el turno sigue abierto —
  * el texto a copiar simplemente no lleva enlace en ese caso, en vez
  * de mostrar un enlace roto o inventado.
+ *
+ * Informes diario/semanal (21/09/2026): si el turno es el de NOCHE y
+ * ya está cerrado, se busca en `informe_periodo` el informe del día
+ * (y, en domingo, el de la semana) para añadir su enlace al texto de
+ * "Copiar" — mismo criterio que el PDF del turno: si todavía no se
+ * generó (lo normal justo al cerrar, se genera después), simplemente
+ * no aparece esa línea.
  */
 export function ResumenScreen() {
   const { usuario } = useAuth();
@@ -37,6 +46,7 @@ export function ResumenScreen() {
   const [esProvisional, setEsProvisional] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [informePdfUrl, setInformePdfUrl] = useState<string | null>(null);
+  const [informesPeriodo, setInformesPeriodo] = useState<InformePeriodoEnResumen[]>([]);
 
   useEffect(() => {
     if (!usuario) return;
@@ -58,6 +68,7 @@ export function ResumenScreen() {
             setResumen(null);
             setEsProvisional(false);
             setInformePdfUrl(null);
+            setInformesPeriodo([]);
           }
           return;
         }
@@ -68,6 +79,7 @@ export function ResumenScreen() {
             setResumen(null);
             setEsProvisional(false);
             setInformePdfUrl(null);
+            setInformesPeriodo([]);
           }
           return;
         }
@@ -83,6 +95,14 @@ export function ResumenScreen() {
           // null mientras el turno sigue abierto, o si el PDF falló
           // al generarse en el cierre (ver comentario en cabecera).
           setInformePdfUrl(turno.informe_pdf_url);
+        }
+
+        // Informes de periodo: solo tiene sentido consultarlos una vez
+        // cerrado el turno (antes de cerrarse no pueden existir); la
+        // propia función descarta turnos que no sean de noche.
+        const infPeriodo = turno.cerrado_at ? await obtenerInformesPeriodoDeTurno(info.fecha, info.tipo) : [];
+        if (!cancelado) {
+          setInformesPeriodo(infPeriodo);
         }
       } catch (err) {
         if (!cancelado) setError(err instanceof Error ? err.message : String(err));
@@ -100,7 +120,7 @@ export function ResumenScreen() {
   async function copiar() {
     if (!resumen) return;
     try {
-      await navigator.clipboard.writeText(formatearResumenTurnoTexto(resumen, informePdfUrl));
+      await navigator.clipboard.writeText(formatearResumenTurnoTexto(resumen, informePdfUrl, informesPeriodo));
       setCopiado(true);
       setTimeout(() => setCopiado(false), 2000);
     } catch (err) {
@@ -128,7 +148,7 @@ export function ResumenScreen() {
     );
   }
 
-  const texto = formatearResumenTurnoTexto(resumen, informePdfUrl);
+  const texto = formatearResumenTurnoTexto(resumen, informePdfUrl, informesPeriodo);
 
   return (
     <div className="mx-auto max-w-md pb-8">

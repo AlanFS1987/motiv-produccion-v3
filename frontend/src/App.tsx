@@ -21,6 +21,7 @@ import { HistorialResponsableScreen } from "./components/responsable/HistorialRe
 import { RelevoScreen } from "./components/responsable/RelevoScreen";
 import { ProgresoFlotante } from "./components/responsable/ProgresoFlotante";
 import { ChatHomeScreen } from "./components/chat/ChatHomeScreen";
+import { ProduccionApp } from "./components/produccion/ProduccionApp";
 type Pestana = "turno" | "resumen" | "lotes" | "historial" | "relevo" | "chat";
 
 export default function App() {
@@ -82,6 +83,10 @@ function AppAutenticada({ username }: { username: string }) {
 
   if (usuario?.rol === "jefe_rectificado") {
     return <RectificadoApp username={username} />;
+  }
+  
+  if (usuario?.rol === "produccion") {
+  return <ProduccionApp username={username} />;
   }
 
   if (usuario?.rol === "calidad") {

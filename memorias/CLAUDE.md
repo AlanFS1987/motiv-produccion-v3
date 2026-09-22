@@ -84,7 +84,7 @@ Unidades — ver `17` y `18`.
 | Incidencias de calidad (dentro del parte) y de producción (línea / turno) | Construido |
 | Corrección de parte por doble entrada, ventana 1 h del responsable; admin sin límite | Construido |
 | Cierre manual de turno + informe (pestaña Resumen, botón Copiar) | Construido |
-| Cierre automático de turno (cron) + envío del informe a Telegram | Construido; el camino automático **no** se ha visto en real |
+| Cierre automático de turno (cron) + envío del informe a Telegram | Construido; el camino automático se ha visto en real |
 | Gestión de lotes (lista, Finalizar/Reabrir) | Construido |
 | Telegram: incidencias calidad, incidencias producción, nuevos lotes, resumen de turno, resumen calidad | Construido |
 | Operario: Inicio (Inicio / Ranking / Stats+Avatar / Logros), Mi línea, Historial, Limpieza | Construido y probado en real |

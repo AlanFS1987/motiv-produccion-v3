@@ -61,6 +61,19 @@ export interface ResumenTurno {
   incidenciasGenerales: IncidenciaResumen[];
 }
 
+/**
+ * Informe DIARIO o SEMANAL ya generado (informe_periodo), para
+ * añadir su enlace al texto de "Copiar" cuando el turno es el de
+ * NOCHE. Ver `obtenerInformesPeriodoDeTurno` más abajo.
+ */
+export interface InformePeriodoEnResumen {
+  tipo: "diario" | "semanal";
+  desde: string;
+  hasta: string;
+  pdfUrl: string;
+  m2Total: number;
+}
+
 /** Supabase a veces devuelve una relación anidada como array de 1, a veces como objeto — se normaliza. */
 function uno<T>(valor: T | T[] | null | undefined): T | null {
   if (!valor) return null;
@@ -88,6 +101,75 @@ export async function obtenerTurnoPorFechaTipo(
     .maybeSingle();
   if (error) throw error;
   return data;
+}
+
+// Misma matemática de fechas que _shared/informe-periodo-datos.ts
+// (sumarDiasISO) — duplicado a propósito: ese archivo es Deno (Edge
+// Functions) y este es del navegador, no se pueden compartir.
+function sumarDiasISO(fechaISO: string, dias: number): string {
+  const [y, m, d] = fechaISO.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + dias)).toISOString().slice(0, 10);
+}
+
+function esDomingo(fechaISO: string): boolean {
+  const [y, m, d] = fechaISO.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay() === 0;
+}
+
+interface FilaInformePeriodo {
+  tipo: "diario" | "semanal";
+  desde: string;
+  hasta: string;
+  pdf_url: string | null;
+  resumen: { m2_total?: number } | null;
+}
+
+async function buscarInformePeriodo(
+  tipo: "diario" | "semanal",
+  desde: string,
+): Promise<InformePeriodoEnResumen | null> {
+  const { data, error } = await supabase
+    .from("informe_periodo")
+    .select("tipo, desde, hasta, pdf_url, resumen")
+    .eq("tipo", tipo)
+    .eq("desde", desde)
+    .not("pdf_url", "is", null)
+    .maybeSingle<FilaInformePeriodo>();
+  if (error) throw error;
+  if (!data || !data.pdf_url) return null;
+  return {
+    tipo,
+    desde: data.desde,
+    hasta: data.hasta,
+    pdfUrl: data.pdf_url,
+    m2Total: Number(data.resumen?.m2_total ?? 0),
+  };
+}
+
+/**
+ * Enlaces a los informes DIARIO (y, en domingo, SEMANAL) para añadir
+ * al texto de "Copiar" — solo el turno de NOCHE dispara esos
+ * informes (ver `19-informes-periodo.md`). Se generan DESPUÉS de
+ * cerrar el turno, de forma asíncrona (misma Edge Function que sube
+ * el PDF del propio turno), así que lo normal es que, justo al
+ * cerrar, todavía no existan: se omiten sin más, igual criterio que
+ * `informe_pdf_url` del turno. Nunca lanza — un fallo aquí no debe
+ * impedir copiar el resto del resumen.
+ */
+export async function obtenerInformesPeriodoDeTurno(
+  fecha: string,
+  tipo: TipoTurno,
+): Promise<InformePeriodoEnResumen[]> {
+  if (tipo !== "N") return [];
+  try {
+    const pedidos: Promise<InformePeriodoEnResumen | null>[] = [buscarInformePeriodo("diario", fecha)];
+    if (esDomingo(fecha)) pedidos.push(buscarInformePeriodo("semanal", sumarDiasISO(fecha, -6)));
+    const resultados = await Promise.all(pedidos);
+    return resultados.filter((r): r is InformePeriodoEnResumen => r !== null);
+  } catch (err) {
+    console.error("No se pudieron cargar los informes de periodo para el resumen de turno:", err);
+    return [];
+  }
 }
 
 /**
@@ -288,7 +370,11 @@ function formatearFecha(fechaISO: string): string {
  * Compartir nativo porque WhatsApp trunca textos largos al
  * compartir directamente", así que se pega a mano).
  */
-export function formatearResumenTurnoTexto(r: ResumenTurno, informePdfUrl?: string | null): string {
+export function formatearResumenTurnoTexto(
+  r: ResumenTurno,
+  informePdfUrl?: string | null,
+  informesPeriodo?: InformePeriodoEnResumen[],
+): string {
   const lineas: string[] = [];
  
   lineas.push(`*RESUMEN DE TURNO — ${NOMBRE_TIPO[r.tipo]}, ${formatearFecha(r.fecha)}*`);
@@ -331,6 +417,16 @@ export function formatearResumenTurnoTexto(r: ResumenTurno, informePdfUrl?: stri
 
   if (informePdfUrl) {
     lineas.push(`📄 Informe completo: ${informePdfUrl}`);
+  }
+
+  for (const inf of informesPeriodo ?? []) {
+    if (inf.tipo === "diario") {
+      lineas.push(`📊 Informe del día ${formatearFecha(inf.desde)}: ${inf.pdfUrl} — ${formatearM2(inf.m2Total)}`);
+    } else {
+      lineas.push(
+        `📅 Informe de la semana ${formatearFecha(inf.desde)} al ${formatearFecha(inf.hasta)}: ${inf.pdfUrl} — ${formatearM2(inf.m2Total)}`,
+      );
+    }
   }
 
   return lineas.join("\n").trimEnd();
