@@ -77,9 +77,12 @@ que tocar esa RLS.
 
 - **`existe_csv_programacion(fecha)`** — hay ya CSV pegado hoy.
 - **`guardar_programacion_csv(fecha, contenido)`** — upsert en
-  `admin_notas` (mismo comportamiento que `guardarProgramacion` de
-  `lib/admin-notas.ts`: sobrescribe si ya existía fila esa fecha).
-  Permite a `jefe` pegar el CSV él mismo, sin depender del admin.
+  `admin_notas` (select-then-write: sobrescribe si ya existía fila esa
+  fecha). Permite a `jefe` pegar el CSV él mismo, sin depender del
+  admin — es la única vía de escritura de `tipo='programacion'` hoy
+  (la pantalla simple del admin que escribía esas filas directamente
+  desde `lib/admin-notas.ts` se retiró el 27/09/2026, ver "Frontend"
+  más abajo).
 - **`parse_programacion(fecha)`** — el parser SQL puro. Detecta
   cabeceras por `ilike '%Nº ORDEN%' and ilike '%MODELO%'`, cuenta
   cabeceras vistas (`sum() over (order by ordinality)`) para asignar
@@ -143,7 +146,7 @@ Dos redes de seguridad ante un error humano (CSV equivocado):
 ## Frontend
 
 `JefeApp.tsx` gana una 8ª pestaña, **"Programación"**
-(`ProgramacionScreen.tsx`), con dos sub-vistas:
+(`jefe/programacion/ProgramacionScreen.tsx`), con dos sub-vistas:
 
 - **Revisar**: si no hay CSV hoy (`existeCsvHoy`), muestra el textarea
   de pegar ahí mismo (fusionado, sin pestaña aparte — decisión de
@@ -158,6 +161,22 @@ Dos redes de seguridad ante un error humano (CSV equivocado):
 
 `lib/programacion.ts` — todas las llamadas RPC + tipos
 (`FilaDiff`, `FilaConEstado`, `FilaAConfirmar`) + `agruparPorHorno`.
+
+**Admin (27/09/2026)**: la pestaña "Programación" de `AdminApp.tsx`
+reutiliza literalmente este mismo `jefe/programacion/ProgramacionScreen.tsx`
+(mismo patrón ya usado para Vista Rápida/Detallada/Incidencias/Informes),
+en vez de la pantalla simple que tenía antes (solo pegar CSV +
+histórico, `admin/AdminProgramacionCsvScreen.tsx`, ya borrada). El
+admin tiene ahora diff editable, confirmar y deshacer igual que el
+jefe — no hizo falta ningún cambio de RLS/RPC: `diff_programacion`,
+`guardar_programacion_csv`, `confirmar_programacion` y
+`deshacer_ultima_programacion` ya comprobaban
+`fn_rol_actual() in ('jefe','administrador')` desde que se crearon.
+Las funciones de Programación que vivían en `lib/admin-notas.ts`
+(`guardarProgramacion`, `listarProgramacionHistorico`,
+`fechaDeHoyISO`, `ProgramacionHistorico`) se borraron por quedar sin
+ningún uso; las de Notas (`tipo='nota'`) en ese mismo archivo no se
+tocaron.
 
 ### Exportación — una hoja A4 vertical, una cara
 

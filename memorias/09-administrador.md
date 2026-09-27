@@ -2,9 +2,9 @@
 
 Shell propio (`admin/AdminApp.tsx`), se muestra cuando `usuario.rol =
 'administrador'`. El admin ve **todo** lo que ve el jefe (Vista
-Rápida, Vista Detallada, Incidencias, Calidad, Informes, Ceria, Chat — reutilizando
-literalmente los componentes de `jefe/` y `calidad/`, no duplicados)
-más sus propias pestañas de gestión.
+Rápida, Vista Detallada, Incidencias, Calidad, Informes, Programación,
+Ceria, Chat — reutilizando literalmente los componentes de `jefe/` y
+`calidad/`, no duplicados) más sus propias pestañas de gestión.
 
 ## Construido
 
@@ -176,6 +176,9 @@ más sus propias pestañas de gestión.
   permitía desde que se creó la tabla.
 - **Notas** (`admin/NotasScreen.tsx`, `lib/admin-notas.ts`) — pestaña
   "Notas" del admin para el jefe.
-- **Programación** (`admin/AdminProgramacionCsvScreen.tsx`) — pestaña
-  "Programación": pegar el CSV diario + histórico. Detalle completo en
+- **Programación** (27/09/2026) — pestaña "Programación": reutiliza
+  literalmente `jefe/programacion/ProgramacionScreen.tsx` (mismo
+  componente que usa el jefe, diff editable + confirmar + deshacer +
+  consultar), no una pantalla propia. Sustituye a la pantalla simple
+  de pegar CSV + histórico que tenía antes. Detalle completo en
   `20-programacion.md`.

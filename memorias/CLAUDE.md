@@ -222,8 +222,8 @@ frontend/src/
                                jefe/programacion/ (Consultar/Revisar/Screen)
     admin/                     AdminApp, AjustarLetras, CorreccionPartes, PruebaCamara,
                                CierreFabrica, Checklist, GestionUsuarios, ChatAcceso,
-                               Gamificacion, Notas, PuntosEngrase, AdminProgramacionCsvScreen,
-                               AdminNuevoParte
+                               Gamificacion, Notas, PuntosEngrase, AdminNuevoParte
+                               (Programación reutiliza jefe/programacion/ProgramacionScreen)
     calidad/                   CalidadApp, CalidadLotesScreen
     rectificado/                RectificadoApp, VistaRapida/VistaDetallada de rectificado
     produccion/                 ProduccionApp (7 pestañas, reutiliza componentes de jefe/ y calidad/)
