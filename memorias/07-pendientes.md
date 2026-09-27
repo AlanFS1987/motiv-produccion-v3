@@ -134,6 +134,10 @@ Cada área lleva su lista abierta en su archivo; aquí solo se remite
   "Regenerar", aviso en la campana, respuesta del mecánico en las
   incidencias, PDF huérfanos tras `regenerar`, comparar m² con el
   dashboard) → `19`.
+- **Programación de hornos**: integrar la hoja de diseño (PDF con
+  CLASE/TONO/CALIBRE/CONTROL) en la app, confirmar que la hoja de
+  impresión sigue cabiendo en una cara con volumen de pedidos alto,
+  reglas de validación de tono/calibre → `20`.
 
 
 ## Ideas futuras sin decidir

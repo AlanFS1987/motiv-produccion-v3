@@ -24,7 +24,7 @@ import { IncidenciasScreen } from "./IncidenciasScreen";
 import { InformesScreen } from "./InformesScreen";
 import { CalidadLotesScreen } from "../calidad/CalidadLotesScreen";
 import { ChatHomeScreen } from "../chat/ChatHomeScreen";
-import { ProgramacionScreen } from "./ProgramacionScreen";
+import { ProgramacionScreen } from "./programacion/ProgramacionScreen";
 
 type PestanaJefe = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "informes" | "programacion" | "ceria" | "chat";
 

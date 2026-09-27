@@ -69,6 +69,27 @@ function hoyISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+export async function existeCsvHoy(fecha: string = hoyISO()): Promise<boolean> {
+  const { data, error } = await supabase.rpc("existe_csv_programacion", { p_fecha: fecha });
+  if (error) throw new Error(error.message);
+  return Boolean(data);
+}
+
+export async function guardarProgramacionCsv(fecha: string, contenido: string): Promise<void> {
+  const { error } = await supabase.rpc("guardar_programacion_csv", {
+    p_fecha: fecha,
+    p_contenido: contenido,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function deshacerUltimaProgramacion(): Promise<{ filasRestauradas: number; snapshotDe: string }> {
+  const { data, error } = await supabase.rpc("deshacer_ultima_programacion");
+  if (error) throw new Error(error.message);
+  const fila = data?.[0];
+  return { filasRestauradas: fila?.filas_restauradas ?? 0, snapshotDe: fila?.snapshot_de ?? "" };
+}
+
 // ---------------------------------------------------------------
 // Revisión (diff editable)
 // ---------------------------------------------------------------
