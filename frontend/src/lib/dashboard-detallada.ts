@@ -179,6 +179,20 @@ function camposCalculadosVacios() {
  * que el resto del proyecto).
  */
 export async function obtenerDetalle(filtros: FiltrosDetalle): Promise<TurnoDetalle[]> {
+  // Se resuelve ANTES de construir queryTurnos: hace falta el id (o su
+  // ausencia) para poder filtrar también los turnos por responsable,
+  // no solo los partes (ver más abajo, queryTurnos.eq("abierto_por"...)).
+  let respRow: { id: string } | null = null;
+  if (filtros.responsableUsername) {
+    const { data } = await supabase
+      .from("usuario")
+      .select("id")
+      .ilike("username", `%${filtros.responsableUsername}%`)
+      .limit(1)
+      .maybeSingle();
+    respRow = data as { id: string } | null;
+  }
+
   let queryTurnos = supabase
     .from("turno")
     .select(
@@ -189,6 +203,17 @@ export async function obtenerDetalle(filtros: FiltrosDetalle): Promise<TurnoDeta
     .lte("fecha", filtros.fechaHasta)
     .order("fecha", { ascending: false });
   if (filtros.turno) queryTurnos = queryTurnos.eq("tipo", filtros.turno);
+  if (filtros.responsableUsername) {
+    // Sin este filtro, los turnos de OTROS responsables se traían
+    // igual (con 0 líneas, porque ninguno de sus partes coincide con
+    // el filtro de queryPartes de más abajo) en vez de no aparecer en
+    // absoluto — rompía la promesa de HistorialResponsableScreen.tsx
+    // (responsableFijo). Si no se resolvió ningún usuario con ese
+    // nombre, se usa un id imposible para que no devuelva ningún
+    // turno (en vez de devolverlos todos sin filtrar, que sería el
+    // mismo bug por otra vía).
+    queryTurnos = queryTurnos.eq("abierto_por", respRow?.id ?? "00000000-0000-0000-0000-000000000000");
+  }
 
   const { data: turnosRaw, error: errorTurnos } = await queryTurnos;
   if (errorTurnos) throw new Error(`turno: ${errorTurnos.message}`);
@@ -233,15 +258,12 @@ export async function obtenerDetalle(filtros: FiltrosDetalle): Promise<TurnoDeta
       .maybeSingle();
     if (lineaRow) queryPartes = queryPartes.eq("linea_id", lineaRow.id as string);
   }
-  if (filtros.responsableUsername) {
-    const { data: respRow } = await supabase
-      .from("usuario")
-      .select("id")
-      .ilike("username", `%${filtros.responsableUsername}%`)
-      .limit(1)
-      .maybeSingle();
-    if (respRow) queryPartes = queryPartes.eq("responsable_id", respRow.id as string);
-  }
+  // Capa extra de seguridad (ahora redundante con el filtro de
+  // queryTurnos de arriba en el caso normal, pero se deja: si algún
+  // día un turno tuviera partes de otro responsable por cualquier
+  // motivo, esto los sigue excluyendo). Reutiliza el respRow ya
+  // resuelto arriba — no se vuelve a consultar `usuario`.
+  if (respRow) queryPartes = queryPartes.eq("responsable_id", respRow.id);
 
   const { data: partesRaw, error: errorPartes } = await queryPartes;
   if (errorPartes) throw new Error(`parte: ${errorPartes.message}`);
