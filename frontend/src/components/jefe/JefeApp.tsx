@@ -24,8 +24,9 @@ import { IncidenciasScreen } from "./IncidenciasScreen";
 import { InformesScreen } from "./InformesScreen";
 import { CalidadLotesScreen } from "../calidad/CalidadLotesScreen";
 import { ChatHomeScreen } from "../chat/ChatHomeScreen";
+import { ProgramacionScreen } from "./ProgramacionScreen";
 
-type PestanaJefe = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "informes" | "ceria" | "chat";
+type PestanaJefe = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "informes" | "programacion" | "ceria" | "chat";
 
 function BotonPestana({
   activa,
@@ -89,6 +90,9 @@ export function JefeApp({ username }: { username: string }) {
           <BotonPestana activa={pestana === "informes"} onClick={() => setPestana("informes")}>
             Informes
           </BotonPestana>
+          <BotonPestana activa={pestana === "programacion"} onClick={() => setPestana("programacion")}>
+            Programación
+          </BotonPestana>
           <BotonPestana activa={pestana === "ceria"} onClick={() => setPestana("ceria")}>
             Ceria
           </BotonPestana>
@@ -104,6 +108,7 @@ export function JefeApp({ username }: { username: string }) {
         {pestana === "incidencias" && <IncidenciasScreen />}
         {pestana === "calidad" && <CalidadLotesScreen />}
         {pestana === "informes" && <InformesScreen />}
+        {pestana === "programacion" && <ProgramacionScreen />}
         {pestana === "ceria" && <CeriaScreen />}
         {pestana === "chat" && <ChatHomeScreen />}
       </div>
