@@ -30,30 +30,29 @@
 // retoma el wizard donde se quedó — mismo camino que "Continuar
 // parte" del responsable, sin lógica especial aquí para ese caso.
 //
-// responsable_id del parte insertado queda como el ADMIN que lo
-// crea, no el responsable original — mismo criterio ya usado en
-// CorreccionPartesScreen para las correcciones.
+// responsable_id del parte insertado es el que abrió el turno
+// (turno.abierto_por), no el admin que lo crea — mismo criterio que
+// corregirParte (lib/parte.ts). Un turno tiene siempre un único
+// responsable (quien cubre a otro lo hace con la sesión del titular).
 
 import { useEffect, useState } from "react";
 import { AlertTriangle, Lock, Search } from "lucide-react";
 import { listarLineas, type Linea } from "../../lib/turno";
 import { obtenerTurnoPorFechaTipo } from "../../lib/resumen-turno";
+import { hoyLocalISO } from "../../lib/fechas";
 import { CapturaParteScreen } from "../captura-parte/CapturaParteScreen";
 
 const NOMBRE_TURNO: Record<"M" | "T" | "N", string> = { M: "Mañana", T: "Tarde", N: "Noche" };
 
-function hoyISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 interface TurnoEncontrado {
   id: string;
   cerrado_at: string | null;
+  abierto_por: string;
 }
 
 export function AdminNuevoParteScreen() {
   const [lineas, setLineas] = useState<Linea[]>([]);
-  const [fecha, setFecha] = useState(hoyISO());
+  const [fecha, setFecha] = useState(hoyLocalISO());
   const [tipo, setTipo] = useState<"M" | "T" | "N">("M");
   const [lineaId, setLineaId] = useState("");
 
@@ -100,6 +99,7 @@ export function AdminNuevoParteScreen() {
           turnoId={turno.id}
           lineaId={lineaSeleccionada.id}
           lineaNombre={lineaSeleccionada.nombre}
+          responsableIdOverride={turno.abierto_por}
           onFinalizado={() => {
             setTurno(null);
             setBuscado(false);

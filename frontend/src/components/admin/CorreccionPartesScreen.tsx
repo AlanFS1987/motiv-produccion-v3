@@ -7,10 +7,8 @@
 // (política parte_admin_todo + trigger security definer, sesión
 // 20/08/2026); aquí solo se quita el candado de la UI.
 //
-// contexto.responsableId al corregir = el ADMIN (quien corrige), no
-// el responsable original — igual que ya hace el propio responsable
-// al corregirse a sí mismo, así queda registrado quién hizo cada
-// corrección.
+// El responsable del parte corregido se hereda siempre del original
+// (lib/parte.ts), nunca del admin que corrige — ver corregirParte.
 
 import { useEffect, useState } from "react";
 import { ArrowLeft, Pencil, Search } from "lucide-react";
@@ -18,14 +16,13 @@ import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase-client";
 import { buscarPartes, type FiltrosBusquedaPartes, type ParteBusqueda } from "../../lib/admin-partes";
 import { obtenerParteDetalle, type ParteDetalle } from "../../lib/parte";
+import { sumarDiasLocalISO, hoyLocalISO } from "../../lib/fechas";
 import { FotoPantallaMaquina } from "../captura-parte/FotoPantallaMaquina";
 
 const NOMBRE_TURNO: Record<"M" | "T" | "N", string> = { M: "Mañana", T: "Tarde", N: "Noche" };
 
 function fechaISOHaceNDias(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
+  return sumarDiasLocalISO(hoyLocalISO(), -n);
 }
 
 type Vista = "lista" | "cargando-detalle" | "detalle" | "editando";
@@ -101,7 +98,6 @@ export function CorreccionPartesScreen() {
             turnoId: parteDetalle.turnoId,
             lineaId: parteDetalle.lineaId,
             loteId: parteDetalle.loteId,
-            responsableId: usuario.id,
           }}
           valoresIniciales={parteDetalle}
           onGuardado={() => {

@@ -38,6 +38,16 @@ interface CapturaParteScreenProps {
   /** Si se pasa, se salta el paso de "hoja de partida" y arranca directo en el formulario de nuevo tono/calibre sobre este lote. */
   origenNuevoTono?: OrigenNuevoTono;
   origenContinuar?: SugerenciaContinuar;
+  /**
+   * Quién debe quedar como responsable_id de un parte NUEVO que se
+   * cree aquí — por defecto es quien tiene la sesión abierta
+   * (el propio responsable creando su parte normal). Se usa desde
+   * AdminNuevoParteScreen para que el parte quede a nombre de quien
+   * de verdad abrió ese turno (turno.abierto_por), no del admin que
+   * lo está creando — mismo criterio que ya aplica corregirParte
+   * (lib/parte.ts) para las correcciones.
+   */
+  responsableIdOverride?: string;
 }
 
 interface InfoCabecera {
@@ -57,6 +67,7 @@ export function CapturaParteScreen({
   onCancelar,
   origenNuevoTono,
   origenContinuar,
+  responsableIdOverride,
 }: CapturaParteScreenProps) {
   const { usuario } = useAuth();
   const [paso, setPaso] = useState<Paso>("cargando");
@@ -192,7 +203,11 @@ export function CapturaParteScreen({
       {cabecera && (paso === "caja" || paso === "codbar" || paso === "pantalla") && <CabeceraParte info={cabecera} />}
 
       {paso === "hoja" && (
-        <FotoHojaPartida turnoId={turnoId} lineaId={lineaId} onResuelto={manejarLoteResuelto} onCancelar={onCancelar} />
+        <FotoHojaPartida
+          turnoId={turnoId}
+          lineaId={lineaId}
+          responsableId={responsableIdOverride}
+          onResuelto={manejarLoteResuelto} onCancelar={onCancelar} />
       )}
 
       {paso === "tono" && origenNuevoTono && (
@@ -200,6 +215,7 @@ export function CapturaParteScreen({
           turnoId={turnoId}
           lineaId={lineaId}
           loteId={origenNuevoTono.loteId}
+          responsableId={responsableIdOverride}
           tonoAnterior={origenNuevoTono.tonoAnterior}
           calibreAnterior={origenNuevoTono.calibreAnterior}
           onCreado={manejarLoteResuelto}
@@ -211,6 +227,7 @@ export function CapturaParteScreen({
           turnoId={turnoId}
           lineaId={lineaId}
           sugerencia={origenContinuar}
+          responsableId={responsableIdOverride}
           onCreado={manejarLoteResuelto}
           onCancelar={onCancelar}
         />

@@ -92,10 +92,10 @@ function tiemposVacios(): TiemposAgregados {
 export async function obtenerTurnoPorFechaTipo(
   fecha: string,
   tipo: TipoTurno,
-): Promise<{ id: string; cerrado_at: string | null; informe_pdf_url: string | null } | null> {
+): Promise<{ id: string; cerrado_at: string | null; informe_pdf_url: string | null; abierto_por: string } | null> {
   const { data, error } = await supabase
     .from("turno")
-    .select("id, cerrado_at, informe_pdf_url")
+    .select("id, cerrado_at, informe_pdf_url, abierto_por")
     .eq("fecha", fecha)
     .eq("tipo", tipo)
     .maybeSingle();

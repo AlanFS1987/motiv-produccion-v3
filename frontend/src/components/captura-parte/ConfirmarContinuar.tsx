@@ -8,6 +8,8 @@ interface ConfirmarContinuarProps {
   turnoId: string;
   lineaId: string;
   sugerencia: SugerenciaContinuar;
+  /** responsable_id del parte nuevo; por defecto, el usuario de la sesión (ver CapturaParteScreen.responsableIdOverride). */
+  responsableId?: string;
   onCreado: (lote: LoteResuelto, parteId: string) => void;
   onCancelar: () => void;
 }
@@ -17,7 +19,7 @@ interface ConfirmarContinuarProps {
  * 01-rol-responsable.md 3.2), crea el parte directo con lo mismo que
  * ya se estaba produciendo y salta a la Foto 4 (pantalla).
  */
-export function ConfirmarContinuar({ turnoId, lineaId, sugerencia, onCreado, onCancelar }: ConfirmarContinuarProps) {
+export function ConfirmarContinuar({ turnoId, lineaId, sugerencia, responsableId, onCreado, onCancelar }: ConfirmarContinuarProps) {
   const { usuario } = useAuth();
   const [creando, setCreando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +50,7 @@ export function ConfirmarContinuar({ turnoId, lineaId, sugerencia, onCreado, onC
         modeloTextoNormalizado: normalizarTexto(sugerencia.modeloNombre),
         fotoHojaPartidaUrl: "",
       };
-      const parte = await crearParteInicial(turnoId, lineaId, usuario.id, loteResuelto);
+      const parte = await crearParteInicial(turnoId, lineaId, responsableId ?? usuario.id, loteResuelto);
       onCreado(loteResuelto, parte.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

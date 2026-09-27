@@ -528,20 +528,74 @@ export interface DatosCorreccionParte {
 
 export async function corregirParte(
   parteOriginalId: string,
-  contexto: { turnoId: string; lineaId: string; loteId: string; responsableId: string },
+  contexto: { turnoId: string; lineaId: string; loteId: string },
   datos: DatosCorreccionParte,
 ): Promise<{ id: string }> {
+  // Se recupera del ORIGINAL lo que esta función no edita nunca —
+  // quién era el operario, quién era el RESPONSABLE, y sus
+  // verificaciones — para no perderlo al insertar la corrección.
+  //
+  // responsable_id se hereda SIEMPRE del original, sin excepción,
+  // desde el 27/09/2026: antes, cuando corregía el administrador,
+  // el parte corregido quedaba a nombre del propio admin — como los
+  // puntos de metros/rendimiento del responsable se calculan sumando
+  // TODOS los partes vigentes del turno agrupados por responsable_id
+  // (v_metros_responsable_por_turno, v_rendimiento_responsable_
+  // por_turno), esa única línea corregida "se escapaba" del total
+  // del responsable real y pasaba a contar (indebidamente) para el
+  // admin. Corregir un parte nunca debe cambiar de quién es el
+  // turno, igual que ya no cambia de quién es el operario. El trigger
+  // trg_parte_validar_correccion lo exige también en BD.
+  //
+  // operario_id y las verificaciones: mismo criterio. Bug real (detectado en producción,
+  // 2-3 correcciones en septiembre/2026): el INSERT de aquí abajo
+  // nunca copiaba operario_id ni las verificaciones (caja/codbar,
+  // ni las del propio responsable ni las 5 columnas *_operario), así
+  // que el parte corregido quedaba sin operario — el operario perdía
+  // sus puntos y desaparecía de "Mi línea" y de los Reyes del formato
+  // para ese tramo, en silencio.
+  //
+  // verificacion_caja_estado NO se hereda aquí (a diferencia del
+  // resto): el formulario de corrección ya lo envía en `datos` más
+  // abajo, y lo que escribe quien corrige debe ganar sobre lo
+  // heredado del original.
+  const { data: original, error: errorOriginal } = await supabase
+    .from("parte")
+    .select(
+      `responsable_id, operario_id,
+       fotos_caja, verificacion_caja_detalle,
+       verificacion_codbar_estado, verificacion_codbar_detalle,
+       verificacion_caja_estado_operario, fotos_caja_operario, verificacion_caja_detalle_operario,
+       verificacion_codbar_estado_operario, verificacion_codbar_detalle_operario`,
+    )
+    .eq("id", parteOriginalId)
+    .single();
+
+  if (errorOriginal) {
+    throw new Error(`No se pudo leer el parte original antes de corregirlo: ${errorOriginal.message}`);
+  }
+
   const { data: nuevo, error: errorInsert } = await supabase
     .from("parte")
     .insert({
       turno_id: contexto.turnoId,
       linea_id: contexto.lineaId,
       lote_id: contexto.loteId,
-      responsable_id: contexto.responsableId,
+      responsable_id: original.responsable_id,
       corrige_a_parte_id: parteOriginalId,
       vigente: true,
       completado: true,
       completado_at: new Date().toISOString(),
+      operario_id: original.operario_id,
+      fotos_caja: original.fotos_caja,
+      verificacion_caja_detalle: original.verificacion_caja_detalle,
+      verificacion_codbar_estado: original.verificacion_codbar_estado,
+      verificacion_codbar_detalle: original.verificacion_codbar_detalle,
+      verificacion_caja_estado_operario: original.verificacion_caja_estado_operario,
+      fotos_caja_operario: original.fotos_caja_operario,
+      verificacion_caja_detalle_operario: original.verificacion_caja_detalle_operario,
+      verificacion_codbar_estado_operario: original.verificacion_codbar_estado_operario,
+      verificacion_codbar_detalle_operario: original.verificacion_codbar_detalle_operario,
       tono: datos.tono,
       calibre: datos.calibre,
       verificacion_caja_estado: datos.verificacionCajaEstado,

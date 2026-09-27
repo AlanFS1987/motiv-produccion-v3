@@ -20,6 +20,8 @@ interface FormularioNuevoTonoProps {
   loteId: string;
   tonoAnterior: string;
   calibreAnterior: string | null;
+  /** responsable_id del parte nuevo; por defecto, el usuario de la sesión (ver CapturaParteScreen.responsableIdOverride). */
+  responsableId?: string;
   onCreado: (lote: LoteResuelto, parteId: string) => void;
   onCancelar: () => void;
 }
@@ -36,6 +38,7 @@ export function FormularioNuevoTono({
   loteId,
   tonoAnterior,
   calibreAnterior,
+  responsableId,
   onCreado,
   onCancelar,
 }: FormularioNuevoTonoProps) {
@@ -83,7 +86,7 @@ export function FormularioNuevoTono({
         modeloTextoNormalizado: normalizarTexto(lote.modeloNombre),
         fotoHojaPartidaUrl: "",
       };
-      const parte = await crearParteInicial(turnoId, lineaId, usuario.id, loteResuelto);
+      const parte = await crearParteInicial(turnoId, lineaId, responsableId ?? usuario.id, loteResuelto);
       onCreado(loteResuelto, parte.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

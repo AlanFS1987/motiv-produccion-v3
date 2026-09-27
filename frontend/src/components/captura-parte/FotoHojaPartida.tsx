@@ -27,11 +27,13 @@ type Fase = "capturando" | "procesando" | "revisando" | "resolviendo" | "error";
 interface FotoHojaPartidaProps {
   turnoId: string;
   lineaId: string;
+  /** responsable_id del parte nuevo; por defecto, el usuario de la sesión (ver CapturaParteScreen.responsableIdOverride). */
+  responsableId?: string;
   onResuelto: (lote: LoteResuelto, parteId: string) => void;
   onCancelar: () => void;
 }
 
-export function FotoHojaPartida({ turnoId, lineaId, onResuelto, onCancelar }: FotoHojaPartidaProps) {
+export function FotoHojaPartida({ turnoId, lineaId, responsableId, onResuelto, onCancelar }: FotoHojaPartidaProps) {
   const { usuario } = useAuth();
   const [fase, setFase] = useState<Fase>("capturando");
   const [mensaje, setMensaje] = useState("");
@@ -161,7 +163,7 @@ export function FotoHojaPartida({ turnoId, lineaId, onResuelto, onCancelar }: Fo
       };
 
       setMensaje("Creando parte...");
-      const parte = await crearParteInicial(turnoId, lineaId, usuario.id, lote);
+      const parte = await crearParteInicial(turnoId, lineaId, responsableId ?? usuario.id, lote);
 
       onResuelto(lote, parte.id);
     } catch (err) {

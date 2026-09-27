@@ -28,7 +28,7 @@ type FotoPantallaMaquinaProps =
   | {
       modo: "corregir";
       parteOriginalId: string;
-      contexto: { turnoId: string; lineaId: string; loteId: string; responsableId: string };
+      contexto: { turnoId: string; lineaId: string; loteId: string };
       valoresIniciales: ParteDetalle;
       onGuardado: () => void;
       onCancelar: () => void;

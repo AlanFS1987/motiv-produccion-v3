@@ -8,6 +8,7 @@
 // directamente desde el componente, sin duplicar aquí.
 
 import { supabase } from "./supabase-client";
+import { fechaLocalISO } from "./fechas";
 
 // ── Producción del ciclo ──────────────────────────────────────────
 
@@ -36,23 +37,15 @@ async function obtenerObjetivoDiario(): Promise<number> {
   return Number.isFinite(valor) && valor > 0 ? valor : 35000;
 }
 
-// `fechaISO` construye/lee SIEMPRE en hora LOCAL, nunca UTC —
-// `inicioRotacion` (más abajo) se parsea como medianoche LOCAL
-// (`new Date(valor + "T00:00:00")`, sin "Z"), así que formatear con
-// `.toISOString()` (que lee en UTC) desincroniza las dos mitades del
-// cálculo: en España (UTC+1/+2) eso adelantaba la medianoche local un
-// día hacia atrás en UTC, y el ciclo aparecía empezando un día antes
-// del real (bug detectado en sesión — el ciclo empezaba el 31 y la
-// pantalla mostraba el 30). Mismo patrón de getters locales que ya
-// usa `FotoPantallaMaquina.tsx` (`aValorDatetimeLocal`) para evitar
-// justo este problema. Exportada porque el componente necesita el
-// mismo criterio para calcular "hoy" al resaltar la fila del día
-// actual — si una de las dos mitades usara UTC y la otra local,
-// volveríamos a tener el mismo desajuste.
-export function fechaISO(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
+// fechaISO vive ahora en lib/fechas.ts (fechaLocalISO), para no
+// duplicar la misma fórmula en dos archivos — el bug que motivó
+// esta función (ciclo mostrado un día antes del real por mezclar
+// hora local y UTC) ya está corregido en ese único sitio compartido.
+// Se reexpone con el mismo nombre (como binding local, no como
+// `export ... from`, porque este archivo también LLAMA a fechaISO
+// más abajo) para no tocar los imports de quien ya la usaba desde
+// aquí.
+export const fechaISO = fechaLocalISO;
 
 /**
  * Ciclo actual = 28 días desde `configuracion.fecha_inicio_rotacion`,

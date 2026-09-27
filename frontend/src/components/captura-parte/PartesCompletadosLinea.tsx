@@ -56,7 +56,7 @@ export function PartesCompletadosLinea({
       <FotoPantallaMaquina
         modo="corregir"
         parteOriginalId={seleccionado.id}
-        contexto={{ turnoId, lineaId, loteId: seleccionado.loteId, responsableId: usuario.id }}
+        contexto={{ turnoId, lineaId, loteId: seleccionado.loteId }}
         valoresIniciales={seleccionado}
         onGuardado={() => {
           setSeleccionado(null);

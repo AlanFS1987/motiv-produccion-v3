@@ -33,8 +33,10 @@ async function obtenerFechaInicioRotacion(): Promise<string> {
   return cacheFechaInicioRotacion;
 }
 
+import { fechaLocalISO } from "./fechas";
+
 function fechaISO(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return fechaLocalISO(d);
 }
 
 /** Ciclo que está pasando ahora mismo. */

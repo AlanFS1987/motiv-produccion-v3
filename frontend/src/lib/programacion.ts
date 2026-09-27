@@ -65,8 +65,10 @@ export interface FilaAConfirmar {
   calibre?: string | null;
 }
 
+import { hoyLocalISO } from "./fechas";
+
 function hoyISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return hoyLocalISO();
 }
 
 export async function existeCsvHoy(fecha: string = hoyISO()): Promise<boolean> {

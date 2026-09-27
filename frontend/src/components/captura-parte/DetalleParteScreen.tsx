@@ -43,7 +43,7 @@ export function DetalleParteScreen({ parteId, turnoId, lineaId, onVolver, onCorr
       <FotoPantallaMaquina
         modo="corregir"
         parteOriginalId={parte.id}
-        contexto={{ turnoId, lineaId, loteId: parte.loteId, responsableId: usuario.id }}
+        contexto={{ turnoId, lineaId, loteId: parte.loteId }}
         valoresIniciales={parte}
         onGuardado={onCorregido}
         onCancelar={() => setVista("detalle")}
