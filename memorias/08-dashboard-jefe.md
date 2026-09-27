@@ -1,8 +1,9 @@
 # 08 — Dashboard del jefe
 
 Shell propio (`jefe/JefeApp.tsx`), se muestra cuando `usuario.rol =
-'jefe'`. Siete pestañas: **Vista Rápida**, **Vista Detallada**,
-**Incidencias**, **Calidad**, **Informes** (20/09/2026), **Ceria** (ver
+'jefe'`. Ocho pestañas: **Vista Rápida**, **Vista Detallada**,
+**Incidencias**, **Calidad**, **Informes** (20/09/2026), **Programación**
+(ver `20-programacion.md`), **Ceria** (ver
 `11-ceria.md`) y **Chat** (ver `15`). Sin
 gamificación — el jefe no quiere ver puntos/ranking/niveles, esa
 parte no aparece aquí bajo ningún concepto.

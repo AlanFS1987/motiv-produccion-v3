@@ -138,5 +138,5 @@ export async function ejecutarGetIncidenciasCalidad(
   if (error) throw new Error(`get_incidencias_calidad: ${error.message}`);
   const filas = data?.length ?? 0;
   const filasTotales = count ?? filas;
-  return { datos, filas, filas_totales: filasTotales, limitado: filasTotales > filas };
+  return { datos: data, filas, filas_totales: filasTotales, limitado: filasTotales > filas };
 }

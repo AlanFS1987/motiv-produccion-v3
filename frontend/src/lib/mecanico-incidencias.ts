@@ -7,6 +7,7 @@
 // generada (06-esquema-bd.md), nunca se deriva aquí.
 
 import { supabase } from "./supabase-client";
+import { uno } from "./supabase-relaciones";
 
 export interface IncidenciaMecanico {
   id: string;
@@ -23,12 +24,6 @@ export interface IncidenciaMecanico {
   respuestaSinIntervencion: boolean;
   respuestaMecanicoUsername: string | null;
   respuestaFecha: string | null;
-}
-
-// deno-lint-ignore no-explicit-any
-function uno<T>(valor: T | T[] | null | undefined): T | null {
-  if (!valor) return null;
-  return Array.isArray(valor) ? (valor[0] ?? null) : valor;
 }
 
 export async function listarIncidenciasParaMecanico(): Promise<IncidenciaMecanico[]> {
@@ -81,7 +76,7 @@ export async function responderIncidencia(
   sinIntervencion: boolean,
   mecanicoId: string,
 ): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("incidencia_produccion")
     .update({
       respuesta_texto: texto,
@@ -90,9 +85,17 @@ export async function responderIncidencia(
       respuesta_mecanico_id: mecanicoId,
       respuesta_fecha: new Date().toISOString(),
     })
-    .eq("id", incidenciaId);
+    .eq("id", incidenciaId)
+    .select("id");
 
-  // Si la incidencia ya estaba contestada, la política RLS bloquea el
-  // hace falta comprobarlo aparte, la fila simplemente no cambia.
   if (error) throw new Error(`No se pudo guardar la respuesta: ${error.message}`);
+
+  // La política RLS de UPDATE exige respuesta_fecha is null: si otro
+  // mecánico ya respondió entre que se cargó la lista y se envió esta
+  // respuesta, el UPDATE afecta a 0 filas sin que Supabase lo marque
+  // como error — hay que comprobarlo aparte para no perder el
+  // texto/fotos en silencio.
+  if (!data || data.length === 0) {
+    throw new Error("Otro mecánico ya respondió esta incidencia. Recarga la lista.");
+  }
 }

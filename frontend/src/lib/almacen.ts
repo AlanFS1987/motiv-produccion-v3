@@ -11,7 +11,7 @@
 // Se consulta aparte y se combina en JS.
 
 import { supabase } from "./supabase-client";
-
+import { uno } from "./supabase-relaciones";
 
 export interface AlmacenCategoria {
   id: string;
@@ -54,12 +54,6 @@ export interface RepuestoFicha {
   stock: number;
   referencias: ReferenciaRepuesto[];
   movimientos: MovimientoRepuesto[];
-}
-
-// deno-lint-ignore no-explicit-any
-function uno<T>(valor: T | T[] | null | undefined): T | null {
-  if (!valor) return null;
-  return Array.isArray(valor) ? (valor[0] ?? null) : valor;
 }
 
 async function obtenerStockPorIds(repuestoIds: string[]): Promise<Map<string, number>> {

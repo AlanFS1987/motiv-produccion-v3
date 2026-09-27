@@ -27,7 +27,7 @@ la tabla `parte` tal cual — sin tablas nuevas.
   rendimiento. Métrica nueva, añadida también a `v_produccion_turno`
   (jefe a secas) el mismo día.
 
-## Vistas SQL (`20260826150000_jefe_rectificado.sql`)
+## Vistas SQL (`20260826211000_jefe_rectificado.sql`)
 
 - `v_rectificado_turno` — por turno+línea, para Vista Rápida.
 - `v_rectificado_modelo` — añade desglose por modelo, para el

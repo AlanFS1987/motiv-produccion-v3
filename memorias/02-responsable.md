@@ -6,8 +6,8 @@ existe en el enum pero no hay ninguna cuenta con él ni se creará
 turnos se hace siempre con las credenciales del titular, nunca con una
 cuenta aparte.
 
-Shell: `App.tsx` con cuatro pestañas arriba — **Turno**, **Resumen**,
-**Lotes**, **Historial** — más un botón flotante **Progreso** fijo
+Shell: `App.tsx` con seis pestañas arriba — **Turno**, **Resumen**,
+**Lotes**, **Historial**, **Relevo**, **Chat** — más un botón flotante **Progreso** fijo
 abajo del todo, que abre un panel con toda la gamificación (Ranking,
 Ranking resp., Stats, Equipo, Logros — detalle en `04`). Principalmente
 en móvil. Todo lo descrito aquí está construido salvo donde se indique.

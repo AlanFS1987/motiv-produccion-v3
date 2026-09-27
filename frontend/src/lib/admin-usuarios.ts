@@ -28,7 +28,7 @@ export async function obtenerUsuariosConLetra(): Promise<UsuarioConLetra[]> {
   const { data, error } = await supabase
     .from("usuario")
     .select("id, username, rol, letra")
-    .neq("rol", "administrador")
+    .not("rol", "in", "(administrador,pantalla)")
     .order("rol", { ascending: true })
     .order("username", { ascending: true });
 

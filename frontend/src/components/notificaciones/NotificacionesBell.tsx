@@ -54,6 +54,13 @@ export function NotificacionesBell() {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const finRef = useRef<HTMLDivElement | null>(null);
 
+  const abiertoRef = useRef(abierto);
+  abiertoRef.current = abierto;
+  const vistaRef = useRef(vista);
+  vistaRef.current = vista;
+  const canalAbiertoRef = useRef(canalAbierto);
+  canalAbiertoRef.current = canalAbierto;
+
   // Carga silenciosa al montar, solo para tener el badge total listo
   // desde el arranque sin necesidad de abrir el panel.
   useEffect(() => {
@@ -64,10 +71,18 @@ export function NotificacionesBell() {
   // Realtime: si el panel está cerrado (o abierto en otro canal),
   // solo sube el contador de ese canal. Si se está viendo justo ese
   // canal en directo, se añade al hilo y se marca leído al momento.
+  //
+  // Se suscribe UNA VEZ por usuario ([usuario] como única dependencia)
+  // — antes se recreaba en cada abrir/cerrar panel o cambio de canal
+  // (canal con contador incremental), perdiendo eventos durante el
+  // hueco de destruir+recrear la suscripción. abierto/vista/canalAbierto
+  // se leen aquí dentro vía refs actualizadas en cada render (mismo
+  // patrón que turnoInfoRef en TurnoScreen.tsx).
   useEffect(() => {
     if (!usuario) return;
     const cancelar = suscribirseANotificaciones((n) => {
-      const viendoEsteCanal = abierto && vista === "canales" && canalAbierto === n.tipo;
+      const viendoEsteCanal =
+        abiertoRef.current && vistaRef.current === "canales" && canalAbiertoRef.current === n.tipo;
 
       setResumenCanales((prev) => {
         if (!prev) return prev;
@@ -84,7 +99,7 @@ export function NotificacionesBell() {
       }
     });
     return cancelar;
-  }, [usuario, abierto, vista, canalAbierto]);
+  }, [usuario]);
 
   useEffect(() => {
     finRef.current?.scrollIntoView({ behavior: "smooth" });

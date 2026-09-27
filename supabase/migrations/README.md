@@ -1,3 +1,10 @@
+> **Nota (27/09/2026)**: este README describe el estado de la PRIMERA
+> entrega (enero 2026) y está desactualizado en partes concretas — por
+> ejemplo, aquí dice que OpenAI es el extractor OCR principal y
+> Anthropic el fallback, pero `memorias/CLAUDE.md` documenta que desde
+> el 28/08/2026 es al revés (Haiku principal, GPT fallback). Antes de
+> fiarte de un detalle concreto de aquí, contrástalo con `memorias/`.
+
 # Esquema Supabase — App de Producción v3
 
 Migraciones en `migrations/`, en orden (`0001`...`0010`). Aplicar con

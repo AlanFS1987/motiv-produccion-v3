@@ -124,6 +124,19 @@ Deno.serve(async (req: Request) => {
   let conversacionId = conversacionIdEntrada;
   if (!conversacionId) {
     conversacionId = await crearConversacion(user_id, pregunta, supabase);
+  } else if (perfil.rol !== "administrador") {
+    // Esta función usa service_role, así que la RLS de
+    // ceria_conversaciones/ceria_mensajes no protege aquí: sin esta
+    // comprobación, cualquiera podría pasar el conversacion_id de otro
+    // usuario en el body y leer/escribir su historial.
+    const { data: conversacion } = await supabase
+      .from("ceria_conversaciones")
+      .select("user_id")
+      .eq("id", conversacionId)
+      .maybeSingle();
+    if (!conversacion || conversacion.user_id !== user_id) {
+      return jsonError("Conversación no encontrada", 404);
+    }
   }
 
   const historialLimpio = await cargarHistorial(conversacionId, supabase);
@@ -182,14 +195,23 @@ Deno.serve(async (req: Request) => {
     // deno-lint-ignore no-explicit-any
     message1.tool_calls.map(async (tc: any) => {
       const nombre = tc.function.name as string;
-      const args = JSON.parse(tc.function.arguments || "{}");
       const t0 = performance.now();
+      let args: Record<string, unknown>;
       let resultado;
       try {
-        resultado = await executeTool(nombre, args, supabase);
+        args = JSON.parse(tc.function.arguments || "{}");
       } catch (err) {
         const errorTool = err instanceof Error ? err.message : String(err);
-        resultado = { datos: { error: errorTool }, filas: 0 };
+        args = {};
+        resultado = { datos: { error: `Argumentos inválidos: ${errorTool}` }, filas: 0 };
+      }
+      if (!resultado) {
+        try {
+          resultado = await executeTool(nombre, args, supabase);
+        } catch (err) {
+          const errorTool = err instanceof Error ? err.message : String(err);
+          resultado = { datos: { error: errorTool }, filas: 0 };
+        }
       }
       const duracion_ms = Math.round(performance.now() - t0);
       const errorTool = (resultado as any)?.datos?.error && Object.keys((resultado as any).datos).length === 1

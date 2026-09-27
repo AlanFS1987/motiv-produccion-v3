@@ -7,48 +7,71 @@ verificaciones, decisiones y construcción.
 
 ## Bugs y huecos conocidos
 
-Ninguno abierto ahora mismo: los 6 que había (cuenta `suplente`,
-migración RLS sin confirmar, código muerto en `gamificacion.ts`,
+1. Posible notificación duplicada del resumen de turno: la versión de
+   `fn_disparar_resumen_turno` de `20260907130000` inserta una fila en
+   `notificaciones` y `generar-resumen-turno` inserta otra. Si esa
+   función no se actualizó después, cada resumen aparece dos veces en la
+   campana. Comprobar con
+   `select prosrc from pg_proc where proname = 'fn_disparar_resumen_turno';`
+2. `ProgramacionConsultar.tsx` (hoja de impresión): el `<caption>`
+   muestra la fecha de HOY aunque los datos impresos sean del último
+   `confirmar_programacion` (puede ser de un día anterior si el CSV de
+   hoy no se ha confirmado todavía). Arreglarlo con una consulta a
+   `programacion_orden_historico` (`creado_en desc limit 1`) queda
+   bloqueado: su única política de SELECT es
+   `fn_rol_actual() in ('jefe','administrador')`, pero esta pantalla
+   también la usan `responsable` y `producción` — para esos roles la
+   consulta devolvería 0 filas por RLS (no por falta de snapshot) y
+   caería al mismo fallback erróneo de "hoy". Necesita antes una
+   migración RLS (fuera del alcance de un cambio "solo archivos, sin
+   tocar BD").
+3. Dos migraciones con nombre "duplicado" sin resolver:
+   `20260826*` y `20260913*` tienen cada una un archivo sin hora
+   (`20260826_fix_rpc_security_definer_expuestas.sql`,
+   `20260913_ceria_documentacion_divisor_revision_fable.sql`) junto a
+   otros del mismo día con timestamp completo. `supabase migration
+   list` detectó una versión "local" (repo) sin aplicar y otra
+   "remota" (ya aplicada en producción) con contenido distinto para
+   estos prefijos. Sin investigar todavía cuál es la buena ni si hace
+   falta reconciliar manualmente — no tocar sin antes comparar
+   local vs. remoto con calma.
+
+(Histórico: los 6 bugs que había antes — cuenta `suplente`, migración
+RLS sin confirmar, código muerto en `gamificacion.ts`,
 `fn_otorgar_bonus_nivel`, el slice de `ceria/index.ts` y el reintento
-de DeepSeek) se cerraron en la sesión 25/08/2026 — decisiones y
+de DeepSeek — se cerraron en la sesión 25/08/2026 — decisiones y
 reparaciones en `01` (suplente) y `04` (bonus de nivel). Durante esa
 misma sesión aparecieron 3 bugs nuevos, ya reparados también: ver `04`,
 secciones "Bugs encontrados y corregidos" (`v_puntos_responsable_total_vida`
 apuntando a la tabla vieja, `fn_ciclo_id(now())` con tipo incorrecto,
-ambigüedad `nivel_id` en `fn_otorgar_bonus_nivel`).
+ambigüedad `nivel_id` en `fn_otorgar_bonus_nivel`).)
 
 ## Verificaciones pendientes con casos reales
 
-8. Primer cierre real de ciclo: lunes 28/09/2026, 8:00 Madrid (ciclo
+1. Primer cierre real de ciclo: lunes 28/09/2026, 8:00 Madrid (ciclo
    7). El cron `cerrar-ciclos-pendientes` ya corre los lunes sin error
    (devuelve 0 filas porque los ciclos 1..6 ya tienen fila).
 
-10. Tras el lanzamiento del 31/08, con partes reales: Ranking del
-    ciclo actual (operario y responsable), Equipo, Historial del
-    responsable, Vista Detallada del jefe, Logros (operario y
-    responsable).
+2. Tras el lanzamiento del 31/08, con partes reales: Ranking del
+   ciclo actual (operario y responsable), Equipo, Historial del
+   responsable, Vista Detallada del jefe, Logros (operario y
+   responsable).
 
-11. Confirmar en el linter de Supabase (Database → Advisors) que tras
-    aplicar `..._fix_search_path_20_funciones.sql`,
-    `function_search_path_mutable` baja a 0 filas — la primera vez que
-    se intentó aplicar falló por colisión de nombre de migración
-    (`schema_migrations_pkey` duplicado, mismo prefijo `20260826` que
-    otra migración del mismo día) y se corrigió renombrando el
-    archivo, sin confirmar todavía que quedó aplicada. De paso probar
-    en real que los 4 flujos afectados por las restricciones de RPC
-    del 26/08/2026 siguen funcionando: generar personaje/avatar,
-    botón "otorgar generaciones" del admin, y el cierre de ciclo (vía
-    cron, la próxima vez que corra).
-    12. Cambio de la hora de revisión (20/09/2026): comprobar en una
-    revisión real que el responsable ve el aviso con la hora de cierre y
-    puede abrir "Nueva orden", "Continuar" y "Nuevo tono/calibre".
+3. Confirmar en el linter de Supabase (Database → Advisors) que tras
+   aplicar `..._fix_search_path_20_funciones.sql`,
+   `function_search_path_mutable` baja a 0 filas — la primera vez que
+   se intentó aplicar falló por colisión de nombre de migración
+   (`schema_migrations_pkey` duplicado, mismo prefijo `20260826` que
+   otra migración del mismo día) y se corrigió renombrando el
+   archivo, sin confirmar todavía que quedó aplicada. De paso probar
+   en real que los 4 flujos afectados por las restricciones de RPC
+   del 26/08/2026 siguen funcionando: generar personaje/avatar,
+   botón "otorgar generaciones" del admin, y el cierre de ciclo (vía
+   cron, la próxima vez que corra).
 
-13. Posible notificación duplicada del resumen de turno: la versión de
-    `fn_disparar_resumen_turno` de `20260907130000` inserta una fila en
-    `notificaciones` y `generar-resumen-turno` inserta otra. Si esa
-    función no se actualizó después, cada resumen aparece dos veces en la
-    campana. Comprobar con
-    `select prosrc from pg_proc where proname = 'fn_disparar_resumen_turno';`
+4. Cambio de la hora de revisión (20/09/2026): comprobar en una
+   revisión real que el responsable ve el aviso con la hora de cierre y
+   puede abrir "Nueva orden", "Continuar" y "Nuevo tono/calibre".
 
 ## Decisiones por tomar
 

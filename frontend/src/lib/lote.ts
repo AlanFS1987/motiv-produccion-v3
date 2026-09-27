@@ -20,6 +20,7 @@
 // última actividad (nunca sobre toda la tabla).
 
 import { supabase } from "./supabase-client";
+import { uno } from "./supabase-relaciones";
 
 export type EstadoLote = "iniciado" | "finalizado";
 
@@ -35,14 +36,6 @@ export interface LoteGestion {
   m2Pendiente: number | null;
   /** Piezas que faltan por producir — null si el lote no tiene objetivo_m2 capturado. */
   piezasPendiente: number | null;
-}
-
-// Normaliza relaciones anidadas de Supabase (a veces llegan como
-// array de 1, a veces como objeto) — mismo patrón que el resto del
-// proyecto (ver lib/parte.ts, notificar-telegram/index.ts).
-function uno<T>(valor: T | T[] | null | undefined): T | null {
-  if (!valor) return null;
-  return Array.isArray(valor) ? (valor[0] ?? null) : valor;
 }
 
 const MAX_PARTES_CONSULTADOS = 300;

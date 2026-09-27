@@ -5,6 +5,7 @@
 // calidad (defectos de producto) son ejes independientes.
 
 import { supabase } from "./supabase-client";
+import { uno } from "./supabase-relaciones";
 
 export interface IncidenciaProduccionItem {
   id: string;
@@ -31,12 +32,6 @@ export interface IncidenciaCalidadItem {
   numero_orden: string;
   creado_por: string | null;
   operario_username: string | null;
-}
-
-// deno-lint-ignore no-explicit-any
-function uno<T>(valor: T | T[] | null | undefined): T | null {
-  if (!valor) return null;
-  return Array.isArray(valor) ? (valor[0] ?? null) : valor;
 }
 
 export async function obtenerIncidenciasProduccion(

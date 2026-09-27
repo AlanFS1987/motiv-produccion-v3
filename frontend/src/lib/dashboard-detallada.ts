@@ -11,6 +11,7 @@
 // `parte` — no se implica causalidad entre ellos.
 
 import { supabase } from "./supabase-client";
+import { uno } from "./supabase-relaciones";
 
 export interface IncidenciaProduccionDetalle {
   id: string;
@@ -170,12 +171,6 @@ function camposCalculadosVacios() {
     pct_1a_oficial: null as number | null,
     pct_comercial_oficial: null as number | null,
   };
-}
-
-// deno-lint-ignore no-explicit-any
-function uno<T>(valor: T | T[] | null | undefined): T | null {
-  if (!valor) return null;
-  return Array.isArray(valor) ? (valor[0] ?? null) : valor;
 }
 
 /**

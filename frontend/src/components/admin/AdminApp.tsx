@@ -27,7 +27,7 @@ import { CierreFabricaScreen } from "./CierreFabricaScreen";
 import { ChecklistScreen } from "./ChecklistScreen";
 import { GamificacionScreen } from "./GamificacionScreen";
 import { PuntosEngraseScreen } from "./PuntosEngraseScreen";
-import { ProgramacionScreen } from "./ProgramacionScreen";
+import { AdminProgramacionCsvScreen } from "./AdminProgramacionCsvScreen";
 import { NotasScreen } from "./NotasScreen";
 
 
@@ -158,7 +158,7 @@ export function AdminApp({ username }: { username: string }) {
         {pestana === "gestion-usuarios" && <GestionUsuariosScreen />}
         {pestana === "accesos" && <ChatAccesoScreen />}
         {pestana === "engrase" && <PuntosEngraseScreen />}
-        {pestana === "programacion" && <ProgramacionScreen />}
+        {pestana === "programacion" && <AdminProgramacionCsvScreen />}
         {pestana === "notas" && <NotasScreen />}
       </div>
     </div>

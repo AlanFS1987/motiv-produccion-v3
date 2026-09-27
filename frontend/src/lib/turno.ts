@@ -148,6 +148,7 @@ export async function estaFabricaCerrada(fecha: string): Promise<boolean> {
     .select("id")
     .lte("fecha_inicio", fecha)
     .gte("fecha_fin", fecha)
+    .limit(1)
     .maybeSingle();
   if (error) throw error;
   return data !== null;

@@ -21,8 +21,12 @@ No tiene acceso a PLCs ni a ningún sistema en tiempo real: todo dato
 nace de una foto o de un formulario. No hay modo offline (decisión
 cerrada: el OCR necesita red igualmente y la fábrica tiene wifi).
 
-Usuarios: **32 reales cargados** (4 responsables A/B/C/D, 19 operarios
-4/5/4/4, jefe, administrador, pantalla), máximo 40. No hay ni habrá
+Usuarios: **[VERIFICAR]** cifra de "32 reales cargados" (4 responsables
+A/B/C/D, 19 operarios 4/5/4/4, jefe, administrador, pantalla) — las
+cifras no cuadran (4+19+3=26, no 32) y falta contar los roles nuevos
+(`mecanico`, `producción`, `jefe_rectificado`). Recontar de verdad
+contra la tabla `usuario` antes de repetir un número aquí. Máximo 40.
+No hay ni habrá
 cuenta `suplente`: decisión cerrada (sesión 25/08/2026) de no usar una
 cuenta compartida para cubrir turnos — se cubre siempre con las
 credenciales del titular (`01`). El rol se queda en el enum, sin uso.
@@ -33,8 +37,10 @@ responsables y operarios llevan letra de rotación; el resto no. `jefe_rectifica
 la sección de rectificado (anterior a clasificación, no una variante
 de `jefe`) — shell propio, ver `13-rectificado.md`. `calidad` tiene
 shell propio de solo lectura (últimos 15 lotes + incidencias), ver
-`14-calidad.md`. `produccion` sigue sin shell — solo tiene permisos
-RLS de lectura sobre `incidencia_produccion`, sin pantalla que los use.
+`14-calidad.md`. `produccion` tiene shell propio
+(`components/produccion/ProduccionApp.tsx`, 7 pestañas, reutiliza
+componentes de `jefe/` y `calidad/`), montado en `App.tsx` desde el
+22/09/2026.
 `mecanico` (2 personas, sin turnos ni letra) tiene shell propio:
 Incidencias (contesta las de producción), Almacén, Engrase y
 Unidades — ver `17` y `18`.
@@ -166,9 +172,10 @@ Unidades — ver `17` y `18`.
 
 ```
 frontend/src/
-  App.tsx                      shell del responsable (Turno/Resumen/Lotes/Historial +
+  App.tsx                      shell del responsable (Turno/Resumen/Lotes/Historial/Relevo/Chat +
                                botón flotante Progreso); bifurca por rol a
-                               OperarioApp / JefeApp / AdminApp / PantallaCarrusel; RolSinInterfaz para el resto
+                               OperarioApp / JefeApp / AdminApp / CalidadApp / RectificadoApp /
+                               ProduccionApp / PantallaCarrusel; RolSinInterfaz para el resto
   main.tsx                     <AuthProvider> + <ThemeProvider>
   context/AuthContext.tsx      sesión + perfil `usuario`
   context/ThemeContext.tsx     temas (12)
@@ -178,38 +185,68 @@ frontend/src/
     parte.ts                   crear/completar/corregir partes, sugerencias, lotes del turno anterior
     lote.ts                    gestión de lotes
     operario.ts                Mi línea, limpieza, verificación del operario
+    relevo.ts                  pestaña Relevo del responsable
+    ciclo.ts                   ciclo actual/anterior calculado en cliente (28 días)
+    programacion.ts            diff/confirmar/deshacer/consultar programación de hornos
+    admin-notas.ts              pegar CSV + histórico de programación (admin)
+    almacen.ts                 almacén de repuestos (rol mecánico)
+    mecanico-incidencias.ts / mecanico-engrase.ts   colas de incidencias y engrase (rol mecánico)
+    notificaciones.ts          feed in-app por canal + suscripción realtime
+    chat.ts / chat-acceso.ts   chat humano de canal único + acceso por rol
+    informes.ts                informes diario/semanal (PDF)
+    fechas.ts                  helpers de fecha local (hoyLocalISO, fechaLocalISO)
+    supabase-relaciones.ts     helper `uno()` para relaciones embebidas de PostgREST
     gamificacion.ts            tipos NivelInfo/PersonajeInfo (reducido 25/08/2026)
     inicio-gamificacion.ts     tarjeta resumen de Inicio del operario
     equipo.ts                  pestaña Equipo del responsable (04)
     ranking.ts / logros.ts / stats-avatar.ts   soportan rol operario+responsable
-    dashboard-jefe.ts / dashboard-detallada.ts / dashboard-incidencias.ts
-    admin-usuarios.ts / admin-partes.ts / admin-cierre-fabrica.ts / admin-checklist.ts
-    pantalla-carrusel.ts / ceria.ts
+    dashboard-jefe.ts / dashboard-detallada.ts / dashboard-incidencias.ts / dashboard-calidad.ts / dashboard-rectificado.ts
+    admin-usuarios.ts / admin-partes.ts / admin-cierre-fabrica.ts / admin-checklist.ts /
+    admin-engrase.ts / admin-gamificacion.ts / admin-gestion-usuarios.ts
+    pantalla-carrusel.ts / ceria.ts / nora.ts
     incidencias.ts / resumen-turno.ts / validaciones-parte.ts / normalizacion.ts
     verificacion-caja.ts / verificacion-codbar.ts
-    captura-imagen.ts / cloudinary.ts / formato.ts
+    captura-imagen.ts / cloudinary.ts / formato.ts / persistencia-captura.ts / orientacion.ts
     supabase-client.ts / supabase-functions.ts / auth.ts
   components/
     TurnoScreen.tsx            pantalla principal del responsable (monolítica, ~20 useState)
     ResumenScreen.tsx, GestionLotes.tsx, OperariosRefuerzoCard.tsx, ThemeSwitcher.tsx
     captura-parte/             wizard: hoja, tono, continuar, caja, codbar, pantalla, aviso
     incidencias/
+    notificaciones/            NotificacionesBell.tsx (campana in-app por canal)
+    chat/                      ChatHomeScreen.tsx, ChatScreen.tsx
     responsable/               ProgresoFlotante (botón+panel), RankingResponsableScreen,
-                               EquipoScreen, HistorialResponsableScreen (04)
+                               EquipoScreen, HistorialResponsableScreen, RelevoScreen (04)
     operario/                  OperarioApp, InicioOperarioScreen (+Ranking/StatsAvatar/Logros), MiLinea, Historial, Limpieza, Verificacion*
-    jefe/                      JefeApp, VistaRapida, VistaDetallada (+prop responsableFijo), Incidencias
-    admin/                     AdminApp, AjustarLetras, CorreccionPartes, PruebaCamara, CierreFabrica, Checklist
-    pantalla/                  PantallaCarrusel
+    jefe/                      JefeApp, VistaRapida, VistaDetallada, Incidencias, Informes,
+                               jefe/programacion/ (Consultar/Revisar/Screen)
+    admin/                     AdminApp, AjustarLetras, CorreccionPartes, PruebaCamara,
+                               CierreFabrica, Checklist, GestionUsuarios, ChatAcceso,
+                               Gamificacion, Notas, PuntosEngrase, AdminProgramacionCsvScreen,
+                               AdminNuevoParte
+    calidad/                   CalidadApp, CalidadLotesScreen
+    rectificado/                RectificadoApp, VistaRapida/VistaDetallada de rectificado
+    produccion/                 ProduccionApp (7 pestañas, reutiliza componentes de jefe/ y calidad/)
+    mecanico/                   MecanicoApp, IncidenciasMecanicoScreen, AlmacenScreen, EngraseScreen
+    pantalla/                  PantallaCarrusel + Slides (Produccion, Ranking, ReyesFormato, UltimosModelos, UltimosTurnos)
     ceria/                     CeriaScreen
+    nora/                      NoraScreen (copiloto de averías por voz)
 supabase/
-  migrations/                  20260101000001 … 20260824130000
+  migrations/                  20260101000001 … 20260927130000
   functions/
     _shared/                   anthropic.ts, openai.ts, openai_images.ts, deepseek_historia.ts,
-                               cors.ts, cloudinary.ts, normalizacion.ts, formato.ts
+                               cors.ts, cloudinary.ts, normalizacion.ts, formato.ts,
+                               pdf-comun.ts, pdf-informe-turno.ts, pdf-informe-periodo.ts,
+                               informe-periodo-datos.ts, informes-en-resumen.ts
     ocr-parte/                 fotos → JSON (prompts.ts)
     resolver-catalogo/         modelo/marca/producto/lote (service_role)
     generar-personaje/         imagen de referencia + prompt → personaje RPG
-    ceria/                     asistente (index.ts + tools.ts)
+    ceria/                     asistente — index.ts (handler HTTP), prompts.ts, conversaciones.ts,
+                               openai-fase1.ts, modelos.ts, tools/ (mecanismo/producción/calidad/incidencias)
+    nora/                      copiloto de averías por voz (Realtime WebRTC)
+    generar-informe-periodo/   informes diario/semanal (PDF)
+    admin-crear-usuario/       alta de usuarios (service_role)
+    admin-cambiar-password/    cambio de contraseña (service_role)
     notificar-telegram/        incidencias + nuevo lote
     generar-resumen-turno/     informe de cierre → Telegram
     notificar-telegram-resumen-calidad/

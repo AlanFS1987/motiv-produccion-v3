@@ -9,7 +9,7 @@ import { LogOut, AlertTriangle, Package, Droplet, RefreshCw } from "lucide-react
 import { cerrarSesion } from "../../lib/auth";
 import { ThemeSwitcher } from "../ThemeSwitcher";
 import { NotificacionesBell } from "../notificaciones/NotificacionesBell";
-import { IncidenciasScreen } from "./IncidenciasScreen";
+import { IncidenciasMecanicoScreen } from "./IncidenciasMecanicoScreen";
 import { EngraseScreen } from "./EngraseScreen";
 import { AlmacenScreen } from "./AlmacenScreen";
 
@@ -91,7 +91,7 @@ export function MecanicoApp({ username }: { username: string }) {
       </div>
 
       <main className="mx-auto max-w-6xl p-4">
-        {pestana === "incidencias" && <IncidenciasScreen />}
+        {pestana === "incidencias" && <IncidenciasMecanicoScreen />}
         {pestana === "almacen" && <AlmacenScreen />}
         {pestana === "engrase" && <EngraseScreen />}
         {pestana === "unidades" && <Proximamente nombre="Unidades" />}

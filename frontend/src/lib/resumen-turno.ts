@@ -17,6 +17,7 @@
 import { supabase } from "./supabase-client";
 import { m2DePiezas } from "./formato";
 import type { TipoTurno } from "./rotacion";
+import { uno } from "./supabase-relaciones";
 
 export interface IncidenciaResumen {
   descripcion: string;
@@ -72,12 +73,6 @@ export interface InformePeriodoEnResumen {
   hasta: string;
   pdfUrl: string;
   m2Total: number;
-}
-
-/** Supabase a veces devuelve una relación anidada como array de 1, a veces como objeto — se normaliza. */
-function uno<T>(valor: T | T[] | null | undefined): T | null {
-  if (!valor) return null;
-  return Array.isArray(valor) ? (valor[0] ?? null) : valor;
 }
 
 function tiemposVacios(): TiemposAgregados {

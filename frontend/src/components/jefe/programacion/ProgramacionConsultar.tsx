@@ -30,6 +30,7 @@ export function ProgramacionConsultar() {
 
   function cargar() {
     setCargando(true);
+    setError(null);
     listarProgramacionConEstado()
       .then(setFilas)
       .catch((err) => setError(err instanceof Error ? err.message : "Error cargando"))

@@ -344,7 +344,10 @@ Un informe PDF por periodo. Único por `(tipo, desde)`.
 
 RLS: escritura solo `service_role` (Edge Function). Lectura:
 `informe_periodo_select_jefe_admin` (`fn_rol_actual() in ('jefe',
-'administrador')`, migración `20260920150000`).
+'produccion', 'administrador')`, migración `20260920150000`, ampliada
+a `produccion` en `20260922120000`) + `informe_periodo_select_responsable`
+(`fn_rol_actual() = 'responsable'`, migración `20260921110000`, para el
+enlace en el "Copiar" del resumen de turno).
 
 Funciones (`20260920140000`), con `REVOKE EXECUTE` a
 `public/anon/authenticated`: `fn_disparar_informe_periodo(tipo, desde)` y
@@ -357,12 +360,12 @@ de turno).
 
 | Tabla | SELECT | INSERT | UPDATE | DELETE |
 |---|---|---|---|---|
-| parte | cualquier rol conocido salvo `pantalla` y `jefe_rectificado` | responsable, suplente, admin | propio & `completado=false`; propio & completado & vigente & `completado_at > now()-1h`; operario si `operario_id = uid` (solo columnas `*_operario`, por trigger); administrador cualquier fila | administrador |
+| parte | cualquier rol conocido salvo `pantalla` (incluye `jefe_rectificado` vía `parte_select_jefe_rectificado`, ver `13`) | responsable, suplente, admin | propio & `completado=false`; propio & completado & vigente & `completado_at > now()-1h`; operario si `operario_id = uid` (solo columnas `*_operario`, por trigger); administrador cualquier fila | administrador |
 | turno | autenticados | responsable solo si `tipo = fn_turno_de_letra(fecha, su letra)`; suplente cualquiera; admin | responsable/suplente; admin | admin |
 | asignacion_operario_linea | autenticados | responsable/suplente; admin | responsable/suplente; admin | responsable/suplente; admin |
 | refuerzo_operario_turno | autenticados | responsable/suplente/admin con `habilitado_por = uid` | — | responsable/suplente/admin |
 | lote | autenticados | admin (Edge Function con service_role) | responsable/suplente; admin | admin |
-| incidencia_calidad | responsable, suplente, jefe, calidad, admin | responsable, suplente, admin | — | — |
+| incidencia_calidad | responsable, suplente, jefe, produccion, calidad, admin | responsable, suplente, admin | — | — |
 | incidencia_produccion | responsable, suplente, jefe, produccion, admin | responsable, suplente, admin | — | — |
 | operario_checklist | propio; jefe; admin | propio; admin | — | — |
 | personaje_rpg | propio; jefe; admin | propio; admin | propio | — |
@@ -374,7 +377,7 @@ de turno).
 | modelo, marca, formato, producto, linea, checklist_items, logros_definicion, puntos_*, niveles, cierre_fabrica | autenticados | admin | admin | admin |
 | app_secrets | ninguno (revoke) | | | |
 | notificaciones | `fn_chat_acceso(tipo, 'ver')` (07/09, sustituye a una lista fija de roles usada en un paso intermedio del mismo día) | solo desde funciones `security definer` (sin GRANT a authenticated/anon) | — | — |
-| chat_mensajes | `fn_rol_actual() in ('responsable','suplente','operario','jefe','administrador')` | mismo conjunto + `usuario_id = auth.uid()` | borrado suave: propio (`usuario_id = auth.uid()`) o administrador — nunca DELETE real | — |
+| chat_mensajes | `fn_chat_acceso('general', 'ver')` (desde `20260907180000`, sustituye a la lista fija de roles usada en un paso intermedio) | `fn_chat_acceso('general', 'escribir')` + `usuario_id = auth.uid()` | borrado suave: propio (`usuario_id = auth.uid()`) o administrador — nunca DELETE real | — |
 | chat_acceso | cualquier rol conocido | admin (`for all`) | admin | admin |
 | notificacion_estado_usuario | propio | propio | propio | propio (política única `for all`, `usuario_id = auth.uid()`) |
 | notificacion_preferencias | propio | propio | propio | propio (`for all`, `usuario_id = auth.uid()`) |

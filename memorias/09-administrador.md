@@ -142,9 +142,9 @@ más sus propias pestañas de gestión.
 - **Cambio de rol** (`admin/AjustarLetrasScreen.tsx`, mismo lib
   `admin-usuarios.ts`) — en la misma pantalla de Rotación, además de
   la letra, se puede cambiar el rol de cualquier usuario entre
-  responsable/suplente/operario/jefe/producción/calidad.
-  `[VERIFICAR]` si la lista ya incluye `jefe_rectificado` y
-  `mecanico`. Nunca a `administrador`: lo impide
+  responsable/suplente/operario/jefe/producción/calidad/jefe_rectificado/mecanico
+  (confirmado en `admin/AjustarLetrasScreen.tsx` y `lib/admin-usuarios.ts`).
+  Nunca a `administrador`: lo impide
   `fn_bloquear_ascenso_admin` (ese rol solo se asigna por SQL a mano).
 - **Gestión de usuarios** (`admin/GestionUsuariosScreen.tsx`,
   `lib/admin-gestion-usuarios.ts`, 27/08/2026) — pestaña "Gestión":
@@ -158,10 +158,10 @@ más sus propias pestañas de gestión.
   cliente son mensajes propios, no el error crudo de Postgres/Auth.
   Sustituye al flujo manual anterior (Dashboard → Authentication →
   Add user + INSERT en `usuario`), que ya no es el camino normal.
-- **Vista de usuarios con gamificación** — puntos, nivel y botón
+- **Vista de usuarios con gamificación** (`admin/GamificacionScreen.tsx`,
+  pestaña "gamificacion" en `AdminApp.tsx`) — puntos, nivel y botón
   "otorgar generaciones" (`fn_otorgar_bonus_nivel`,
   `v_admin_usuarios_gamificacion`). Detalle de la mecánica en `04`.
-  `[VERIFICAR]` nombre del componente y añadirlo aquí.
 - **Acceso a los chats** (`admin/ChatAccesoScreen.tsx`) — qué roles
   ven Ceria y NORA (`chat_acceso`, sin tocar código ni desplegar) y
   qué modelos de Fase 3 de Ceria quedan apagados. Ver `15` y `11`.
@@ -174,3 +174,8 @@ más sus propias pestañas de gestión.
   de engrase antiguos que ya lo tenían marcado. Sin migración nueva —
   la política `engrase_punto_admin_todo` (`for all`, solo admin) ya lo
   permitía desde que se creó la tabla.
+- **Notas** (`admin/NotasScreen.tsx`, `lib/admin-notas.ts`) — pestaña
+  "Notas" del admin para el jefe.
+- **Programación** (`admin/AdminProgramacionCsvScreen.tsx`) — pestaña
+  "Programación": pegar el CSV diario + histórico. Detalle completo en
+  `20-programacion.md`.

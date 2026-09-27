@@ -1,4 +1,4 @@
-// frontend/src/components/mecanico/IncidenciasScreen.tsx
+// frontend/src/components/mecanico/IncidenciasMecanicoScreen.tsx
 //
 // Cola de incidencias de producción para el rol mecánico. Sin
 // reapertura: una vez contestada, la política RLS de UPDATE impide
@@ -86,7 +86,7 @@ function TarjetaIncidencia({
   );
 }
 
-export function IncidenciasScreen() {
+export function IncidenciasMecanicoScreen() {
   const { usuario } = useAuth();
   const [incidencias, setIncidencias] = useState<IncidenciaMecanico[]>([]);
   const [cargando, setCargando] = useState(true);

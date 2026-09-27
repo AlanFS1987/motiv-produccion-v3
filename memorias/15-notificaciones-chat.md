@@ -45,10 +45,11 @@ el administrador sin tocar código.
   y/o fotos (Cloudinary, preset `motiv_v3_chat`). Borrado **suave**
   (`eliminado=true`, nunca DELETE real — mismo criterio que
   `parte.vigente` en el resto del proyecto): cada uno borra lo suyo,
-  el administrador borra cualquiera. Alcance de roles: responsable,
-  suplente, operario, jefe, administrador — **calidad y
-  jefe_rectificado quedan fuera a propósito**, misma decisión que en
-  notificaciones.
+  el administrador borra cualquiera. Desde `20260907180000` el acceso
+  (ver/escribir) ya no es una lista fija de roles en la política RLS:
+  se resuelve dinámicamente vía `fn_chat_acceso('general', 'ver'/
+  'escribir')` contra la tabla `chat_acceso`, editable por el admin
+  desde la app sin tocar código ni desplegar nada.
 - **`chat_acceso`** — control de acceso por rol para los **7
   "chats"** (los 5 automáticos + `general` + `ceria`): `tipo_chat`,
   `rol`, `puede_ver`, `puede_escribir`. **Deny-by-default**:

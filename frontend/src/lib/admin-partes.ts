@@ -10,6 +10,7 @@
 // campos de piezas/calibres/tiempos que la lista no necesita mostrar.
 
 import { supabase } from "./supabase-client";
+import { uno } from "./supabase-relaciones";
 
 export interface FiltrosBusquedaPartes {
   fechaDesde: string;
@@ -37,10 +38,6 @@ export interface ParteBusqueda {
 }
 
 const LIMITE_RESULTADOS = 150;
-
-function uno<T>(valor: T | T[] | null | undefined): T | null {
-  return (Array.isArray(valor) ? (valor[0] ?? null) : valor) as T | null;
-}
 
 /**
  * Busca partes VIGENTES y COMPLETADOS en el rango/filtros dados —

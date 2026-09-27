@@ -1,7 +1,8 @@
 # 11 — Ceria (asistente de producción)
 
-Edge Function `supabase/functions/ceria/` (`index.ts` + `tools.ts` +
-`modelos.ts`), accesible desde la pestaña Ceria en `jefe/` y `admin/`
+Edge Function `supabase/functions/ceria/` (`index.ts`, `tools/`,
+`modelos.ts` y el resto de módulos, ver "Archivos" más abajo),
+accesible desde la pestaña Ceria en `jefe/` y `admin/`
 (mismo componente `ceria/CeriaScreen.tsx`) y también desde la pestaña
 unificada **Chat** (`chat/ChatHomeScreen.tsx`, ver `15`) para
 cualquier rol al que el administrador se lo habilite. Adaptación de
@@ -282,12 +283,6 @@ fechas de prueba.
   cerrar turno) para plantillas fijas nuevas a 1 clic, o una tool
   genérica que Ceria dispare para exportar lo último consultado. Sin
   decidir cuál.
-- **`tools.ts` e `index.ts` han crecido mucho** (10 herramientas +
-  orquestación de 3 fases + gestión de conversaciones/logs en un solo
-  archivo cada uno) — partirlos en módulos dentro de la misma carpeta
-  de la función (seguro en Deno, se empaqueta todo el directorio
-  junto) es puro refactor, sin cambio de comportamiento, planteado
-  pero no hecho.
 - **Nueva multi-tool "copiloto de diagnóstico"** (máquinas,
   mantenimiento, reparación, ajustes), con tabla propia en BD — en
   diseño (10/09/2026, a desarrollar en otro chat). Podría absorber el
@@ -309,10 +304,16 @@ fechas de prueba.
 
 ## Archivos
 
-`supabase/functions/ceria/index.ts` (prompt + orquestación 3 fases),
-`tools.ts` (schema + `executeTool`), `modelos.ts` (catálogo y
-despacho de Fase 3) · `frontend/src/components/ceria/CeriaScreen.tsx`,
-`lib/ceria.ts` · `lib/chat-acceso.ts`,
+`supabase/functions/ceria/` — `index.ts` (handler HTTP: auth,
+`chat_acceso`, parseo del body, orquestación de las 3 fases,
+`sanearRespuestaJSON`), `prompts.ts` (`buildSystemPrompt`,
+`MENU_ASK_USER`, `cargarPrompt`), `conversaciones.ts`
+(`crearConversacion`, `guardarMensaje`, `cargarHistorial`),
+`openai-fase1.ts` (`llamarOpenAI`, Fase 1), `modelos.ts` (catálogo y
+despacho de Fase 3), `tools/` (`TOOLS` + `executeTool`, divididos en
+`mecanismo.ts`/`produccion.ts`/`calidad.ts`/`incidencias.ts` +
+`limits.ts`/`helpers.ts` compartidos) · `frontend/src/components/
+ceria/CeriaScreen.tsx`, `lib/ceria.ts` · `lib/chat-acceso.ts`,
 `components/admin/ChatAccesoScreen.tsx` (acceso por rol + apagado de
 modelos, ver `15`).
 ## Refactor de `index.ts`/`tools.ts` (10/09/2026)

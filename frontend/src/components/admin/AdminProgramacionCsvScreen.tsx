@@ -1,4 +1,4 @@
-// frontend/src/components/admin/ProgramacionScreen.tsx
+// frontend/src/components/admin/AdminProgramacionCsvScreen.tsx
 //
 // Pestaña "Programación": pega el CSV diario de producción (guardado
 // desde Excel como CSV UTF-8) y lo sube a `admin_notas`
@@ -14,7 +14,7 @@ import {
   type ProgramacionHistorico,
 } from "../../lib/admin-notas";
 
-export function ProgramacionScreen() {
+export function AdminProgramacionCsvScreen() {
   const [fecha, setFecha] = useState(fechaDeHoyISO());
   const [csvTexto, setCsvTexto] = useState("");
   const [guardando, setGuardando] = useState(false);

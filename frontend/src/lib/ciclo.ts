@@ -24,11 +24,15 @@ let cacheFechaInicioRotacion: string | null = null;
 
 async function obtenerFechaInicioRotacion(): Promise<string> {
   if (cacheFechaInicioRotacion) return cacheFechaInicioRotacion;
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("configuracion")
     .select("valor")
     .eq("clave", "fecha_inicio_rotacion")
     .maybeSingle();
+  if (error) {
+    console.error("No se pudo leer fecha_inicio_rotacion, usando fallback:", error.message);
+    return "2026-02-16";
+  }
   cacheFechaInicioRotacion = (data?.valor as string | undefined) ?? "2026-02-16";
   return cacheFechaInicioRotacion;
 }

@@ -136,7 +136,7 @@ historial de partes propio.
 **Nombre de cara al usuario: "Progreso"**, no "Gamificación".
 
 Pestañas de arriba del responsable, ahora **Turno · Resumen · Lotes ·
-Historial** (Historial es nuevo, ver más abajo). Además, un **botón
+Historial · Relevo · Chat** (Historial es nuevo, ver más abajo). Además, un **botón
 flotante "Progreso"** fijo abajo del todo (`position: fixed`, `z-50`)
 — primer patrón de navegación de la app que no es una pestaña fija
 arriba (hasta ahora toda la navegación de operario/jefe/admin/
