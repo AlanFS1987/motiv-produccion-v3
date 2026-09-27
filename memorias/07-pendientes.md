@@ -25,16 +25,6 @@ verificaciones, decisiones y construcción.
    caería al mismo fallback erróneo de "hoy". Necesita antes una
    migración RLS (fuera del alcance de un cambio "solo archivos, sin
    tocar BD").
-3. Dos migraciones con nombre "duplicado" sin resolver:
-   `20260826*` y `20260913*` tienen cada una un archivo sin hora
-   (`20260826_fix_rpc_security_definer_expuestas.sql`,
-   `20260913_ceria_documentacion_divisor_revision_fable.sql`) junto a
-   otros del mismo día con timestamp completo. `supabase migration
-   list` detectó una versión "local" (repo) sin aplicar y otra
-   "remota" (ya aplicada en producción) con contenido distinto para
-   estos prefijos. Sin investigar todavía cuál es la buena ni si hace
-   falta reconciliar manualmente — no tocar sin antes comparar
-   local vs. remoto con calma.
 
 (Histórico: los 6 bugs que había antes — cuenta `suplente`, migración
 RLS sin confirmar, código muerto en `gamificacion.ts`,

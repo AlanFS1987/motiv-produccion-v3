@@ -1,3 +1,18 @@
+-- Nota (28/09/2026): este archivo y su versión remota en Supabase
+-- (supabase_migrations.schema_migrations) llevan el mismo nombre de
+-- versión de solo 8 dígitos (sin hora), a diferencia del resto de
+-- migraciones del proyecto (14 dígitos). Esto hace que `supabase
+-- migration list` lo muestre como dos filas sueltas sin emparejar
+-- (una 'solo local', otra 'solo remota'), aunque el contenido es
+-- idéntico — confirmado letra por letra contra
+-- supabase_migrations.schema_migrations el 28/09/2026, y confirmado
+-- que existe una única fila real en esa tabla para esta versión (no
+-- se aplicó dos veces). Es un fallo de comparación de la propia
+-- herramienta con versiones de formato corto, no un problema de
+-- datos. No requiere ninguna acción — se resolverá solo cuando este
+-- archivo se reescriba con un nombre de 14 dígitos como parte de la
+-- compactación general de migraciones.
+
 -- Sincroniza ceria_documentacion_maquina con la revisión del Divisor
 -- (BS08) preparada por Fable tras hablar con el mecánico -- sesión
 -- 12-13/09/2026.
