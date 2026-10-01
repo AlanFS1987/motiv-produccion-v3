@@ -16,6 +16,7 @@ import { VistaDetalladaScreen } from "../jefe/VistaDetalladaScreen";
 import { IncidenciasScreen } from "../jefe/IncidenciasScreen";
 import { InformesScreen } from "../jefe/InformesScreen";
 import { CalidadLotesScreen } from "../calidad/CalidadLotesScreen";
+import { AlimentacionPanel } from "../alimentacion/AlimentacionPanel";
 import { ChatHomeScreen } from "../chat/ChatHomeScreen";
 import { AjustarLetrasScreen } from "./AjustarLetrasScreen";
 import { GestionUsuariosScreen } from "./GestionUsuariosScreen";
@@ -32,7 +33,7 @@ import { NotasScreen } from "./NotasScreen";
 
 
 
-type PestanaAdmin = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "informes" | "ceria" | "rotacion" | "partes" | "nuevo-parte" | "prueba-camara" | "cierre-fabrica" | "checklist" | "gamificacion" | "gestion-usuarios" | "chat" | "accesos" | "engrase" | "programacion" | "notas";
+type PestanaAdmin = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "alimentacion" | "informes" | "ceria" | "rotacion" | "partes" | "nuevo-parte" | "prueba-camara" | "cierre-fabrica" | "checklist" | "gamificacion" | "gestion-usuarios" | "chat" | "accesos" | "engrase" | "programacion" | "notas";
 function BotonPestana({
   activa,
   onClick,
@@ -92,6 +93,9 @@ export function AdminApp({ username }: { username: string }) {
           <BotonPestana activa={pestana === "calidad"} onClick={() => setPestana("calidad")}>
             Calidad
           </BotonPestana>
+          <BotonPestana activa={pestana === "alimentacion"} onClick={() => setPestana("alimentacion")}>
+            Alimentación
+          </BotonPestana>
           <BotonPestana activa={pestana === "informes"} onClick={() => setPestana("informes")}>
             Informes
           </BotonPestana>
@@ -145,6 +149,7 @@ export function AdminApp({ username }: { username: string }) {
         {pestana === "vista-detallada" && <VistaDetalladaScreen />}
         {pestana === "incidencias" && <IncidenciasScreen />}
         {pestana === "calidad" && <CalidadLotesScreen />}
+        {pestana === "alimentacion" && <AlimentacionPanel />}
         {pestana === "informes" && <InformesScreen />}
         {pestana === "ceria" && <CeriaScreen />}
         {pestana === "chat" && <ChatHomeScreen />}

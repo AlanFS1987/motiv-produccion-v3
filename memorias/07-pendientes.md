@@ -151,6 +151,11 @@ Cada área lleva su lista abierta en su archivo; aquí solo se remite
   CLASE/TONO/CALIBRE/CONTROL) en la app, confirmar que la hoja de
   impresión sigue cabiendo en una cara con volumen de pedidos alto,
   reglas de validación de tono/calibre → `20`.
+- **Alimentación**: confirmar el rango de minutos válidos (360–540,
+  provisional), confirmar los valores de `REFERENCIAS_PIEZAS_MIN`
+  (tomados de la gráfica de trabajo), zoom en las nubes (solo
+  escritorio, fase 2) y saber si alguna línea ha cambiado de consigna
+  en el histórico → `21`.
 
 
 ## Ideas futuras sin decidir

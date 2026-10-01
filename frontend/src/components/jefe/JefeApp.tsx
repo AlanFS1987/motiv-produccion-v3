@@ -3,14 +3,17 @@
 // se monta en vez del shell de responsable (Turno/Resumen/Lotes) en
 // cuanto usuario.rol === 'jefe'.
 //
-// Siete pestañas: Vista Rápida, Vista Detallada, Incidencias, Calidad,
-// Informes, Ceria y Chat — dashboard del jefe completo por ahora (ver
-// memorias/07-pendientes.md punto 6 para lo que quede fuera).
+// Nueve pestañas: Vista Rápida, Vista Detallada, Incidencias, Calidad,
+// Alimentación, Informes, Programación, Ceria y Chat — dashboard del
+// jefe completo por ahora (ver memorias/07-pendientes.md punto 6 para
+// lo que quede fuera).
 // "Calidad" reutiliza CalidadLotesScreen.tsx tal cual (mismo
 // componente que usa el rol calidad, sin ningún cambio ni prop
 // nueva) — decisión de sesión 27/08/2026: exactamente igual.
 // "Informes" (20/09/2026) lista los PDF diarios, semanales y de turno
 // para abrirlos desde la app — mismo componente que usa el admin.
+// "Alimentación" (01/10/2026, ver memorias/21-alimentacion.md)
+// rendimiento vs velocidad de alimentación, eje de producción.
 
 import { useState } from "react";
 import { LogOut } from "lucide-react";
@@ -25,8 +28,9 @@ import { InformesScreen } from "./InformesScreen";
 import { CalidadLotesScreen } from "../calidad/CalidadLotesScreen";
 import { ChatHomeScreen } from "../chat/ChatHomeScreen";
 import { ProgramacionScreen } from "./programacion/ProgramacionScreen";
+import { AlimentacionPanel } from "../alimentacion/AlimentacionPanel";
 
-type PestanaJefe = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "informes" | "programacion" | "ceria" | "chat";
+type PestanaJefe = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "alimentacion" | "informes" | "programacion" | "ceria" | "chat";
 
 function BotonPestana({
   activa,
@@ -40,7 +44,7 @@ function BotonPestana({
   return (
     <button
       onClick={onClick}
-      className={`border-b-2 px-3 py-2 text-sm font-medium ${
+      className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${
         activa ? "border-[var(--acento)] text-[var(--texto)]" : "border-transparent text-[var(--texto-tenue)] hover:text-[var(--texto-secundario)]"
       }`}
     >
@@ -87,6 +91,9 @@ export function JefeApp({ username }: { username: string }) {
           <BotonPestana activa={pestana === "calidad"} onClick={() => setPestana("calidad")}>
             Calidad
           </BotonPestana>
+          <BotonPestana activa={pestana === "alimentacion"} onClick={() => setPestana("alimentacion")}>
+            Alimentación
+          </BotonPestana>
           <BotonPestana activa={pestana === "informes"} onClick={() => setPestana("informes")}>
             Informes
           </BotonPestana>
@@ -107,6 +114,7 @@ export function JefeApp({ username }: { username: string }) {
         {pestana === "vista-detallada" && <VistaDetalladaScreen />}
         {pestana === "incidencias" && <IncidenciasScreen />}
         {pestana === "calidad" && <CalidadLotesScreen />}
+        {pestana === "alimentacion" && <AlimentacionPanel />}
         {pestana === "informes" && <InformesScreen />}
         {pestana === "programacion" && <ProgramacionScreen />}
         {pestana === "ceria" && <CeriaScreen />}

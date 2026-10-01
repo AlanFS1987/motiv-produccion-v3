@@ -1,8 +1,9 @@
 # 08 — Dashboard del jefe
 
 Shell propio (`jefe/JefeApp.tsx`), se muestra cuando `usuario.rol =
-'jefe'`. Ocho pestañas: **Vista Rápida**, **Vista Detallada**,
-**Incidencias**, **Calidad**, **Informes** (20/09/2026), **Programación**
+'jefe'`. Nueve pestañas: **Vista Rápida**, **Vista Detallada**,
+**Incidencias**, **Calidad**, **Alimentación** (ver `21-alimentacion.md`),
+**Informes** (20/09/2026), **Programación**
 (ver `20-programacion.md`), **Ceria** (ver
 `11-ceria.md`) y **Chat** (ver `15`). Sin
 gamificación — el jefe no quiere ver puntos/ranking/niveles, esa
@@ -86,6 +87,12 @@ Ver `14-calidad.md` para el detalle completo (fórmulas, buscador,
 limitación del filtro de fecha). No hizo falta tocar RLS: el jefe ya
 tenía SELECT sobre `parte`/`incidencia_calidad`/`modelo` desde el
 diseño original.
+
+## Alimentación (`alimentacion/AlimentacionPanel.tsx`, `lib/dashboard-alimentacion.ts`)
+
+Relación entre velocidad a plena, tiempo a plena y lo que sale del
+turno, eje de producción, sin calidad. Detalle completo (métricas,
+vista SQL propia, qué turnos entran, pantalla) en `21-alimentacion.md`.
 
 ## Informes (`jefe/InformesScreen.tsx`, `lib/informes.ts`)
 

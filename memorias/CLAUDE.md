@@ -38,7 +38,7 @@ la sección de rectificado (anterior a clasificación, no una variante
 de `jefe`) — shell propio, ver `13-rectificado.md`. `calidad` tiene
 shell propio de solo lectura (últimos 15 lotes + incidencias), ver
 `14-calidad.md`. `produccion` tiene shell propio
-(`components/produccion/ProduccionApp.tsx`, 7 pestañas, reutiliza
+(`components/produccion/ProduccionApp.tsx`, 8 pestañas, reutiliza
 componentes de `jefe/` y `calidad/`), montado en `App.tsx` desde el
 22/09/2026.
 `mecanico` (2 personas, sin turnos ni letra) tiene shell propio:
@@ -110,6 +110,7 @@ Unidades — ver `17` y `18`.
 | Pantalla de fábrica en tiempo real (Supabase Realtime) | Construido 13/09/2026 (`10`) |
 | Informes diario y semanal (PDF, enlaces dentro del resumen del turno N + cron de respaldo) y pestaña Informes del jefe/admin | Construido; verificado en real 21/09/2026 como mensajes sueltos, pendiente de ver la primera noche "dentro del resumen" (`19`) |
 | Hora de revisión del turno: se pueden abrir partes nuevos | Construido 20/09/2026, pendiente de probar en una revisión real (`02`, `07`) |
+| Pestaña Alimentación (rendimiento vs velocidad, jefe/admin/producción) | Construido 01/10/2026 (`21`) |
 
 ## Fechas clave
 
@@ -201,6 +202,7 @@ frontend/src/
     equipo.ts                  pestaña Equipo del responsable (04)
     ranking.ts / logros.ts / stats-avatar.ts   soportan rol operario+responsable
     dashboard-jefe.ts / dashboard-detallada.ts / dashboard-incidencias.ts / dashboard-calidad.ts / dashboard-rectificado.ts
+    dashboard-alimentacion.ts / alimentacion-calculos.ts   consulta + cálculos puros de la pestaña Alimentación (21)
     admin-usuarios.ts / admin-partes.ts / admin-cierre-fabrica.ts / admin-checklist.ts /
     admin-engrase.ts / admin-gamificacion.ts / admin-gestion-usuarios.ts
     pantalla-carrusel.ts / ceria.ts / nora.ts
@@ -225,6 +227,8 @@ frontend/src/
                                Gamificacion, Notas, PuntosEngrase, AdminNuevoParte
                                (Programación reutiliza jefe/programacion/ProgramacionScreen)
     calidad/                   CalidadApp, CalidadLotesScreen
+    alimentacion/               AlimentacionPanel, FiltrosAlimentacion, NubesAlimentacion,
+                               TemporalAlimentacion, TooltipAlimentacion (21)
     rectificado/                RectificadoApp, VistaRapida/VistaDetallada de rectificado
     produccion/                 ProduccionApp (7 pestañas, reutiliza componentes de jefe/ y calidad/)
     mecanico/                   MecanicoApp, IncidenciasMecanicoScreen, AlmacenScreen, EngraseScreen

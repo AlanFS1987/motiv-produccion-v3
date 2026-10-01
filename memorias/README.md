@@ -29,6 +29,7 @@ solo remite a él con el número (`ver 04`).
 | `18-rol-mecanico-frontend.md` | Rol mecánico: pantallas construidas y pendientes |
 | `19-informes-periodo.md` | Informes diario y semanal en PDF: diseño, automatización (trigger + cron), pestaña Informes del jefe/admin |
 | `20-programacion.md` | Programación diaria de hornos: parser CSV, diff editable, confirmación con historial/deshacer, pestaña Programación del jefe |
+| `21-alimentacion.md` | Pestaña Alimentación: rendimiento vs velocidad de alimentación, vista SQL propia, nubes y evolución temporal |
 
 Marcas usadas:
 - `[VERIFICAR]` — descrito a partir de migraciones/código, no contrastado con la BD real.

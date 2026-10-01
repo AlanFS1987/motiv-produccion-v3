@@ -6,11 +6,11 @@
 // tal cual los componentes de `jefe/` y `calidad/`, igual patrón que
 // `AdminApp.tsx` — sin duplicar ni una pantalla.
 //
-// Siete pestañas: Vista Rápida, Vista Detallada, Incidencias, Calidad,
-// Informes, Ceria y Chat. Qué canales de Chat ve (incidencia_calidad,
-// incidencia_produccion, ceria — sin "general") se decide aparte desde
-// `admin/ChatAccesoScreen.tsx`, no aquí: `ChatHomeScreen` ya filtra
-// solo lo que el rol tiene permitido.
+// Ocho pestañas: Vista Rápida, Vista Detallada, Incidencias, Calidad,
+// Alimentación, Informes, Ceria y Chat. Qué canales de Chat ve
+// (incidencia_calidad, incidencia_produccion, ceria — sin "general")
+// se decide aparte desde `admin/ChatAccesoScreen.tsx`, no aquí:
+// `ChatHomeScreen` ya filtra solo lo que el rol tiene permitido.
 //
 // RLS necesaria para que esto funcione: ver
 // supabase/migrations/20260922120000_rol_produccion_rls.sql.
@@ -27,12 +27,14 @@ import { IncidenciasScreen } from "../jefe/IncidenciasScreen";
 import { InformesScreen } from "../jefe/InformesScreen";
 import { CalidadLotesScreen } from "../calidad/CalidadLotesScreen";
 import { ChatHomeScreen } from "../chat/ChatHomeScreen";
+import { AlimentacionPanel } from "../alimentacion/AlimentacionPanel";
 
 type PestanaProduccion =
   | "vista-rapida"
   | "vista-detallada"
   | "incidencias"
   | "calidad"
+  | "alimentacion"
   | "informes"
   | "ceria"
   | "chat";
@@ -49,7 +51,7 @@ function BotonPestana({
   return (
     <button
       onClick={onClick}
-      className={`border-b-2 px-3 py-2 text-sm font-medium ${
+      className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${
         activa
           ? "border-[var(--acento)] text-[var(--texto)]"
           : "border-transparent text-[var(--texto-tenue)] hover:text-[var(--texto-secundario)]"
@@ -98,6 +100,9 @@ export function ProduccionApp({ username }: { username: string }) {
           <BotonPestana activa={pestana === "calidad"} onClick={() => setPestana("calidad")}>
             Calidad
           </BotonPestana>
+          <BotonPestana activa={pestana === "alimentacion"} onClick={() => setPestana("alimentacion")}>
+            Alimentación
+          </BotonPestana>
           <BotonPestana activa={pestana === "informes"} onClick={() => setPestana("informes")}>
             Informes
           </BotonPestana>
@@ -115,6 +120,7 @@ export function ProduccionApp({ username }: { username: string }) {
         {pestana === "vista-detallada" && <VistaDetalladaScreen />}
         {pestana === "incidencias" && <IncidenciasScreen />}
         {pestana === "calidad" && <CalidadLotesScreen />}
+        {pestana === "alimentacion" && <AlimentacionPanel />}
         {pestana === "informes" && <InformesScreen />}
         {pestana === "ceria" && <CeriaScreen />}
         {pestana === "chat" && <ChatHomeScreen />}
