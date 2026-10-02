@@ -115,6 +115,11 @@ export function ProgramacionRevisar() {
 
   const nuevasPendientesDeTono = filas.filter((f) => f.cambio === "nuevo" && f.incluida && !f.tono);
 
+  // Un numero_orden repetido en el CSV es siempre un error (aunque sea en
+  // hornos distintos). El diff solo devuelve una de las apariciones, así
+  // que no se puede resolver aquí: hay que corregir el archivo.
+  const repetidas = filas.filter((f) => f.repetida);
+
   function actualizarFila(numeroOrden: string, horno: number, cambios: Partial<FilaEditable>) {
     setFilas((prev) =>
       prev.map((f) => (f.horno === horno && f.numeroOrden === numeroOrden ? { ...f, ...cambios } : f)),
@@ -122,9 +127,18 @@ export function ProgramacionRevisar() {
   }
 
   async function confirmar() {
+    if (repetidas.length > 0) {
+      setError("Hay números de orden repetidos en el archivo. Corrígelo y usa «Sustituir».");
+      return;
+    }
     setConfirmando(true);
     setError(null);
     try {
+      // Entran todas las filas que existen en el CSV nuevo (nuevo,
+      // reordenado, sin_cambios, cambia_horno): la clave es numero_orden,
+      // así que una orden que cambia de horno se actualiza en su sitio y
+      // conserva tono, calibre y fecha de alta. Solo "eliminado" queda
+      // fuera (salvo que el jefe lo mantenga, más abajo).
       const filasFinales: FilaAConfirmar[] = filas
         .filter((f) => f.incluida && f.cambio !== "eliminado")
         .map((f, idx) => ({
@@ -318,6 +332,17 @@ export function ProgramacionRevisar() {
           {resultado}
         </div>
       )}
+      {repetidas.length > 0 && (
+        <div className="flex items-start gap-2 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />
+          <div>
+            <strong>Números de orden repetidos en el archivo:</strong>{" "}
+            {repetidas.map((f) => f.numeroOrden).join(", ")}.
+            <br />
+            No se puede confirmar. Corrige el archivo y pégalo de nuevo con «¿Archivo equivocado? Sustituir».
+          </div>
+        </div>
+      )}
 
       {[1, 2, 3, 4].map((horno) => {
         const filasHorno = porHorno.get(horno) ?? [];
@@ -331,8 +356,16 @@ export function ProgramacionRevisar() {
                   <span
                     className={`w-fit shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${COLOR_CAMBIO[f.cambio]}`}
                   >
-                    {ETIQUETA_CAMBIO[f.cambio]}
+                    {ETIQUETA_CAMBIO[f.cambio] ?? f.cambio}
                   </span>
+                  {f.cambio === "cambia_horno" && f.hornoActual !== null && (
+                    <span className="w-fit shrink-0 text-xs text-blue-700">viene del horno {f.hornoActual}</span>
+                  )}
+                  {f.repetida && (
+                    <span className="w-fit shrink-0 rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                      Repetida
+                    </span>
+                  )}
 
                   <div className="flex-1">
                     <div className="flex items-center gap-2 font-medium text-[var(--texto)]">
@@ -392,14 +425,16 @@ export function ProgramacionRevisar() {
 
       <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-slate-200 bg-[var(--fondo)] py-3">
         <span className="text-xs text-slate-500">
-          {nuevasPendientesDeTono.length > 0
-            ? `${nuevasPendientesDeTono.length} pedido(s) nuevo(s) sin tono/calibre — puedes confirmar igualmente y rellenarlos después.`
-            : "Todo listo."}
+          {repetidas.length > 0
+            ? "Confirmar bloqueado: hay números de orden repetidos."
+            : nuevasPendientesDeTono.length > 0
+              ? `${nuevasPendientesDeTono.length} pedido(s) nuevo(s) sin tono/calibre — puedes confirmar igualmente y rellenarlos después.`
+              : "Todo listo."}
         </span>
         <button
           type="button"
           onClick={confirmar}
-          disabled={confirmando}
+          disabled={confirmando || repetidas.length > 0}
           className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
         >
           {confirmando && <Loader2 size={14} className="animate-spin" aria-hidden />}

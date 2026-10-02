@@ -14,6 +14,7 @@ export const ETIQUETA_CAMBIO: Record<CambioDiff, string> = {
   eliminado: "− Eliminado",
   reordenado: "~ Reordenado",
   sin_cambios: "= Sin cambios",
+  cambia_horno: "⇄ Cambia de horno",
 };
 
 export const COLOR_CAMBIO: Record<CambioDiff, string> = {
@@ -21,6 +22,7 @@ export const COLOR_CAMBIO: Record<CambioDiff, string> = {
   eliminado: "bg-red-50 text-red-700 border-red-200",
   reordenado: "bg-amber-50 text-amber-700 border-amber-200",
   sin_cambios: "bg-slate-50 text-slate-500 border-slate-200",
+  cambia_horno: "bg-blue-50 text-blue-700 border-blue-200",
 };
 
 export const COLOR_ESTADO: Record<Estado, string> = {

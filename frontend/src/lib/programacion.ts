@@ -16,7 +16,9 @@
 
 import { supabase } from "./supabase-client";
 
-export type CambioDiff = "nuevo" | "eliminado" | "reordenado" | "sin_cambios";
+// cambia_horno: la orden ya existía en otro horno. La clave es solo
+// numero_orden; en ese caso la posición no es comparable entre hornos.
+export type CambioDiff = "nuevo" | "eliminado" | "reordenado" | "sin_cambios" | "cambia_horno";
 export type Estado = "pendiente" | "iniciado" | "finalizado";
 
 export interface FilaDiff {
@@ -30,6 +32,12 @@ export interface FilaDiff {
   caja: string | null;
   posicionActual: number | null;
   posicionNueva: number | null;
+  // horno guardado hoy / horno según el CSV nuevo (null si no existe en ese lado).
+  hornoActual: number | null;
+  hornoNuevo: number | null;
+  // true = el mismo numero_orden aparece más de una vez en el CSV pegado.
+  // El diff solo devuelve una de las apariciones; confirmar debe quedar bloqueado.
+  repetida: boolean;
 }
 
 export interface FilaConEstado {
@@ -111,6 +119,9 @@ export async function obtenerDiffProgramacion(fecha: string = hoyISO()): Promise
     caja: f.caja as string | null,
     posicionActual: f.posicion_actual as number | null,
     posicionNueva: f.posicion_nueva as number | null,
+    hornoActual: (f.horno_actual ?? null) as number | null,
+    hornoNuevo: (f.horno_nuevo ?? null) as number | null,
+    repetida: Boolean(f.repetida),
   }));
 }
 
