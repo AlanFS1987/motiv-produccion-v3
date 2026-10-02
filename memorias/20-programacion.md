@@ -48,12 +48,23 @@ calibre ∈ `{3, 4, 44, SC}`; tono = letra `M`/`X`/`R` + número `01..N`.
 **`programacion_orden`** — una fila por pedido activo hoy.
 `horno smallint` (1-4), `posicion integer` (orden dentro del horno,
 según el último CSV), `numero_orden text`, `modelo`, `metros numeric`,
-`acabado`, `cep boolean`, `caja`, `tono`, `calibre`. `unique (horno,
-numero_orden)`. El estado (pendiente/iniciado/finalizado) **no se
-guarda aquí**: se calcula al vuelo.
+`acabado`, `cep boolean`, `caja`, `tono`, `calibre`, `fecha_alta date`.
+**La clave de negocio es solo `numero_orden`** (`unique (numero_orden)`,
+desde el 02/10/2026): el horno es un dato de la orden, no parte de la
+clave, y una orden puede cambiar de horno conservando tono, calibre y
+fecha de alta. Antes era `unique (horno, numero_orden)`. `fecha_alta` =
+día en que la orden se insertó por primera vez (la fija solo
+`confirmar_programacion` al insertar; `null` en las filas anteriores al
+02/10/2026, la UI las muestra como "—"). El estado
+(pendiente/iniciado/finalizado) **no se guarda aquí**: se calcula al
+vuelo.
 
 **`programacion_con_estado`** (vista) — `programacion_orden` +
 `LEFT JOIN lote on lote.numero_orden = programacion_orden.numero_orden`.
+La vista corre como owner (convención del proyecto, sin
+`security_invoker`), así que **filtra por rol dentro de la propia vista**
+(`where fn_rol_actual() in ('jefe','responsable','produccion','administrador')`);
+sin sesión o con otro rol devuelve 0 filas. Expone `fecha_alta`.
 `lote.estado` (enum `estado_lote`) solo tiene `iniciado`/`finalizado` —
 no existe `pendiente` como valor guardado en ningún sitio: pendiente es
 la ausencia de fila en `lote` para ese `numero_orden`
@@ -97,30 +108,82 @@ que tocar esa RLS.
   `#variable_conflict use_column` al principio del body (mismo fix ya
   usado en `fn_otorgar_bonus_nivel`, `04`).
 - **`diff_programacion(fecha)`** — `full outer join` entre
-  `parse_programacion(fecha)` y el `programacion_orden` actual.
-  Devuelve `cambio` (`nuevo`/`eliminado`/`reordenado`/`sin_cambios`)
-  por `(horno, numero_orden)`. Solo lectura, no escribe nada.
+  `parse_programacion(fecha)` y el `programacion_orden` actual, **por
+  `numero_orden`**. Devuelve `cambio`
+  (`nuevo`/`eliminado`/`reordenado`/`sin_cambios`/`cambia_horno`),
+  `horno_actual`, `horno_nuevo` y `repetida`. `cambia_horno`: la orden
+  existía en otro horno; se comprueba **antes** que `reordenado`
+  (la posición no es comparable entre hornos). Un `numero_orden`
+  repetido en el CSV (mismo horno o distinto) sale **una sola vez**
+  (`distinct on`, la primera aparición) con `repetida = true`: no
+  multiplica filas, y el frontend bloquea confirmar. Solo lectura.
 - **`confirmar_programacion(fecha, filas jsonb)`** — la escritura real.
   Recibe el estado final **ya revisado/editado por el jefe** (no
   vuelve a llamar al parser a ciegas — el jefe pudo excluir una
   eliminación, descartar un "nuevo" falso positivo, corregir algo).
-  Guarda primero un snapshot en `programacion_orden_historico`, luego
-  hace reemplazo completo (`delete` de lo que sobra + `upsert` de lo
-  que viene). `tono`/`calibre` solo se sobrescriben si el payload trae
-  valor no vacío (`coalesce(excluded.tono, programacion_orden.tono)`)
-  — para no borrar por accidente lo ya rellenado en una fila que solo
-  se reordenó.
+  Rechaza (`raise exception`) un payload con `numero_orden` repetidos o
+  filas sin número/horno. Guarda primero un snapshot en
+  `programacion_orden_historico` (incluye `fecha_alta`), luego hace
+  reemplazo completo (`delete` de lo que sobra + `upsert` por
+  `numero_orden`, que actualiza también `horno` y `posicion`).
+  `tono`/`calibre` solo se sobrescriben si el payload trae valor no
+  vacío (`coalesce(excluded.tono, programacion_orden.tono)`) — para no
+  borrar por accidente lo ya rellenado en una fila que solo se
+  reordenó o cambió de horno. `fecha_alta` no se toca en el conflicto.
 - **`deshacer_ultima_programacion()`** — restaura la foto más reciente
-  de `programacion_orden_historico` y la consume (pila: cada uso
-  retrocede un paso más). Ojo: `delete from programacion_orden` sin
-  condición choca con la protección `safe-update` del proyecto
-  ("DELETE requires a WHERE clause") — lleva `where true` explícito.
+  de `programacion_orden_historico` (incluidos `horno` y `fecha_alta`;
+  los snapshots anteriores al 02/10/2026 no la traen y quedan en
+  `null`) y la consume. **Es una pila: cada uso retrocede UN paso más**;
+  pulsarlo dos veces seguidas deshace también la confirmación anterior
+  (pasó en la prueba del 02/10/2026). Los `id` de las filas cambian al
+  restaurar. Ojo: `delete from programacion_orden` sin condición choca
+  con la protección `safe-update` del proyecto ("DELETE requires a
+  WHERE clause") — lleva `where true` explícito.
+- Las tres comprobaciones de rol de `diff`, `confirmar` y `deshacer`
+  usan `coalesce(fn_rol_actual()::text,'') not in (...)`: con rol nulo,
+  `NULL NOT IN (...)` es `NULL` y el `if` no saltaba. Las demás RPC de
+  programación (`parse`, `guardar_programacion_csv`,
+  `existe_csv_programacion`) y el resto del proyecto siguen con el
+  patrón antiguo hasta que se corrijan (pendiente).
 
 RLS de `programacion_orden`: SELECT para `jefe, responsable,
 produccion, administrador`. Sin políticas de INSERT/UPDATE/DELETE
 directas — toda escritura pasa por `confirmar_programacion`/
 `deshacer_ultima_programacion`. `programacion_orden_historico`: mismo
 SELECT, sin escritura directa tampoco.
+
+> **Corrección (02/10/2026).** Este documento afirmaba lo anterior desde
+> el principio, pero **en producción `programacion_orden` tenía RLS
+> desactivado y `GRANT ALL` a `anon` y `authenticated`** (se copió la
+> afirmación sin comprobarla en la BD): con la clave anónima del
+> frontend se podía leer, modificar o vaciar. Cerrado el 02/10/2026 con
+> la migración `20261002131613_cerrar_acceso_programacion_orden.sql`
+> (RLS + política de SELECT, `revoke all` a `anon`/`authenticated` y
+> `grant select` solo a `authenticated`, filtro por rol dentro de la
+> vista). En la misma migración se eliminó `aplicar_programacion`,
+> versión antigua sin comprobación de rol ni `security definer`,
+> ejecutable por `anon`/`PUBLIC`, que nadie usaba. Se comprobó con un
+> usuario de cada rol: jefe, administrador, responsable y producción
+> leen 39 filas; operario, calidad y mecánico 0; `anon` denegado; ningún
+> rol puede escribir directo. `get_advisors` ya no marca
+> `rls_disabled_in_public`. La migración
+> `20261002164859_programacion_clave_numero_orden.sql` (clave por
+> `numero_orden`, `fecha_alta`, `cambia_horno`) se aplicó el mismo día.
+
+## Copias de seguridad y restauración
+
+Antes de la migración de la clave se hizo copia de las dos tablas:
+`programacion_orden_bak_20261002` y
+`programacion_orden_historico_bak_20261002` (RLS activo, sin acceso para
+`anon`/`authenticated`), más el archivo
+`privado/backups/programacion_pre_M2_20261002.json` (fuera de git y de
+`supabase/migrations/`). **La copia en BD es la fiable para restaurar**;
+el JSON es solo una copia de conveniencia (en una fila el `modelo` pierde
+unos espacios finales al transcribirlo). Se usó una vez, tras la prueba
+de UI del 02/10/2026: se restauró `programacion_orden` (con sus `id` y
+marcas de tiempo) y el historial, y se verificó por hash que quedaron
+idénticos a la copia. **Borrar las dos tablas `_bak_20261002` a partir
+del 2026-10-16** si todo va bien (están marcadas con un comentario).
 
 ## Por qué el diff es editable (y no un upsert automático)
 
@@ -153,7 +216,14 @@ Dos redes de seguridad ante un error humano (CSV equivocado):
   sesión: "reduce complejidad"). En cuanto hay CSV, diff agrupado por
   horno: `+ nuevo` (con inputs de tono/calibre), `− eliminado` (con
   botón "mantener igualmente"), `~ reordenado`/`= sin cambios`
-  informativos. Botón "Confirmar y actualizar".
+  informativos, y `⇄ cambia de horno` (informativo, agrupado bajo el
+  horno nuevo con "viene del horno X"; **sí entra en el payload**, con
+  la posición dentro del horno nuevo). Si alguna fila viene `repetida`
+  hay un aviso rojo y **confirmar queda bloqueado**: hay que corregir el
+  archivo y usar «¿Archivo equivocado? Sustituir». El resultado de
+  confirmar/deshacer se muestra tras recargar el diff (`cargarDiff`
+  recibe el mensaje; antes la propia recarga lo borraba y solo se veía
+  el spinner). Botón "Confirmar y actualizar".
 - **Consultar**: la lista congelada de hoy, agrupada por horno, con
   badge de estado en vivo (pendiente/iniciado/finalizado, colores
   distintos), botón "copiar → copiado" junto a cada `Nº ORDEN`

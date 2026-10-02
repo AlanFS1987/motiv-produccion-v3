@@ -54,19 +54,23 @@ export function ProgramacionRevisar() {
   // (por si se equivocó de archivo) — fuerza a mostrar el textarea.
   const [sustituyendo, setSustituyendo] = useState(false);
 
-  function cargarDiff() {
+  // `mensaje` (opcional): resultado de la acción que provoca la recarga
+  // (confirmar/deshacer). Se muestra cuando termina de cargar; si se
+  // fijara antes, la propia recarga lo borraría y solo se vería el spinner.
+  function cargarDiff(mensaje?: string) {
     setCargando(true);
     setError(null);
     setResultado(null);
     obtenerDiffProgramacion(fecha)
-      .then((diff) =>
+      .then((diff) => {
         setFilas(
           diff.map((f) => ({
             ...f,
             incluida: f.cambio !== "eliminado",
           })),
-        ),
-      )
+        );
+        if (mensaje) setResultado(mensaje);
+      })
       .catch((err) => setError(err instanceof Error ? err.message : "Error cargando el diff"))
       .finally(() => setCargando(false));
   }
@@ -172,10 +176,7 @@ export function ProgramacionRevisar() {
       }
 
       const r = await confirmarProgramacion(fecha, filasFinales);
-      setResultado(
-        `Guardado: ${r.nuevos} nuevos, ${r.eliminados} eliminados, ${r.actualizados} actualizados.`,
-      );
-      cargarDiff();
+      cargarDiff(`Guardado: ${r.nuevos} nuevos, ${r.eliminados} eliminados, ${r.actualizados} actualizados.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al confirmar");
     } finally {
@@ -195,10 +196,9 @@ export function ProgramacionRevisar() {
     setError(null);
     try {
       const r = await deshacerUltimaProgramacion();
-      setResultado(
+      cargarDiff(
         `Deshecho: ${r.filasRestauradas} filas restauradas (estado de ${new Date(r.snapshotDe).toLocaleString("es-ES")}).`,
       );
-      cargarDiff();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al deshacer");
     } finally {
@@ -283,8 +283,14 @@ export function ProgramacionRevisar() {
 
   if (filas.length === 0 && !error) {
     return (
-      <div className="p-6 text-sm text-slate-500">
-        No hay ningún cambio que revisar respecto a la última programación confirmada.
+      <div className="space-y-2 p-6 text-sm text-slate-500">
+        {resultado && (
+          <div className="flex items-start gap-2 rounded-xl bg-green-50 p-3 text-green-700">
+            <Check size={16} className="mt-0.5 shrink-0" aria-hidden />
+            {resultado}
+          </div>
+        )}
+        <div>No hay ningún cambio que revisar respecto a la última programación confirmada.</div>
       </div>
     );
   }
@@ -296,7 +302,7 @@ export function ProgramacionRevisar() {
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={cargarDiff}
+            onClick={() => cargarDiff()}
             className="flex items-center gap-1 rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
           >
             <RefreshCw size={12} aria-hidden /> Recargar

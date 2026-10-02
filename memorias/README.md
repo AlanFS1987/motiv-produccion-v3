@@ -30,6 +30,7 @@ solo remite a él con el número (`ver 04`).
 | `19-informes-periodo.md` | Informes diario y semanal en PDF: diseño, automatización (trigger + cron), pestaña Informes del jefe/admin |
 | `20-programacion.md` | Programación diaria de hornos: parser CSV, diff editable, confirmación con historial/deshacer, pestaña Programación del jefe |
 | `21-alimentacion.md` | Pestaña Alimentación: rendimiento vs velocidad de alimentación, vista SQL propia, nubes y evolución temporal |
+| `22-programacion-mejoras.md` | Mejoras acordadas de Programación (pegado de celdas, avisos de validación, Consultar de trabajo, notas) y estado de implementación; incluye lo aparcado (SAP, SASO, hoja de partida) |
 
 Marcas usadas:
 - `[VERIFICAR]` — descrito a partir de migraciones/código, no contrastado con la BD real.
