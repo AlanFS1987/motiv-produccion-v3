@@ -150,6 +150,59 @@ export async function confirmarProgramacion(
 }
 
 // ---------------------------------------------------------------
+// Avisos de validación (validar_programacion, solo lectura)
+// ---------------------------------------------------------------
+
+export type TipoAviso = "repetida" | "incompleta" | "descartada";
+
+// Una aparición cruda de una línea del CSV con problema. Los campos vienen como TEXTO tal
+// cual están en el archivo (diff_programacion solo devuelve una fila por número repetido,
+// y el jefe necesita ver todas para elegir cuál es la buena).
+export interface AvisoProgramacion {
+  tipo: TipoAviso;
+  numeroOrden: string | null;
+  linea: number;
+  horno: number;
+  posicion: number | null;
+  modelo: string;
+  metros: string;
+  acabado: string;
+  cep: string;
+  caja: string;
+  // incompleta: qué campos faltan ("modelo", "metros").
+  falta: string[];
+  // descartada: la línea tal cual está en el archivo.
+  lineaCruda: string | null;
+}
+
+export async function validarProgramacion(fecha: string = hoyISO()): Promise<AvisoProgramacion[]> {
+  const { data, error } = await supabase.rpc("validar_programacion", { p_fecha: fecha });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((a: any) => ({
+    tipo: a.tipo as TipoAviso,
+    numeroOrden: (a.numero_orden ?? null) as string | null,
+    linea: a.linea as number,
+    horno: a.horno as number,
+    posicion: (a.posicion ?? null) as number | null,
+    modelo: (a.modelo ?? "") as string,
+    metros: (a.metros ?? "") as string,
+    acabado: (a.acabado ?? "") as string,
+    cep: (a.cep ?? "") as string,
+    caja: (a.caja ?? "") as string,
+    falta: (a.falta ?? []) as string[],
+    lineaCruda: (a.linea_cruda ?? null) as string | null,
+  }));
+}
+
+/** METROS del CSV: el punto es separador de miles (5.500 = 5500). null si no se entiende o es ≤ 0. */
+export function metrosDeTexto(raw: string): number | null {
+  const limpio = raw.trim();
+  if (!/^[0-9][0-9.]*$/.test(limpio)) return null;
+  const n = Number(limpio.replace(/\./g, ""));
+  return n > 0 ? n : null;
+}
+
+// ---------------------------------------------------------------
 // Consulta (vista móvil, estado en vivo)
 // ---------------------------------------------------------------
 
