@@ -31,10 +31,16 @@ export interface EspecificacionFoto {
 }
 
 /**
- * Resolución de referencia de cada forma de foto. Para hoja/pantalla/
- * limpieza es solo el ancho de destino del recuadro-guía visual (ya
- * no fuerza recorte). Para caja_superior/caja_lateral SÍ es la
- * resolución final real, porque ahí sigue habiendo recorte.
+ * Resolución de referencia de cada forma de foto. Para pantalla/limpieza
+ * es solo el ancho de destino del recuadro-guía visual (ya no fuerza
+ * recorte). Para caja_superior/caja_lateral SÍ es la resolución final
+ * real, porque ahí sigue habiendo recorte.
+ *
+ * `hoja_partida` (1600x1200, apaisado) YA NO se usa para el recuadro de
+ * la Foto 1: la hoja es un A4 VERTICAL y FotoHojaPartida usa su propia
+ * proporción 210/297 (y no recorta: procesarFotoLibre solo redimensiona).
+ * La entrada se conserva solo porque FormaFoto la incluye; no la tomes
+ * como la forma real de la hoja.
  */
 export const ESPECIFICACIONES_FOTO: Record<FormaFoto, EspecificacionFoto> = {
   hoja_partida: { ancho: 1600, alto: 1200 },
