@@ -114,9 +114,19 @@ que tocar esa RLS.
   cabeceras vistas (`sum() over (order by ordinality)`) para asignar
   horno, extrae por `split_part(line, ';', N)`, filtra filas basura
   con `numero_orden ~ '^[0-9]{6,8}$'` (descarta huecos `" - "`, notas
-  tipo "CAMBIO DE FORMATO...", cabeceras repetidas). `metros`:
-  `replace(..,'.','')::numeric` — el CSV usa el punto como separador
-  de miles (`5.500` = 5500), no decimal. **Nota de PL/pgSQL**: al
+  tipo "CAMBIO DE FORMATO...", cabeceras repetidas). `metros`: **la regla
+  vive en `fn_metros_entero(texto)`** (03/10/2026, `20261003142002`), que usan
+  `parse_programacion` y `validar_programacion`: quita todo lo que no sea un dígito
+  (`5500`, `5.500` y `5,500` = 5500; `15.000` y `15,000` = 15000; **`5,5` = 55**: un
+  decimal se lee como entero, los metros son siempre enteros), sin dígitos (vacío,
+  `" - "`, texto) = `null`, y más de 18 dígitos = `null`. Nunca lanza excepción, es pura
+  e inmutable y **no es ejecutable por `public`/`anon`/`authenticated`** (solo la llaman
+  funciones `security definer`). Antes era `replace(..,'.','')::numeric`, que lanzaba
+  `invalid input syntax` con `5,5` o `" - "` y hacía fallar todo el diff.
+  **`validar_programacion` reimplementa la lectura de líneas de `parse_programacion`**
+  (cabeceras, horno por orden de cabecera, posición, filtro del número): **cualquier
+  cambio de formato hay que replicarlo en las dos** (y mantener las mismas 8 columnas de
+  salida de `parse_programacion`, de las que depende `diff_programacion`). **Nota de PL/pgSQL**: al
   convertirla a `security definer`/`plpgsql`, los nombres de columna
   del `RETURNS TABLE` (`numero_orden`, `modelo`, `acabado`, `caja`)
   colisionan con variables internas de la función — lleva
@@ -290,8 +300,9 @@ Dos redes de seguridad ante un error humano (CSV equivocado):
   de seguridad). Sin avisos: un solo botón. Conserva «Mantener igualmente»,
   «Descartar», «¿Archivo equivocado? Sustituir» y «Deshacer última confirmación». El
   resultado de confirmar/deshacer se muestra tras recargar el diff
-  (`cargarDiff(mensaje)`). **Si el diff falla** (p. ej. un METROS como `5,5`:
-  `parse_programacion` convierte con `::numeric` y da `invalid input syntax`) se
+  (`cargarDiff(mensaje)`). **Si el diff falla** (desde `fn_metros_entero` un METROS
+  ilegible ya no lo provoca; antes sí, con `invalid input syntax`; el aviso para ese
+  error concreto se conserva) se
   explica con las líneas afectadas y se bloquea confirmar; antes, un diff fallido dejaba
   el botón activo y habría enviado una lista vacía (reemplazo completo = vaciar la
   programación; recuperable con Deshacer). Ahora el botón se bloquea **y** el servidor
@@ -398,8 +409,10 @@ espacios) y otras columnas usan coma decimal (`9,4`).
   puede fallar en casos no previstos (el CSV con `;` sigue funcionando como siempre).
 - **Pasada de UI** (fase D): guion preparado en `privado/backups/guion_pasada_ui_programacion.md`;
   se hace una vez, con el usuario, y se limpia después (notas, CSV sintético).
-- `parse_programacion` convierte METROS con `::numeric` y falla con un valor no
-  numérico (p. ej. `5,5`); Revisar ya lo explica y bloquea, pero el parser no es robusto.
+- ~~`parse_programacion` fallaba con un METROS no numérico~~: resuelto el 03/10/2026 con
+  `fn_metros_entero` (ver arriba). Queda por alinear el frontend: `metrosDeTexto`
+  (`lib/programacion.ts`, usado en las tarjetas de avisos) sigue con la regla antigua
+  (`^[0-9][0-9.]*$`) y no entiende `5,500`.
 
 - **Hoja de diseño** (el PDF tipo "CAJA 20x120 SL ARGENTA MATE REC
   5PZ APAISADO F5" que se grapa junto a la hoja de partida, con
@@ -428,6 +441,12 @@ Superficie nueva de Programación, para recoger en `00-seguridad.md` cuando se r
   `editar_nota`, `borrar_nota` (jefe/administrador); `guardar_frase` (solo administrador);
   `validar_programacion` (solo lectura, jefe/administrador).
 - **Función de trigger**: `set_updated_at_programacion_nota` (`search_path` fijo).
+- **`fn_metros_entero(text)`** (`20261003142002`): pura, inmutable, `search_path = pg_catalog`,
+  `execute` revocado a `public`, `anon` y `authenticated` (solo `service_role` y el propietario;
+  la llaman `parse_programacion` y `validar_programacion`, ambas `security definer`).
+- **`parse_programacion` es llamable por `authenticated`** (EXECUTE por la API), con su guarda
+  interna (`jefe`/`administrador`; el resto «No autorizado»; `anon` no tiene EXECUTE). El frontend
+  no la usa directamente: solo la llama `diff_programacion`.
 - Ensayadas en transacción revertida con un usuario real de cada rol (`jefe`,
   `administrador`, `responsable`, `produccion`, `operario`, `calidad`, `mecanico`,
   `pantalla`, `jefe_rectificado`), una cuenta sin fila en `usuario` (rol nulo) y `anon`:

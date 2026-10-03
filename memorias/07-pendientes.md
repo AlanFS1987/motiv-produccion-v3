@@ -126,6 +126,11 @@ abiertos:
 
 ## Programación — pendiente
 
+> Seguridad (03/10/2026): `parse_programacion` es **llamable por `authenticated`** (EXECUTE por
+> la API, `anon` no), con su guarda interna (solo `jefe`/`administrador`; el resto recibe «No
+> autorizado»). El frontend no la usa; solo la llama `diff_programacion` (`security definer`),
+> así que se le podría revocar EXECUTE a `authenticated` como a `fn_metros_entero`. Sin hacer.
+
 Mejoras 1–4 implementadas el 03/10/2026 (`20`, `22`). Queda:
 
 1. **Muestra real de celdas copiadas de Excel**: el pegado directo
@@ -139,10 +144,20 @@ Mejoras 1–4 implementadas el 03/10/2026 (`20`, `22`). Queda:
    `privado/backups/guion_pasada_ui_programacion.md`; se hace una vez, con el
    usuario, y se limpia después (notas sintéticas, CSV sintético, verificación por hash contra
    `programacion_orden_bak_20261002`, vigente hasta el 2026-10-16).
-3. `parse_programacion` convierte METROS con `::numeric` y falla con un valor no
-   numérico (p. ej. `5,5`). Revisar lo explica y bloquea la confirmación, pero no se puede
-   completar en pantalla; endurecer el parser lo haría posible.
-4. Reglas de validación de tono/calibre (formato cerrado), sin las normas reales (`20`).
+3. **`parse_programacion` no entiende el formato del CSV guardado con fecha 2026-10-03**
+   (observado el 03/10/2026 en `admin_notas`, creado por el administrador): la cabecera es
+   `ORDEN;MODELO;METROS;Nº BOX;…` (sin «Nº» y sin la primera columna vacía), el número de orden
+   va en la columna 1 y METROS llega como `4500` (sin punto de miles). El parser busca la
+   cabecera con «Nº ORDEN» y lee el número en la columna 2, así que reconoce 0 órdenes: el
+   diff marca como «eliminadas» las 48 de `programacion_orden` y `validar_programacion` da 50
+   avisos de «línea ignorada». Confirmar sin órdenes queda rechazado por el servidor. No se ha
+   tocado el parser; hay que decidir si se admite ese formato (y entonces replicarlo en
+   `validar_programacion`, ver `20`).
+4. `metrosDeTexto` (`frontend/src/lib/programacion.ts`) sigue con la regla antigua de METROS
+   (`^[0-9][0-9.]*$`); la regla de la base de datos es ahora `fn_metros_entero` (quita todo lo que
+   no sea un dígito: `5,500` = 5500). Las tarjetas de avisos de Revisar mostrarían «falta metros»
+   para un METROS con coma que el servidor sí lee. Alinear en una tarea aparte.
+5. Reglas de validación de tono/calibre (formato cerrado), sin las normas reales (`20`).
 
 ## Por construir (orden sugerido)
 
