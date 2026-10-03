@@ -42,6 +42,13 @@ export function formatoMetros(m: number | null): string {
   return m.toLocaleString("es-ES");
 }
 
+/** "2026-10-03" -> "03/10/2026"; "—" si no hay fecha (filas anteriores al 02/10/2026). */
+export function formatoFechaISO(f: string | null): string {
+  if (!f) return "—";
+  const [y, m, d] = f.split("-");
+  return `${d}/${m}/${y}`;
+}
+
 export function BotonCopiar({ texto }: { texto: string }) {
   const [copiado, setCopiado] = useState(false);
 

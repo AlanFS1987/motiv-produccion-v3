@@ -53,6 +53,9 @@ export interface FilaConEstado {
   tono: string | null;
   calibre: string | null;
   estado: Estado;
+  // Día en que la orden entró en programación (null en las filas anteriores
+  // al 02/10/2026: la UI muestra "—" y no las marca como nuevas).
+  fechaAlta: string | null;
 }
 
 // Fila final que se manda a confirmar_programacion. Es lo que
@@ -153,7 +156,7 @@ export async function confirmarProgramacion(
 export async function listarProgramacionConEstado(): Promise<FilaConEstado[]> {
   const { data, error } = await supabase
     .from("programacion_con_estado")
-    .select("id, horno, posicion, numero_orden, modelo, metros, acabado, cep, caja, tono, calibre, estado")
+    .select("id, horno, posicion, numero_orden, modelo, metros, acabado, cep, caja, tono, calibre, estado, fecha_alta")
     .order("horno", { ascending: true })
     .order("posicion", { ascending: true });
 
@@ -172,7 +175,25 @@ export async function listarProgramacionConEstado(): Promise<FilaConEstado[]> {
     tono: f.tono as string | null,
     calibre: f.calibre as string | null,
     estado: f.estado as Estado,
+    fechaAlta: (f.fecha_alta ?? null) as string | null,
   }));
+}
+
+// Edición directa de tono/calibre desde Consultar (jefe/administrador). Identifica la
+// orden por numero_orden (los id cambian al deshacer). Texto vacío = sin valor.
+export async function actualizarTonoCalibre(
+  numeroOrden: string,
+  tono: string,
+  calibre: string,
+): Promise<{ tono: string | null; calibre: string | null }> {
+  const { data, error } = await supabase.rpc("actualizar_tono_calibre", {
+    p_numero_orden: numeroOrden,
+    p_tono: tono,
+    p_calibre: calibre,
+  });
+  if (error) throw new Error(error.message);
+  const fila = data?.[0];
+  return { tono: (fila?.tono ?? null) as string | null, calibre: (fila?.calibre ?? null) as string | null };
 }
 
 export function agruparPorHorno<T extends { horno: number }>(filas: T[]): Map<number, T[]> {

@@ -30,10 +30,11 @@ import { GamificacionScreen } from "./GamificacionScreen";
 import { PuntosEngraseScreen } from "./PuntosEngraseScreen";
 import { ProgramacionScreen } from "../jefe/programacion/ProgramacionScreen";
 import { NotasScreen } from "./NotasScreen";
+import { FrasesNotaScreen } from "./FrasesNotaScreen";
 
 
 
-type PestanaAdmin = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "alimentacion" | "informes" | "ceria" | "rotacion" | "partes" | "nuevo-parte" | "prueba-camara" | "cierre-fabrica" | "checklist" | "gamificacion" | "gestion-usuarios" | "chat" | "accesos" | "engrase" | "programacion" | "notas";
+type PestanaAdmin = "vista-rapida" | "vista-detallada" | "incidencias" | "calidad" | "alimentacion" | "informes" | "ceria" | "rotacion" | "partes" | "nuevo-parte" | "prueba-camara" | "cierre-fabrica" | "checklist" | "gamificacion" | "gestion-usuarios" | "chat" | "accesos" | "engrase" | "programacion" | "frases-nota" | "notas";
 function BotonPestana({
   activa,
   onClick,
@@ -141,6 +142,9 @@ export function AdminApp({ username }: { username: string }) {
           <BotonPestana activa={pestana === "programacion"} onClick={() => setPestana("programacion")}>
             Programación
           </BotonPestana>
+          <BotonPestana activa={pestana === "frases-nota"} onClick={() => setPestana("frases-nota")}>
+            Frases
+          </BotonPestana>
         </div>
       </div>
 
@@ -164,6 +168,7 @@ export function AdminApp({ username }: { username: string }) {
         {pestana === "accesos" && <ChatAccesoScreen />}
         {pestana === "engrase" && <PuntosEngraseScreen />}
         {pestana === "programacion" && <ProgramacionScreen />}
+        {pestana === "frases-nota" && <FrasesNotaScreen />}
         {pestana === "notas" && <NotasScreen />}
       </div>
     </div>

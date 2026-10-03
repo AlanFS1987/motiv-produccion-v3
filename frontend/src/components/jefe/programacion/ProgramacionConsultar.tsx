@@ -3,7 +3,15 @@
 // Sub-vista "Consultar" de la pestaña Programación: la lista de hoy,
 // ya congelada, con estado en vivo (pendiente/iniciado/finalizado vía
 // JOIN contra `lote`) y botón copiar → copiado en cada Nº ORDEN.
-// Pensada para el móvil.
+// Pensada para el móvil. Es la vista de trabajo del jefe (memorias/22,
+// Mejoras 3 y 4), tras confirmar en Revisar:
+//   - fecha de alta por fila + insignia «Nueva hoy»;
+//   - filtros «Solo nuevas de hoy» y «Sin tono/calibre» (combinables);
+//   - tono y calibre editables en la fila (jefe/administrador);
+//   - «Copiar nuevas de hoy» (números de orden, uno por línea);
+//   - notas por orden con selección múltiple («Añadir nota»).
+// Los demás roles con acceso a la lista (responsable, produccion) la ven
+// solo en lectura. La hoja impresa A4 NO cambia: las notas no van en ella.
 //
 // PDF: tabla compacta a una hoja A4 vertical, una sola cara, imitando
 // el formato tradicional de papel (columna de horno combinada a la
@@ -16,17 +24,81 @@
 // la cabecera de la app si no se oculta explícitamente. Con volúmenes
 // de pedidos muy por encima de lo habitual (~55-60), podría desbordar
 // a una segunda hoja — si pasa, bajar el font-size de abajo o revisar
-// qué columna se puede recortar más (ver 20-programacion.md).
+// qué columna se puede recortar más (ver 20-programacion.md). La hoja
+// impresa usa SIEMPRE todas las filas, no las filtradas en pantalla.
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Loader2, Printer, RefreshCw } from "lucide-react";
+import { AlertTriangle, ClipboardList, Loader2, MessageSquarePlus, Printer, RefreshCw } from "lucide-react";
+import { useAuth } from "../../../context/AuthContext";
+import { hoyLocalISO } from "../../../lib/fechas";
 import { agruparPorHorno, listarProgramacionConEstado, type FilaConEstado } from "../../../lib/programacion";
-import { BotonCopiar, COLOR_ESTADO, ETIQUETA_ESTADO, formatoMetros } from "./ui";
+import {
+  listarFrases,
+  listarNotasProgramacion,
+  type FraseNota,
+  type NotaOrden,
+} from "../../../lib/programacion-notas";
+import { ConsultarFila } from "./ConsultarFila";
+import { DialogoAnadirNota } from "./DialogoAnadirNota";
+import { formatoMetros } from "./ui";
+
+function FiltroChip({
+  activo,
+  onClick,
+  children,
+}: {
+  activo: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={activo}
+      className={`rounded-full border px-3 py-1 text-xs font-medium ${
+        activo ? "border-slate-800 bg-slate-800 text-white" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
 
 export function ProgramacionConsultar() {
+  const { usuario } = useAuth();
+  // Solo jefe y administrador editan (las RPC lo exigen igualmente en servidor).
+  const puedeEditar = usuario?.rol === "jefe" || usuario?.rol === "administrador";
+
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [avisoNotas, setAvisoNotas] = useState<string | null>(null);
   const [filas, setFilas] = useState<FilaConEstado[]>([]);
+  const [notas, setNotas] = useState<Map<string, NotaOrden[]>>(new Map());
+  const [frases, setFrases] = useState<FraseNota[]>([]);
+
+  const [soloNuevasHoy, setSoloNuevasHoy] = useState(false);
+  const [soloSinTonoCalibre, setSoloSinTonoCalibre] = useState(false);
+  const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
+  const [dialogoAbierto, setDialogoAbierto] = useState(false);
+  const [mensaje, setMensaje] = useState<string | null>(null);
+
+  const hoy = hoyLocalISO();
+
+  function avisar(texto: string) {
+    setMensaje(texto);
+    setTimeout(() => setMensaje(null), 3000);
+  }
+
+  function recargarNotas() {
+    setAvisoNotas(null);
+    listarNotasProgramacion()
+      .then(setNotas)
+      .catch((err) => {
+        setNotas(new Map());
+        setAvisoNotas(err instanceof Error ? err.message : "No se pudieron cargar las notas");
+      });
+  }
 
   function cargar() {
     setCargando(true);
@@ -35,11 +107,70 @@ export function ProgramacionConsultar() {
       .then(setFilas)
       .catch((err) => setError(err instanceof Error ? err.message : "Error cargando"))
       .finally(() => setCargando(false));
+    recargarNotas();
+    listarFrases(true)
+      .then(setFrases)
+      .catch(() => setFrases([]));
   }
 
   useEffect(cargar, []);
 
+  // Si una orden sale de programación, deja de estar seleccionada.
+  useEffect(() => {
+    setSeleccion((prev) => {
+      const vigentes = new Set(filas.map((f) => f.numeroOrden));
+      const filtrada = new Set([...prev].filter((n) => vigentes.has(n)));
+      return filtrada.size === prev.size ? prev : filtrada;
+    });
+  }, [filas]);
+
+  // La hoja impresa usa TODAS las filas.
   const porHorno = useMemo(() => agruparPorHorno(filas), [filas]);
+
+  const nuevasHoy = useMemo(() => filas.filter((f) => f.fechaAlta === hoy), [filas, hoy]);
+  const sinTonoCalibre = useMemo(() => filas.filter((f) => !f.tono?.trim() || !f.calibre?.trim()), [filas]);
+
+  const visibles = useMemo(
+    () =>
+      filas.filter((f) => {
+        if (soloNuevasHoy && f.fechaAlta !== hoy) return false;
+        if (soloSinTonoCalibre && f.tono?.trim() && f.calibre?.trim()) return false;
+        return true;
+      }),
+    [filas, soloNuevasHoy, soloSinTonoCalibre, hoy],
+  );
+  const visiblesPorHorno = useMemo(() => agruparPorHorno(visibles), [visibles]);
+
+  function alternar(numeros: string[], marcar: boolean) {
+    setSeleccion((prev) => {
+      const sig = new Set(prev);
+      for (const n of numeros) {
+        if (marcar) sig.add(n);
+        else sig.delete(n);
+      }
+      return sig;
+    });
+  }
+
+  function tonoCalibreGuardado(numeroOrden: string, tono: string | null, calibre: string | null) {
+    setFilas((prev) => prev.map((f) => (f.numeroOrden === numeroOrden ? { ...f, tono, calibre } : f)));
+  }
+
+  async function copiarNuevasHoy() {
+    if (nuevasHoy.length === 0) {
+      avisar("Hoy no hay órdenes nuevas");
+      return;
+    }
+    const ordenadas = [...nuevasHoy].sort((a, b) => a.horno - b.horno || a.posicion - b.posicion);
+    try {
+      await navigator.clipboard.writeText(ordenadas.map((f) => f.numeroOrden).join("\n"));
+      avisar(`Copiadas ${ordenadas.length} ${ordenadas.length === 1 ? "orden nueva" : "órdenes nuevas"}`);
+    } catch {
+      avisar("No se pudo copiar (portapapeles no disponible)");
+    }
+  }
+
+  const todasVisiblesSeleccionadas = visibles.length > 0 && visibles.every((f) => seleccion.has(f.numeroOrden));
 
   if (cargando) {
     return (
@@ -51,7 +182,7 @@ export function ProgramacionConsultar() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-4 print:p-0">
+    <div className={`mx-auto max-w-3xl space-y-4 p-4 print:p-0 ${seleccion.size > 0 ? "pb-24" : ""}`}>
       <div className="flex items-center justify-between print:hidden">
         <h2 className="text-sm font-semibold text-[var(--texto)]">Programación de hoy</h2>
         <div className="flex gap-2">
@@ -78,6 +209,12 @@ export function ProgramacionConsultar() {
           {error}
         </div>
       )}
+      {avisoNotas && (
+        <div className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-700 print:hidden">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden />
+          No se pudieron cargar las notas: {avisoNotas}
+        </div>
+      )}
 
       {filas.length === 0 && !error && (
         <div className="p-6 text-sm text-slate-500">
@@ -85,42 +222,133 @@ export function ProgramacionConsultar() {
         </div>
       )}
 
+      {filas.length > 0 && (
+        <div className="space-y-2 print:hidden">
+          <div className="flex flex-wrap items-center gap-2">
+            <FiltroChip activo={soloNuevasHoy} onClick={() => setSoloNuevasHoy((v) => !v)}>
+              Solo nuevas de hoy ({nuevasHoy.length})
+            </FiltroChip>
+            <FiltroChip activo={soloSinTonoCalibre} onClick={() => setSoloSinTonoCalibre((v) => !v)}>
+              Sin tono/calibre ({sinTonoCalibre.length})
+            </FiltroChip>
+            <button
+              type="button"
+              onClick={copiarNuevasHoy}
+              className="flex items-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <ClipboardList size={12} aria-hidden /> Copiar nuevas de hoy
+            </button>
+          </div>
+          {puedeEditar && (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() =>
+                  alternar(
+                    visibles.map((f) => f.numeroOrden),
+                    !todasVisiblesSeleccionadas,
+                  )
+                }
+                disabled={visibles.length === 0}
+                className="rounded-lg border border-slate-300 px-2 py-1 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+              >
+                {todasVisiblesSeleccionadas ? "Quitar las visibles" : `Seleccionar las visibles (${visibles.length})`}
+              </button>
+              {seleccion.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSeleccion(new Set())}
+                  className="rounded-lg border border-slate-300 px-2 py-1 text-slate-600 hover:bg-slate-50"
+                >
+                  Limpiar selección
+                </button>
+              )}
+            </div>
+          )}
+          {mensaje && (
+            <div role="status" className="rounded-lg bg-slate-800 px-3 py-2 text-xs text-white">
+              {mensaje}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Vista de tarjetas — solo pantalla / móvil */}
       <div className="space-y-4 print:hidden">
+        {filas.length > 0 && visibles.length === 0 && (
+          <div className="rounded-xl border border-slate-200 p-4 text-sm text-slate-500">
+            Ninguna orden cumple los filtros.
+          </div>
+        )}
         {[1, 2, 3, 4].map((horno) => {
-          const filasHorno = porHorno.get(horno) ?? [];
+          const filasHorno = visiblesPorHorno.get(horno) ?? [];
           if (filasHorno.length === 0) return null;
+          const todasDelHorno = (porHorno.get(horno) ?? []).map((f) => f.numeroOrden);
+          const hornoSeleccionado = todasDelHorno.length > 0 && todasDelHorno.every((n) => seleccion.has(n));
           return (
             <div key={horno} className="overflow-hidden rounded-xl border border-slate-200">
-              <div className="bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white">🔥 Horno {horno}</div>
+              <div className="flex items-center justify-between gap-2 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white">
+                <span>🔥 Horno {horno}</span>
+                {puedeEditar && (
+                  <button
+                    type="button"
+                    onClick={() => alternar(todasDelHorno, !hornoSeleccionado)}
+                    className="rounded bg-white/15 px-2 py-0.5 font-medium hover:bg-white/25"
+                  >
+                    {hornoSeleccionado ? "Quitar el horno" : `Seleccionar las ${todasDelHorno.length} del horno`}
+                  </button>
+                )}
+              </div>
               <div className="divide-y divide-slate-100">
                 {filasHorno.map((f) => (
-                  <div key={f.numeroOrden} className="flex flex-col gap-1 p-3 text-sm sm:flex-row sm:items-center sm:gap-3">
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span className="font-mono text-xs text-slate-500">{f.numeroOrden}</span>
-                      <BotonCopiar texto={f.numeroOrden} />
-                    </div>
-
-                    <div className="flex-1">
-                      <div className="font-medium text-[var(--texto)]">{f.modelo}</div>
-                      <div className="text-xs text-slate-500">
-                        {formatoMetros(f.metros)} m² · Acabado {f.acabado} · Caja {f.caja}
-                        {f.cep ? " · Cepillado" : ""}
-                        {f.tono ? ` · Tono ${f.tono}` : ""}
-                        {f.calibre ? ` · Calibre ${f.calibre}` : ""}
-                      </div>
-                    </div>
-
-                    <span className={`w-fit shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${COLOR_ESTADO[f.estado]}`}>
-                      {ETIQUETA_ESTADO[f.estado]}
-                    </span>
-                  </div>
+                  <ConsultarFila
+                    key={f.numeroOrden}
+                    fila={f}
+                    hoy={hoy}
+                    puedeEditar={puedeEditar}
+                    seleccionada={seleccion.has(f.numeroOrden)}
+                    onSeleccion={(marcada) => alternar([f.numeroOrden], marcada)}
+                    notas={notas.get(f.numeroOrden) ?? []}
+                    onTonoCalibreGuardado={tonoCalibreGuardado}
+                    onNotasCambiadas={recargarNotas}
+                  />
                 ))}
               </div>
             </div>
           );
         })}
       </div>
+
+      {puedeEditar && seleccion.size > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-[var(--superficie)] p-3 shadow-lg print:hidden">
+          <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
+            <span className="text-sm text-[var(--texto)]">
+              {seleccion.size} {seleccion.size === 1 ? "seleccionada" : "seleccionadas"}
+            </span>
+            <button
+              type="button"
+              onClick={() => setDialogoAbierto(true)}
+              className="flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white"
+            >
+              <MessageSquarePlus size={14} aria-hidden /> Añadir nota
+            </button>
+          </div>
+        </div>
+      )}
+
+      {dialogoAbierto && (
+        <DialogoAnadirNota
+          ordenes={[...seleccion]}
+          frases={frases}
+          onCerrar={() => setDialogoAbierto(false)}
+          onHecho={(n) => {
+            setDialogoAbierto(false);
+            setSeleccion(new Set());
+            recargarNotas();
+            avisar(`Nota añadida a ${n} ${n === 1 ? "orden" : "órdenes"}`);
+          }}
+        />
+      )}
 
       {/* Hoja de impresión — solo al imprimir/exportar PDF */}
       <style>{`
