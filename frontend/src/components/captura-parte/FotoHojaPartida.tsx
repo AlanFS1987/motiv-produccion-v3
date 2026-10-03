@@ -2,11 +2,9 @@ import { useState } from "react";
 import { FileCheck2, RotateCcw } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { SelectorFoto } from "../SelectorFoto";
-import { AvisoGirarMovil } from "../AvisoGirarMovil";
 import {
   cargarImagenDesdeArchivo,
   procesarFotoLibre,
-  cssAspectRatio,
   blobABase64,
   type ImagenProcesada,
 } from "../../lib/captura-imagen";
@@ -23,6 +21,46 @@ import {
 import { crearParteInicial, type DatosOcrHojaPartida, type LoteResuelto } from "../../lib/parte";
 
 type Fase = "capturando" | "procesando" | "revisando" | "resolviendo" | "error";
+
+// La hoja de partida es un A4 VERTICAL: se fotografía con la hoja en vertical y la cabecera
+// arriba. Por eso esta pantalla NO usa AvisoGirarMovil (que pide girar el móvil en horizontal,
+// correcto para caja y pantalla pero no para la hoja: al obedecerlo se fotografiaba la hoja de
+// lado, el texto salía vertical y el OCR leía mal, p. ej. el nº de orden 1117222 como 11172222).
+const PROPORCION_A4_VERTICAL = "210 / 297";
+
+// Alto máximo del recuadro: 55 % del alto de pantalla, pero dejando sitio (~31 rem) para lo demás
+// —cabecera y pestañas de la app (~7 rem), título y aviso (~7 rem), botones «Hacer foto» /
+// «Elegir de galería» y «Cancelar» (~6 rem), barras del navegador y del sistema del móvil
+// (~7 rem) y margen— para que los botones se vean sin desplazarse en móviles de 360x800 y
+// 390x844. Mínimo 12 rem para que no quede ridículamente pequeño. (La cámara es la nativa: el
+// recuadro es solo una guía de cómo colocar la hoja, no un visor.)
+const ALTO_MAXIMO_MARCO = "min(55vh, max(12rem, calc(100vh - 31rem)))";
+
+/** Aviso SIEMPRE visible (no depende de cómo tenga el móvil): hoja en vertical, cabecera arriba. */
+function AvisoHojaVertical() {
+  return (
+    <div className="mb-3 flex items-center gap-3 rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900">
+      <svg viewBox="0 0 84 72" className="h-14 w-16 shrink-0" aria-hidden>
+        {/* folio vertical con la cabecera arriba */}
+        <rect x="6" y="8" width="34" height="56" rx="2" fill="#ffffff" stroke="#92400e" strokeWidth="2" />
+        <rect x="11" y="13" width="24" height="9" rx="1" fill="#f59e0b" />
+        <line x1="11" y1="30" x2="35" y2="30" stroke="#cbd5e1" strokeWidth="2" />
+        <line x1="11" y1="37" x2="35" y2="37" stroke="#cbd5e1" strokeWidth="2" />
+        <line x1="11" y1="44" x2="35" y2="44" stroke="#cbd5e1" strokeWidth="2" />
+        <line x1="11" y1="51" x2="28" y2="51" stroke="#cbd5e1" strokeWidth="2" />
+        {/* flecha hacia arriba + ARRIBA */}
+        <line x1="62" y1="62" x2="62" y2="22" stroke="#92400e" strokeWidth="3" strokeLinecap="round" />
+        <polyline points="53,31 62,20 71,31" fill="none" stroke="#92400e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        <text x="62" y="13" textAnchor="middle" fontSize="10" fontWeight="700" fill="#92400e">
+          ARRIBA
+        </text>
+      </svg>
+      <p>
+        <strong>Pon la hoja en vertical, con la cabecera arriba.</strong> El texto tiene que leerse recto.
+      </p>
+    </div>
+  );
+}
 
 interface FotoHojaPartidaProps {
   turnoId: string;
@@ -176,15 +214,31 @@ export function FotoHojaPartida({ turnoId, lineaId, responsableId, onResuelto, o
     return (
       <div className="mx-auto max-w-md">
         <p className="mb-3 text-sm font-medium text-slate-600">Foto 1 — Hoja de partida</p>
-        <AvisoGirarMovil />
+        <AvisoHojaVertical />
 
-        <div className="w-full overflow-hidden rounded-lg border-4 border-dashed border-amber-500 bg-slate-200" style={{ aspectRatio: cssAspectRatio("hoja_partida") }}>
-          {previsualizacion ? (
-            <img src={previsualizacion} alt="Previsualización" className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full items-center justify-center text-sm text-slate-400">Encuadra la hoja completa</div>
-          )}
-        </div>
+        {previsualizacion ? (
+          // Con foto: se enseña ENTERA y con su proporción real (vertical o apaisada), sin recortar
+          // ni forzar el marco vertical.
+          <div className="mx-auto w-fit max-w-full overflow-hidden rounded-lg border-4 border-dashed border-amber-500 bg-slate-200">
+            <img
+              src={previsualizacion}
+              alt="Previsualización de la hoja"
+              className="block h-auto w-auto max-w-full object-contain"
+              style={{ maxHeight: ALTO_MAXIMO_MARCO }}
+            />
+          </div>
+        ) : (
+          // Sin foto: recuadro VERTICAL con proporción A4, centrado y con altura máxima.
+          <div
+            className="mx-auto flex items-center justify-center overflow-hidden rounded-lg border-4 border-dashed border-amber-500 bg-slate-200"
+            style={{
+              aspectRatio: PROPORCION_A4_VERTICAL,
+              width: `min(100%, calc(${ALTO_MAXIMO_MARCO} * 210 / 297))`,
+            }}
+          >
+            <span className="px-2 text-center text-sm text-slate-400">Encuadra la hoja completa</span>
+          </div>
+        )}
 
         <div className="mt-4">
           <SelectorFoto onArchivoSeleccionado={manejarArchivo} disabledCamara={fase === "procesando"} disabledGaleria={fase === "procesando"} />

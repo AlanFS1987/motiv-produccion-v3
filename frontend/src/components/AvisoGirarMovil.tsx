@@ -2,11 +2,17 @@ import { RotateCw } from "lucide-react";
 import { useOrientacionDispositivo } from "../lib/orientacion";
 
 /**
- * Aviso que se muestra cuando el móvil está en vertical, para las
- * fotos de documentos (todas nuestras 4 formas son más anchas que
- * altas). No bloquea la captura — el responsable puede ignorarlo y
- * seguir si quiere — solo reduce la probabilidad de que el texto
- * salga girado y el OCR falle.
+ * Aviso que se muestra cuando el móvil está en vertical, para las fotos de
+ * documentos APAISADOS: la caja (superior 4:3 y lateral, una franja muy alargada)
+ * y la pantalla de la máquina. Para esas, girar el móvil deja el texto recto.
+ *
+ * NO sirve para la hoja de partida (Foto 1): es un A4 VERTICAL, y pedir que se gire el
+ * móvil hacía que se fotografiara la hoja de lado (texto vertical, OCR peor). La hoja
+ * no usa este aviso: FotoHojaPartida tiene el suyo, siempre visible, que pide la hoja
+ * en vertical con la cabecera arriba.
+ *
+ * No bloquea la captura — el responsable puede ignorarlo y seguir si quiere — solo
+ * reduce la probabilidad de que el texto salga girado y el OCR falle.
  */
 export function AvisoGirarMovil() {
   const orientacion = useOrientacionDispositivo();

@@ -127,14 +127,31 @@ uno nuevo) motivó dos ajustes más: el texto explicativo junto a
 el parte que faltó (`09`, "Añadir parte a un turno ya cerrado").
 
 ### Paso hoja (Foto 1 — hoja de partida)
-Cámara en vivo con recuadro-guía 4:3, o galería. Recorte en cliente a
-1600×1200 WebP → Cloudinary (`hoja_{...}`) → `ocr-parte` con
+La hoja de partida es un **A4 vertical**: se fotografía en vertical, con la
+cabecera arriba y el texto recto. Cámara nativa (`<input capture>`) o galería,
+sin recorte (`procesarFotoLibre`: solo reduce a ≤1600 px de ancho, WebP) →
+Cloudinary (`hoja_{...}`) → `ocr-parte` con
 `foto_tipo=hoja_partida` → JSON con modelo, marca, formato, acabado,
 espesor, tono anterior, calibre, número de orden, palet, piezas/caja,
 objetivo, 4 códigos de barras, observaciones, confianza. El responsable
 revisa y edita. Al confirmar → `resolver-catalogo` (crea/enlaza modelo,
 marca, producto, lote; reabre el lote si estaba finalizado) → se
 inserta el parte con tono sugerido `tono_ant + 1`.
+
+En pantalla (`FotoHojaPartida.tsx`): aviso propio, siempre visible, con un
+dibujo de folio vertical y flecha ARRIBA ("Pon la hoja en vertical, con la
+cabecera arriba. El texto tiene que leerse recto."), recuadro-guía vertical con
+proporción A4 (210/297, altura máxima) y previsualización entera
+(`object-contain`, sin recorte, también si la foto sale apaisada). No usa
+`AvisoGirarMovil`: ese aviso ("Gira el móvil en horizontal") solo lo usan las
+fotos de documentos apaisados (caja y pantalla). No hay detección ni giro
+automático de la foto: posible mejora si esto no basta.
+
+**Incidente (02/10/2026):** hasta este cambio la Foto 1 mostraba
+`AvisoGirarMovil` y un recuadro apaisado 4:3, así que se fotografiaba la hoja
+de lado. Resultado: número de orden mal leído por el OCR y un lote duplicado
+(lotes `1117222` y `11172222`, mismo modelo SL IRATI TAUPE; el primero quedó
+iniciado con 1 parte y el segundo finalizado con 2).
 
 ### Paso tono
 Formulario tono (obligatorio, patrón `[A-ZÑ0-9]`) y calibre.
