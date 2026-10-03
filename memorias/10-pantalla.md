@@ -24,7 +24,7 @@ equivalente.
    (misma fórmula que `fn_ciclo_id`, replicada aquí porque es solo
    para pintar fechas, ningún cálculo de puntos depende de esto).
    Cada barra: % del objetivo diario de m² (`configuracion.objetivo_m2_dia`,
-   valor de partida 35.000, editable por SQL hoy), con segmentos de
+   valor de partida 35.000; hoy la fila vale 48.000, editable por SQL; el código usa 35.000 solo si la fila falta), con segmentos de
    1ª/comercial. Total del ciclo abajo.
 2. **Últimos modelos en producción** — REAL. Los 9 productos con
    producción más reciente (`v_calidad_modelo` ordenada por
@@ -58,12 +58,19 @@ equivalente.
 minutos crudos de `v_produccion_turno` — no hizo falta vista SQL
 nueva para esto) + `components/pantalla/PantallaCarrusel.tsx`
 (las 5 diapositivas, donut SVG propio sin librería externa).
-## Actualización en tiempo real (13/09/2026)
+## Actualización en tiempo real (13/09/2026) — solo la parte de base de datos
 
-La pantalla ya no refresca por el remontaje del carrusel (~60 s): usa
-Supabase Realtime sobre `parte`, `turno` e `historial_ciclos`
-(`RefrescoPantalla.tsx`, migración `20260913150000_realtime_pantalla.sql`).
-`parte_select_todos` se amplió al rol `pantalla` porque Realtime
-respeta la RLS de SELECT. `personaje_rpg` queda fuera a propósito
-(RLS más estricta): los avatares de Ranking/Reyes se refrescan con la
+Lo que **sí** existe: la migración `20260913150000_realtime_pantalla.sql` está
+aplicada. `parte`, `turno` e `historial_ciclos` están en la publicación
+`supabase_realtime` y `parte_select_todos` incluye al rol `pantalla` (Realtime
+respeta la RLS de SELECT del rol que escucha). `personaje_rpg` queda fuera a
+propósito (RLS más estricta): los avatares de Ranking/Reyes se refrescarían con la
 siguiente recarga o refresco relevante.
+
+Lo que **no** existe (comprobado el 03/10/2026): el componente que se suscribe,
+`RefrescoPantalla.tsx` (que cita la migración), no está en el repositorio ni
+consta en su historial de git, y ni `PantallaCarrusel.tsx` ni las diapositivas
+usan Realtime. Por tanto la pantalla **no** refresca por Realtime hoy: sigue como
+describe la propia migración que ocurría antes (cada diapositiva vuelve a pedir
+sus datos cuando el carrusel la remonta, ~60 s). Pendiente: escribir el
+suscriptor (`07`).

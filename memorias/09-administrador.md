@@ -2,9 +2,12 @@
 
 Shell propio (`admin/AdminApp.tsx`), se muestra cuando `usuario.rol =
 'administrador'`. El admin ve **todo** lo que ve el jefe (Vista
-Rápida, Vista Detallada, Incidencias, Calidad, Informes, Programación,
-Ceria, Chat — reutilizando literalmente los componentes de `jefe/` y
-`calidad/`, no duplicados) más sus propias pestañas de gestión.
+Rápida, Vista Detallada, Incidencias, Calidad, Alimentación, Informes,
+Ceria, Chat — reutilizando literalmente los componentes de `jefe/`,
+`calidad/` y `alimentacion/`, no duplicados) más sus propias pestañas de
+gestión. En total **21 pestañas**: esas 8 y las 13 propias — Rotación,
+Partes, Añadir parte, Cámara, Cierre fábrica, Checklist, Gamificación,
+Usuarios, Accesos, Engrase, Notas, Programación y Frases.
 
 ## Construido
 
@@ -176,6 +179,15 @@ Ceria, Chat — reutilizando literalmente los componentes de `jefe/` y
   permitía desde que se creó la tabla.
 - **Notas** (`admin/NotasScreen.tsx`, `lib/admin-notas.ts`) — pestaña
   "Notas" del admin para el jefe.
+- **Cierre fábrica** (`admin/CierreFabricaScreen.tsx`,
+  `lib/admin-cierre-fabrica.ts`) — alta y baja de rangos de fechas (inicio y
+  fin) en `cierre_fabrica`. Mientras una fecha cae dentro de un rango, el
+  trigger de `turno` impide crear turnos y `TurnoScreen.tsx` muestra «Fábrica
+  cerrada»; la rotación no se pausa (detalle en `01` y `05`).
+- **Frases** (03/10/2026, `admin/FrasesNotaScreen.tsx`) — frases frecuentes del
+  desplegable al añadir una nota a las órdenes de Programación: alta, edición,
+  activar/desactivar y orden, con `guardar_frase` (solo administrador). Mismo
+  patrón que Engrase. Detalle en `20`.
 - **Programación** (27/09/2026) — pestaña "Programación": reutiliza
   literalmente `jefe/programacion/ProgramacionScreen.tsx` (mismo
   componente que usa el jefe, diff editable + confirmar + deshacer +

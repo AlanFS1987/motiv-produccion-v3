@@ -23,7 +23,8 @@ Secrets de Edge Functions (contrastados con `supabase secrets list` el
 `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_CHAT_CALIDAD`,
 `TELEGRAM_CHAT_PRODUCCION`, `TELEGRAM_CHAT_NUEVOS_LOTES`,
 `TELEGRAM_CHAT_RESUMEN_TURNO`, `TELEGRAM_CHAT_RESUMEN_CALIDAD`,
-`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_PRESET_PERSONAJES`. Los
+`TELEGRAM_CHAT_INFORMES` (la lee el código de los informes diario/semanal,
+añadido después de esta lista; ver `19`), `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_PRESET_PERSONAJES`. Los
 `SUPABASE_*` (URL, SERVICE_ROLE_KEY, ANON_KEY, JWKS, DB_URL y las
 claves publicables/secretas nuevas) los inyecta Supabase.
 
@@ -32,7 +33,7 @@ Las cuatro funciones llamadas desde la BD se despliegan con
 funciones SQL `fn_notificar_telegram`, `fn_disparar_resumen_turno`,
 `fn_disparar_resumen_calidad` y `fn_disparar_informe_periodo`.
 
-## Telegram — un bot, cinco grupos
+## Telegram — un bot, seis grupos
 
 | Grupo | Disparo | Estado |
 |---|---|---|
@@ -41,6 +42,7 @@ funciones SQL `fn_notificar_telegram`, `fn_disparar_resumen_turno`,
 | Nuevos lotes | trigger `AFTER UPDATE OF verificacion_caja_estado` en `parte`, solo cuando pasa a no-null o cambia | Construido |
 | Resumen de turno | trigger `AFTER UPDATE OF cerrado_at` en `turno` (null → valor); cron reintenta si no se confirmó | Construido; cierre manual probado, automático no visto en real |
 | Resúmenes calidad | cron, 07/15/23 h Madrid | Construido |
+| Informes diario/semanal | enlaces dentro del resumen del turno que cierra el periodo (`generar-resumen-turno` → `generar-informe-periodo`); el cron `informes-periodo-pendientes` reintenta como mensaje suelto (`TELEGRAM_CHAT_INFORMES`) | Construido (`19`) |
 
 El secreto compartido vive en `app_secrets` (`telegram_webhook_secret`)
 y en el secret `TELEGRAM_WEBHOOK_SECRET`; si no coinciden las funciones
@@ -52,6 +54,7 @@ devuelven 401 y no envían nada (falla cerrado).
 |---|---|---|
 | `resumenes-turno-pendientes` | `0 * * * *` | `fn_encolar_resumenes_turno_pendientes()`: (1) marca `cerrado_at/como_cerro='automatico'` en turnos cuya franja + 1 h ya pasó (hora Madrid) y nadie cerró; ese UPDATE dispara el trigger de envío. (1b) cierra "sin producción" cualquier parte que quedó `completado=false` en esos turnos (20/08/2026). (2) Reintenta `fn_disparar_resumen_turno` para turnos cerrados hace > 5 min sin `resumen_enviado_at`. |
 | `resumen-calidad-diario` | `0 * * * *` | Solo si la hora de Madrid es 7, 15 o 23 → `fn_disparar_resumen_calidad()`. |
+| `informes-periodo-pendientes` | `30 * * * *` | `fn_encolar_informes_periodo_pendientes()`: red de seguridad de los informes diario/semanal (ver `19`). |
 | `cerrar-ciclos-pendientes` | `0 * * * 1` (solo lunes) | Solo si la hora de Madrid es 8 → `fn_cerrar_ciclos_pendientes()` (`04`). Lunes porque cada ciclo de 28 días desde un lunes acaba en domingo; las 8:00 dan margen sobre el cierre automático del turno N (07:00) y la ventana de corrección de 1 h. |
 
 Disparar cada hora es deliberado: España siempre está a un número

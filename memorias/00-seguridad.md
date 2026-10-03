@@ -1,8 +1,9 @@
 # 00 — Seguridad
 
-Estado de la superficie expuesta con la clave pública (`anon`) y de los
-análisis automáticos. Lo que sigue abierto vive en `07-pendientes.md`
-("Seguridad — pendiente"); aquí solo lo cerrado y cómo se comprobó.
+Estado de la superficie expuesta con la clave pública (`anon`), de los
+avisos del linter de Supabase y de los análisis automáticos. Lo que sigue
+abierto vive en `07-pendientes.md` ("Seguridad — pendiente"); aquí, lo cerrado,
+cómo se comprobó y el estado actual de cada vía.
 
 ## Superficie con la clave pública (estado al 03/10/2026)
 
@@ -14,7 +15,10 @@ análisis automáticos. Lo que sigue abierto vive en `07-pendientes.md`
 | Confirmación de email | Activa | — |
 | Funciones de `public` ejecutables por `anon`/PUBLIC | Cerradas, y los privilegios por defecto ya no las abren | 02/10/2026 (`20261002191839`) |
 | `SELECT` de `anon` en las vistas de `public` | **Revocado**: 0 de 58 legibles por `anon` | 03/10/2026 (`20261003015059`, `20261003015203`) |
-| `SELECT` de `anon` en tablas de `public` | Abierto (54 tablas), solo lo frena la RLS — pendiente en `07` | — |
+| Privilegios de `anon` en tablas de `public` | **Abierto**: 53 de 61 tablas con **todos** los privilegios (SELECT, INSERT, UPDATE, DELETE, TRUNCATE…); solo los frena la RLS — pendiente en `07` | — |
+| Privilegios de las tablas de Programación (`programacion_orden`, `_historico`, `programacion_nota`, `programacion_nota_frase`) | **Cerrados**: solo `SELECT` para `authenticated` (el historial conservaba los siete para `anon` y `authenticated`) | 02/10/2026 (`programacion_orden`, `20261002131613`) y 03/10/2026 (resto, `20261003033056`) |
+| `confirmar_programacion` con lista vacía | Rechazada (antes borraba toda la programación) | 03/10/2026 (`20261003032652`) |
+| `fn_metros_entero` | Sin `EXECUTE` para `public`, `anon` y `authenticated` (la llaman funciones `security definer`) | 03/10/2026 (`20261003142002`) |
 
 ### Registro de usuarios
 
@@ -69,7 +73,7 @@ usuario real de cada uno de `jefe`, `administrador`, `responsable`,
 vistas sin ningún error. Las filas que ve cada rol coinciden con las del
 propietario salvo en `programacion_con_estado`, que filtra por
 `fn_rol_actual()` a propósito (jefe, administrador, responsable y
-producción ven 39 filas; el resto, 0). No cambia nada para `authenticated`.
+producción veían 39 filas en esa fecha —hoy son 53—; el resto, 0). No cambia nada para `authenticated`.
 
 Antes de revocar se comprobó que ninguna pantalla consulta sin sesión:
 `App.tsx` solo monta `Login` mientras no hay sesión, `Login` y `auth.ts`
@@ -80,14 +84,65 @@ validar el JWT de quien llama. **Vistas nuevas**: los privilegios por
 defecto de tablas y vistas aún pueden darlas a `anon` — revocar a mano o
 cerrarlo en `07`, punto 2.
 
+### Privilegios de tablas y funciones (comprobado el 03/10/2026)
+
+- **Funciones propias de `public`** (59): `anon` no puede ejecutar ninguna; 47 las ejecuta
+  `authenticated` (con guarda de rol interna donde procede) y 12 son solo `service_role`.
+  Los privilegios por defecto de `postgres` ya no abren las funciones nuevas a `anon`/PUBLIC (M3).
+  Excepción: las 31 funciones de la extensión `pg_trgm`, instalada en `public`, sí son ejecutables
+  por `anon`/PUBLIC (son funciones puras de similitud de texto; ver `extension_in_public`).
+- **Tablas**: 53 de las 61 tablas tienen todos los privilegios para `anon` y `authenticated`
+  (los privilegios por defecto de Supabase) y se apoyan solo en la RLS. Las 8 sin ningún privilegio
+  para `anon` son `app_secrets` (única sin RLS, sin acceso para `anon` ni `authenticated`), las cuatro
+  de Programación, las dos copias `_bak_20261002` y `stg_migracion_operario_v2`.
+- **Tablas y vistas nuevas nacen abiertas**: propietario `postgres`, sin RLS y con los siete privilegios
+  para `anon` y `authenticated`. Cada migración que cree una tabla debe cerrarlo en la misma migración
+  (`enable row level security`, `revoke all ... from public, anon, authenticated`, `grant select` si
+  procede); a una vista nueva hay que revocarle `select` a `anon`. Pendiente: cambiar los privilegios por
+  defecto (`07`, punto 2).
+
+### Programación: superficie nueva (03/10/2026)
+
+Detalle del esquema en `06` y de los flujos en `20`.
+
+- **Tablas** (RLS desde la creación, política de `SELECT` para jefe, responsable, produccion y
+  administrador, `revoke all` a `anon`/`authenticated` y `grant select` a `authenticated`, sin políticas de
+  escritura): `programacion_nota` (referencia por `numero_orden` sin FK; FK de `creado_por` a `usuario`) y
+  `programacion_nota_frase`.
+- **RPC** (todas `security definer`, `search_path = public`, guarda `coalesce(fn_rol_actual()::text,'')`,
+  `revoke execute ... from public, anon`, `grant ... to authenticated`): `actualizar_tono_calibre`,
+  `anadir_nota_ordenes`, `editar_nota`, `borrar_nota` (jefe/administrador), `guardar_frase` (solo
+  administrador), `validar_programacion` (solo lectura, jefe/administrador).
+- **`parse_programacion` es llamable por `authenticated`**, con su guarda interna (jefe/administrador); el
+  frontend no la usa, solo `diff_programacion`. Se le podría revocar `EXECUTE` a `authenticated`
+  (como a `fn_metros_entero`); sin hacer.
+- Ensayadas en transacción revertida con un usuario real de cada rol (`jefe`, `administrador`,
+  `responsable`, `produccion`, `operario`, `calidad`, `mecanico`, `pantalla`, `jefe_rectificado`), una
+  cuenta sin fila en `usuario` (rol nulo) y `anon`: solo los roles previstos pueden; el resto recibe «No
+  autorizado»; `anon`, «permission denied»; ninguna escritura directa en las tablas nuevas.
+
+### Avisos del linter de Supabase (03/10/2026)
+
+| Aviso | Nivel | Nº | Estado |
+|---|---|---|---|
+| `security_definer_view` | ERROR | 58 | Por diseño: las vistas corren como propietario (`06`). El control es el `GRANT` (ver «Vistas») |
+| `authenticated_security_definer_function_executable` | WARN | 21 | 13 RPC de Programación/notas con guarda interna, 3 funciones de trigger y 5 anteriores (`06`) |
+| `function_search_path_mutable` | WARN | 7 | Las 7 son `security invoker`; lista en `07`, punto 4 |
+| `extension_in_public` | WARN | 1 | `pg_trgm`; pendiente de decidir (`07`) |
+| `auth_leaked_password_protection` | WARN | 1 | Desactivada en el panel de Auth; pendiente de decidir (`07`) |
+| `rls_enabled_no_policy` | INFO | 3 | Las dos copias `_bak_20261002` y `stg_migracion_operario_v2` (`07`) |
+
 ## Análisis automáticos
 
 **Semgrep OSS** (210 reglas, 124 ficheros): 2 hallazgos aceptados, ambos
 `unsafe-formatstring`:
 
-1. `supabase/functions/ceria/index.ts:152` — `role` solo admite valores
-   literales controlados por código.
-2. `supabase/functions/ceria/tools.ts:220` — `toolName` procede del
+1. `supabase/functions/ceria/conversaciones.ts:36` (antes `index.ts:152`, movido en el refactor
+   del 10/09/2026) — `role` solo admite valores literales controlados por código.
+2. `supabase/functions/ceria/tools/index.ts:57` (antes `tools.ts:220`) — `toolName` procede del
    conjunto cerrado de herramientas definido por la aplicación.
+
+(Los números de línea son de la revisión del 03/10/2026; el escaneo se hizo sobre una versión anterior
+del código y no se ha repetido: conviene volver a pasarlo.)
 
 **`npm audit`**: 0 vulnerabilidades en la raíz y en `frontend/`.

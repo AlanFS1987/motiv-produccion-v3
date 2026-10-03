@@ -1,8 +1,12 @@
 # 06 — Esquema de base de datos
 
-Contrastado con la BD real el 16/09/2026 y actualizado con cada
-migración hasta `20260916`
-Extensiones: `pg_trgm`, `pgcrypto`, `pg_cron`, `pg_net`.
+Contrastado con la BD real el 03/10/2026 (169 migraciones, hasta
+`20261003142002`: 61 tablas, 58 vistas, 59 funciones propias en `public`, 112
+políticas RLS, 4 trabajos de `pg_cron`). Las secciones de abajo se escribieron por
+etapas; los bloques «Rol mecánico», «Programación» y «Otros objetos no descritos
+arriba» van al final.
+Extensiones instaladas: `pg_trgm` (en `public`), `pgcrypto`, `pg_cron`, `pg_net`,
+`supabase_vault`, `uuid-ossp` y `pg_stat_statements`.
 
 ## Enums
 
@@ -16,7 +20,7 @@ Extensiones: `pg_trgm`, `pgcrypto`, `pg_cron`, `pg_net`.
 ## Tablas
 
 **configuracion** (clave PK, valor, nota). Filas: `fecha_inicio_rotacion
-= 2026-02-16` (ver `01`), `objetivo_m2_dia = 35000` (ver `10`).
+= 2026-02-16` (ver `01`), `objetivo_m2_dia = 48000` (ver `10`; era 35000 en la primera versión, y el frontend usa 35000 solo si la fila falta).
 
 **app_secrets** (key PK, value). Sin acceso para anon/authenticated.
 Fila `telegram_webhook_secret`.
@@ -27,8 +31,9 @@ Fila `telegram_webhook_secret`.
 lee en ningún sitio del código tras la limpieza de la sesión
 25/08/2026 — la columna sigue existiendo en la tabla, inofensiva),
 created_at. Índice único parcial: una sola fila con rol = suplente.
-24 usuarios reales (4 responsables A/B/C/D, 17 operarios, jefe, admin,
-pantalla — comprobado 24/08/2026). La fila `suplente` **no existe ni
+34 usuarios (recuento 03/10/2026): 4 responsables (A/B/C/D), 20 operarios
+(A=5, B=4, C=4, D=6 y uno sin letra), 1 jefe, 1 produccion, 3 calidad, 1
+administrador, 1 pantalla, 1 jefe_rectificado y 2 mecanico. La fila `suplente` **no existe ni
 se creará**: decisión cerrada en sesión 25/08/2026 de no usar una
 cuenta compartida para cubrir turnos (detalle en `01`, "Suplente y
 refuerzo"); el índice único parcial y el rol del enum se quedan sin
@@ -201,14 +206,23 @@ y no formaban parte del diseño de v3. Verificado antes de borrar que
 ningún objeto (vista/función/trigger) dependía de ellas. Deja el
 camino libre para el squash de migraciones (`07`).
 
+**Queda otra tabla de staging del import v2: `stg_migracion_operario_v2`**
+(operario_nombre, fecha, formato, piezas, m², minutos y turno/línea — 2.694 filas).
+No la citaba ninguna memoria. Comprobado el 03/10/2026 que ninguna función, vista ni
+trigger de la BD la usa, ni el frontend, las Edge Functions o las migraciones. Tiene RLS
+activa y ninguna política (el linter la marca `rls_enabled_no_policy`). Pendiente de
+decidir si se borra antes del squash (`07`).
+
 ## Vistas
 
 Todas sin `security_invoker`: se evalúan como el owner y saltan RLS
 (convención en `CLAUDE.md`). Es lo que permite que `pantalla`, Ranking
 y Logros lean agregados de tablas cuya RLS no les cubre. El linter de
-Supabase marca las 49 vistas del proyecto como `security_definer_view`
-(nivel ERROR) — es exactamente este comportamiento por diseño, no un
-hueco: revisado en sesión 26/08/2026, no requiere ningún cambio.
+Supabase marca las 58 vistas del proyecto (49 en la revisión del 26/08/2026)
+como `security_definer_view` (nivel ERROR) — es exactamente este comportamiento por
+diseño, no un hueco: no requiere ningún cambio. Lo que sí protege a las vistas es el
+`GRANT`: desde el 03/10/2026 `anon` no tiene `SELECT` en ninguna (ver `00`); una vista
+nueva nace con `SELECT` para `anon` y hay que revocarlo.
 
 Dashboard (`08`): `v_produccion_turno`, `v_calidad_turno`,
 `v_calidad_modelo`, `v_calidad_lote`.
@@ -328,6 +342,20 @@ correctamente); `fn_notificar_telegram`, `fn_marcar_corregido_no_vigente`
 y `fn_bloquear_ascenso_admin` (funciones de trigger, `returns trigger`
 — Postgres no permite ejecutarlas fuera de un trigger real, así que
 el linter las marca pero no son explotables vía RPC).
+
+Estado del linter el 03/10/2026 (`authenticated_security_definer_function_executable`,
+21 funciones): 13 son RPC de Programación y notas (`parse_programacion`,
+`diff_programacion`, `validar_programacion`, `confirmar_programacion`,
+`deshacer_ultima_programacion`, `guardar_programacion_csv`, `existe_csv_programacion`,
+`actualizar_tono_calibre`, `anadir_nota_ordenes`, `editar_nota`, `borrar_nota`,
+`guardar_frase`, `guardar_muestra_excel`), todas con guarda de rol interna (patrón de
+arriba: la barrera vive dentro de la función porque el llamador legítimo es un
+`authenticated`); 3 son funciones de trigger (`fn_bloquear_ascenso_admin`,
+`fn_marcar_corregido_no_vigente`, `fn_notificar_telegram`); y 5 anteriores:
+`fn_otorgar_bonus_nivel` (guarda interna de administrador), `fn_disparar_resumen_turno`
+(pendiente, `07`), `fn_seleccionar_personaje` y `fn_rol_actual` (usan `auth.uid()`) y
+`fn_chat_acceso` (consulta `chat_acceso`; la usan las políticas RLS). Las funciones que solo
+llaman Edge Functions o el cron son `service_role`-only y no aparecen en este aviso.
 ### `informe_periodo` (20260920130000)
 
 Un informe PDF por periodo. Único por `(tipo, desde)`.
@@ -405,6 +433,12 @@ descartado — el real es con login (`10`). La migración no se edita.
 - `auth_leaked_password_protection` (comprobación de contraseñas
   filtradas contra HaveIBeenPwned) está desactivado en Supabase Auth.
   Toggle en el panel, sin código — pendiente de decidir (`07`).
+
+Otros avisos del linter el 03/10/2026 (resumen completo en `00`): `function_search_path_mutable`
+en 7 funciones (`calidad_lote_por_fecha`, `calidad_linea_por_fecha`, `calidad_modelo_por_fecha`,
+`produccion_linea_por_fecha`, `fn_parte_validar_correccion`,
+`fn_incidencia_produccion_restringir_columnas_update`, `fn_almacen_pedido_linea_recibida`) y
+`rls_enabled_no_policy` en las dos copias `_bak_20261002` y en `stg_migracion_operario_v2`.
 
 ## Referencias cruzadas
 
@@ -550,3 +584,105 @@ tenía SELECT desde antes y lo conserva.
 - Vistas exactas de producción para que el mecánico detecte anomalías
   de máquina (`v_produccion_turno`, `get_partes`...) — sin resolver,
   ver `17-rol-mecanico-plan.md`.
+
+## Programación (03/10/2026)
+
+Descripción funcional, flujos y decisiones en `20` y `22`. Aquí, solo el esquema.
+
+### Tablas
+
+**programacion_orden** — id, `numero_orden` (unique; es la clave de negocio, el horno es un
+dato de la orden), `horno` smallint (1-4), `posicion`, modelo, metros numeric, acabado, cep
+boolean, caja, tono, calibre, created_at, updated_at, `fecha_alta` date (null en las filas
+anteriores al 02/10/2026; la fija `confirmar_programacion` al insertar). Trigger
+`trg_programacion_orden_updated_at` (`set_updated_at_programacion_orden`). RLS: SELECT
+(`programacion_orden_select`) para jefe, responsable, produccion y administrador; sin
+políticas de escritura. Privilegios: solo `SELECT` para `authenticated`. Contenido actual: la
+programación cargada con el Excel real del 03/10/2026 (53 órdenes).
+
+**programacion_orden_historico** — id, `snapshot` jsonb, `creado_en`, `creado_por`. Foto de
+`programacion_orden` antes de cada `confirmar_programacion`; `deshacer_ultima_programacion`
+restaura la más reciente y la consume (es una pila). RLS: SELECT para jefe y administrador
+(`programacion_orden_historico_select`) y para responsable y produccion
+(`..._select_ampliada`). Privilegios: solo `SELECT` para `authenticated` (cerrado el 03/10/2026,
+`20261003033056`: antes tenía los siete privilegios abiertos para `anon` y `authenticated`).
+Solo la escriben `confirmar_programacion` y `deshacer_ultima_programacion` (security definer).
+
+**programacion_nota** — id, `numero_orden` (SIN FK a `programacion_orden`: las notas sobreviven
+si la orden sale de programación), `texto` (1-500), `creado_por` (FK a `usuario`, `on delete set
+null`), created_at, updated_at. Varias notas por orden. Trigger `trg_programacion_nota_updated_at`.
+RLS: SELECT para jefe, responsable, produccion y administrador; sin escritura directa
+(solo `anadir_nota_ordenes`, `editar_nota`, `borrar_nota`). Solo `SELECT` para `authenticated`.
+
+**programacion_nota_frase** — id, `texto` (único, 1-200), `activa`, `orden`. Siembra: «guardar 2
+palets y una caja», «recordar sacar palet de revisión», «cuidado diseño UGL». Mismas RLS y
+privilegios que la anterior; se escribe solo con `guardar_frase` (administrador).
+
+**admin_notas** — id, `tipo` ('programacion' o 'nota'), fecha, titulo, `contenido`, `num_filas`,
+`creado_por`, created_at, updated_at. Espacio de trabajo del administrador: tipo `programacion`
+guarda el texto crudo del Excel/CSV diario (una fila por fecha, índice único parcial) y tipo
+`nota` las notas sueltas (también `muestra_excel: …`, de `guardar_muestra_excel`). RLS: solo
+administrador (`admin_notas_admin_todo`, `for all`); el jefe escribe a través de las RPC.
+
+**programacion_orden_bak_20261002** y **programacion_orden_historico_bak_20261002** — copias
+del 02/10/2026 (RLS activa, sin políticas). **Ya no representan la programación vigente**
+(la tabla se cargó con el Excel real el 03/10/2026). Borrar a partir del 2026-10-16.
+
+### Vista
+
+**programacion_con_estado** — `programacion_orden` + `LEFT JOIN lote` por `numero_orden`;
+estado `pendiente` (no hay lote) / `iniciado` / `finalizado` calculado en vivo. Filtra por rol
+dentro de la propia vista (jefe, responsable, produccion, administrador): sin sesión o con otro
+rol devuelve 0 filas. Expone `fecha_alta`.
+
+### Funciones
+
+Todas `security definer`, `search_path = public`, guarda de rol con `coalesce(fn_rol_actual()::text,'')`,
+`EXECUTE` solo para `authenticated` (y `service_role`) salvo que se indique.
+
+| Función | Rol | Qué hace |
+|---|---|---|
+| `existe_csv_programacion(fecha)` | jefe, administrador | ¿hay texto guardado para esa fecha? |
+| `guardar_programacion_csv(fecha, contenido)` | jefe, administrador | upsert en `admin_notas` (tipo `programacion`) |
+| `parse_programacion(fecha)` | jefe, administrador | lee el texto: cabeceras, horno por orden de cabecera, número de 6-8 cifras en la 2.ª columna; METROS con `fn_metros_entero`. Solo la llama `diff_programacion` |
+| `diff_programacion(fecha)` | jefe, administrador | compara `parse_programacion` con la tabla por `numero_orden`; `repetida` sin multiplicar filas |
+| `validar_programacion(fecha)` | jefe, administrador | avisos `repetida` / `incompleta` / `descartada` con los campos crudos; **reimplementa la lectura de líneas de `parse_programacion`**: cualquier cambio de formato, en las dos |
+| `confirmar_programacion(fecha, filas jsonb)` | jefe, administrador | reemplazo completo con snapshot previo; rechaza repetidos, filas sin número/horno y **lista vacía** |
+| `deshacer_ultima_programacion()` | jefe, administrador | restaura la última foto del historial y la consume |
+| `actualizar_tono_calibre(numero_orden, tono, calibre)` | jefe, administrador | edita tono/calibre; vacío = null; ≤ 20 caracteres |
+| `anadir_nota_ordenes(ordenes[], texto)` | jefe, administrador | la misma nota en varias órdenes, todo o nada (máx. 200) |
+| `editar_nota(id, texto)` / `borrar_nota(id)` | jefe, administrador | |
+| `guardar_frase(id, texto, activa, orden)` | solo administrador | alta (`id` nulo) o edición; baja lógica |
+| `guardar_muestra_excel(titulo, contenido)` | jefe, administrador | guarda una muestra como `admin_notas` tipo `nota` (≤ 2 MB) |
+| `fn_metros_entero(texto)` | **solo `service_role`** (la llaman funciones definer) | quita todo lo que no sea un dígito; sin dígitos o > 18 → null; nunca lanza excepción; inmutable, `search_path = pg_catalog` |
+| `set_updated_at_programacion_orden()` / `set_updated_at_programacion_nota()` | triggers | `updated_at = now()` |
+
+## Otros objetos no descritos arriba (revisión 03/10/2026)
+
+Objetos que existen en la BD y que ninguna parte de este archivo recogía (algunos se explican en
+su archivo de área).
+
+- **ceria_tool_logs** (`11`) — una fila por herramienta ejecutada en cada pregunta a Ceria:
+  conversacion_id, user_id, herramienta, args jsonb, filas, filas_totales, limitado, duracion_ms,
+  error, created_at. RLS: inserta solo `service_role`; cada usuario ve sus propios logs.
+  Vista **v_ceria_uso_herramientas**: ranking de uso (frecuencia, duración media, filas medias, errores).
+- **v_alimentacion_turno_linea** (`21`) — por turno+línea: piezas, minutos reales y tres cocientes
+  (`piezas_min_plena`, `piezas_min_turno`, `pct_plena`), con `formatos`/`formatos_distintos`. Para
+  agregar varios turnos: `SUM(piezas)/SUM(minutos)`, nunca promediar los cocientes.
+- **v_rectificado_turno** y **v_rectificado_modelo** (`13`) — Vista Rápida y Vista Detallada de
+  `jefe_rectificado`: tiempos en 3 bloques y calidad como cuadre/descuadre de calibre.
+- **v_lote_pendiente** — objetivo_m2 menos lo ya producido por el lote (NULL sin objetivo; 0 = ya
+  completado; clamp a 0 si se produjo de más). La usa `lib/lote.ts`.
+- **v_puntos_piezas_operario_ciclo**, **v_puntos_limpieza_operario_ciclo** y las tres
+  `v_puntos_{piezas,rendimiento,limpieza}_operario_total_vida` (`04`) — desglose por categoría del
+  ciclo en vivo y de por vida para la tarjeta de Inicio.
+- **calidad_lote_por_fecha**, **calidad_modelo_por_fecha**, **calidad_linea_por_fecha** y
+  **produccion_linea_por_fecha** (`11`) — funciones de lectura (no definer, `STABLE`) que usan las
+  herramientas de Ceria para filtrar con precisión por `turno.fecha`. Sin `search_path` fijo (lint).
+- **fn_parte_validar_correccion** (trigger `BEFORE INSERT` en `parte`) — blindaje en la BD de las
+  reglas de corrección de partes (`02`). **fn_incidencia_produccion_restringir_columnas_update**
+  (trigger `BEFORE UPDATE` en `incidencia_produccion`) — qué columnas puede tocar cada rol (`17`).
+  Las dos sin `search_path` fijo (lint).
+- **fn_set_nombre_normalizado_marca** / **fn_set_nombre_normalizado_modelo** — triggers
+  (`BEFORE INSERT OR UPDATE OF nombre`) que rellenan `nombre_normalizado` con `fn_normalizar_texto`.
+- **stg_migracion_operario_v2** — staging del import v2 (ver arriba, «Tablas temporales»).

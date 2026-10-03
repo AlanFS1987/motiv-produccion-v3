@@ -40,7 +40,7 @@ Lanzamiento 31/08/2026 = ciclo 7; primer cierre real 28/09/2026.
 
 ## Puntos del operario (por línea+turno)
 
-**Rendimiento** (`v_rendimiento_operario_por_turno`,
+**Rendimiento** (`v_puntos_rendimiento_operario_por_turno`,
 `v_puntos_rendimiento_operario_ciclo`, base `operario_ledger` que ya
 resuelve el operario por `parte.operario_id`):
 
@@ -630,7 +630,8 @@ y contenido sexual/violento. (Una versión antigua de este doc decía
 
 ## Datos migrados de v2
 
-Script de un solo uso (`scripts/migrar_v2_historial.sql`), más los
+Script de un solo uso (`scripts/migrar_v2_historial.sql`, que ya no está en el
+repositorio), más los
 backfills puntuales de responsable de la sesión 25/08/2026.
 - **Operarios** (23/08): 19 reales (`operario1` era de pruebas),
   recalculados parte a parte con fórmulas de v3, cruzados por

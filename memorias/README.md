@@ -9,6 +9,7 @@ solo remite a él con el número (`ver 04`).
 | Archivo | Contenido |
 |---|---|
 | `CLAUDE.md` | Entrada: qué es, stack, estado de un vistazo, fechas clave, convenciones, mapa de archivos |
+| `00-seguridad.md` | Superficie expuesta con la clave pública (`anon`): registro, vistas, funciones, privilegios de tablas; avisos del linter; análisis automáticos |
 | `01-dominio.md` | Entidades y reglas de negocio: catálogo, lote, parte, turno, rotación (fecha ancla), operario del parte, corrección, m² |
 | `02-responsable.md` | App del responsable: turno, captura, verificación, incidencias, resumen, lotes |
 | `03-operario.md` | App del operario: pertenencia al turno, Inicio, Mi línea, historial, limpieza |

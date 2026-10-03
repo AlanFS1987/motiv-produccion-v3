@@ -1,8 +1,9 @@
 # 03 — App del operario (comportamiento real)
 
 Shell propio (`operario/OperarioApp.tsx`), se muestra cuando
-`usuario.rol = 'operario'`. Cuatro pestañas: **Inicio**, **Mi línea**,
-**Historial**, **Limpieza**. Dentro de Inicio hay una segunda barra
+`usuario.rol = 'operario'`. Cinco pestañas: **Inicio**, **Mi línea**,
+**Historial**, **Limpieza** y **Chat** (el chat humano de canal único, ver
+`15`). Dentro de Inicio hay una segunda barra
 (solo visible ahí) con 4 sub-vistas: **Inicio** (turno + tarjeta
 resumen), **Ranking**, **Stats+Avatar**, **Logros** — las tres últimas
 son toda la gamificación del operario, descritas en `04`.

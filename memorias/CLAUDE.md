@@ -19,13 +19,14 @@ asistente Ceria, pantalla de fábrica y una capa de gamificación
 
 No tiene acceso a PLCs ni a ningún sistema en tiempo real: todo dato
 nace de una foto o de un formulario. No hay modo offline (decisión
-cerrada: el OCR necesita red igualmente y la fábrica tiene wifi).
+cerrada: el OCR necesita red igualmente y la fábrica tiene wifi). La app
+es una PWA instalable, pero su service worker solo cachea el «app shell»
+para que abra sin cobertura: los datos siempre vienen de la red.
 
-Usuarios: **[VERIFICAR]** cifra de "32 reales cargados" (4 responsables
-A/B/C/D, 19 operarios 4/5/4/4, jefe, administrador, pantalla) — las
-cifras no cuadran (4+19+3=26, no 32) y falta contar los roles nuevos
-(`mecanico`, `producción`, `jefe_rectificado`). Recontar de verdad
-contra la tabla `usuario` antes de repetir un número aquí. Máximo 40.
+Usuarios (recuento real de la tabla `usuario`, 03/10/2026): **34
+cuentas** — 4 responsables (una por letra A/B/C/D), 20 operarios (A=5,
+B=4, C=4, D=6 y uno sin letra), 1 jefe, 1 produccion, 3 calidad, 1
+administrador, 1 pantalla, 1 jefe_rectificado y 2 mecanico. Máximo 40.
 No hay ni habrá
 cuenta `suplente`: decisión cerrada (sesión 25/08/2026) de no usar una
 cuenta compartida para cubrir turnos — se cubre siempre con las
@@ -64,7 +65,8 @@ Unidades — ver `17` y `18`.
   Ver `16`.
 - **Imágenes**: Cloudinary, cloud `dugiquak1`, 5 presets unsigned con
   carpeta fija cada uno. Ver `05`.
-- **Notificaciones**: un bot de Telegram, 5 grupos. Ver `05`.
+- **Notificaciones**: un bot de Telegram, 6 grupos (incidencias de calidad, incidencias de producción,
+  nuevos lotes, resumen de turno, resumen de calidad e informes diario/semanal). Ver `05`.
 - **Frontend**: React 19 + TypeScript + Vite + Tailwind v4 +
   lucide-react. Captura de fotos con reparto híbrido de cámara
   (decisión 28/08/2026): hoja/pantalla/limpieza usan cámara NATIVA
@@ -93,11 +95,11 @@ Unidades — ver `17` y `18`.
 | Cierre automático de turno (cron) + envío del informe a Telegram | Construido; el camino automático se ha visto en real |
 | Gestión de lotes (lista, Finalizar/Reabrir) | Construido |
 | Telegram: incidencias calidad, incidencias producción, nuevos lotes, resumen de turno, resumen calidad | Construido |
-| Operario: Inicio (Inicio / Ranking / Stats+Avatar / Logros), Mi línea, Historial, Limpieza | Construido y probado en real |
+| Operario: Inicio (Inicio / Ranking / Stats+Avatar / Logros), Mi línea, Historial, Limpieza, Chat | Construido y probado en real |
 | Gamificación operario: puntos (rendimiento+piezas+limpieza), niveles, cierre de ciclo, stats, 19 logros sembrados, personaje RPG, datos de v2 migrados | **Construido** (`04`) |
 | Gamificación responsable: puntos (metros+rendimiento), niveles, cierre de ciclo (tabla propia `historial_ciclo_responsable`), pestaña "Progreso" (Ranking, Ranking resp., Stats, Equipo, Logros), 18 logros propios, historial de partes propio | **Construido** (`04`) |
-| Dashboard del jefe (Vista Rápida, Detallada, Incidencias, Calidad) | Construido (`08`) |
-| Panel de administrador | Construido (`09`); faltan fusión de catálogo, vista de usuarios con bonus de nivel y botón "recalcular ciclo" |
+| Dashboard del jefe (9 pestañas: Vista Rápida, Detallada, Incidencias, Calidad, Alimentación, Informes, Programación, Ceria, Chat) | Construido (`08`) |
+| Panel de administrador (21 pestañas: las 8 del jefe que reutiliza + 13 de gestión) | Construido (`09`); faltan fusión de catálogo y botón "recalcular ciclo" (la vista de usuarios con bonus de nivel ya está, pestaña Gamificación) |
 | Pantalla de fábrica (carrusel, rol `pantalla`) | Construido: 5 de 5 diapositivas reales (`10`) |
 | Ceria | Construido (`11`) |
 | Sistema de temas (5 temas) | Construido en arquitectura y marcos; interior de la mayoría de pantallas sin migrar (`12`) |
@@ -105,12 +107,14 @@ Unidades — ver `17` y `18`.
 | App de `calidad` (últimos 15 lotes, incidencias, tonos) | Construido (`14`), sin verificar con datos reales |
 | Copiloto de averías (NORA, por voz) + `ceria_documentacion_maquina` | Experimento funcionando de punta a punta; solo BS08 documentada (8 submáquinas, 150 filas), probado solo con el Divisor (`16`, `11`) |
 | Rol mecánico: Incidencias, Engrase, Almacén (árbol, alta de repuesto, movimientos manuales) | Construido (`17`, `18`); faltan Pedidos y Unidades |
-| Alta de usuarios desde el panel admin (pestaña Gestión) | Construido 27/08/2026 (`09`) |
+| Alta de usuarios desde el panel admin (pestaña Usuarios) | Construido 27/08/2026 (`09`) |
 | Notificaciones in-app y chat con acceso por rol (`chat_acceso`) | Construido 07/09/2026 (`15`) |
-| Pantalla de fábrica en tiempo real (Supabase Realtime) | Construido 13/09/2026 (`10`) |
+| Pantalla de fábrica en tiempo real (Supabase Realtime) | **Parcial**: la base de datos ya publica `parte`, `turno` e `historial_ciclos` y `parte_select_todos` incluye `pantalla` (13/09/2026), pero el componente que se suscribe (`RefrescoPantalla.tsx`) no existe en el repositorio y la pantalla no usa Realtime hoy (`10`) |
 | Informes diario y semanal (PDF, enlaces dentro del resumen del turno N + cron de respaldo) y pestaña Informes del jefe/admin | Construido; verificado en real 21/09/2026 como mensajes sueltos, pendiente de ver la primera noche "dentro del resumen" (`19`) |
 | Hora de revisión del turno: se pueden abrir partes nuevos | Construido 20/09/2026, pendiente de probar en una revisión real (`02`, `07`) |
 | Pestaña Alimentación (rendimiento vs velocidad, jefe/admin/producción) | Construido 01/10/2026 (`21`) |
+| Programación diaria de hornos: Revisar (avisos de repetidos/incompletas, pegado de celdas de Excel), Consultar (alta, tono/calibre en la fila, notas con selección múltiple), frases del admin | Construido y verificado con un Excel real el 03/10/2026 (`20`, `22`) |
+| App instalable (PWA): `manifest.json`, `sw.js` (cachea solo el app shell; nunca Supabase ni Cloudinary), página `instalar.html` | Construido; sigue necesitando red para cualquier dato |
 
 ## Fechas clave
 
@@ -120,7 +124,8 @@ Unidades — ver `17` y `18`.
   migrar los datos de v2. Detalle y reglas para moverla en `01`
   (sección "Turno y rotación").
 - Lanzamiento de v3: **31/08/2026** = inicio del ciclo 7.
-- Primer cierre real de ciclo: **28/09/2026** (cierre del ciclo 7).
+- Primer cierre real de ciclo: **28/09/2026** (cierre del ciclo 7). Ya ocurrió: `historial_ciclos` e
+  `historial_ciclo_responsable` tienen los ciclos 1 a 7 y el 03/10/2026 corre el ciclo 8.
 
 ## Convenciones que hay que respetar
 
@@ -129,11 +134,15 @@ Unidades — ver `17` y `18`.
   ser idempotente (`if not exists`, `create or replace`).
 - **Despliegue**: `supabase db push` (migraciones) y
   `supabase functions deploy <nombre>` (funciones), siempre desde la
-  raíz del repo. Las funciones que llama la BD vía `pg_net`
+  raíz del repo. Las funciones que llama la BD vía `pg_net` o un cron
   (`notificar-telegram`, `generar-resumen-turno`,
-  `notificar-telegram-resumen-calidad`) se despliegan con
-  `--no-verify-jwt`; las que llama el navegador (`ocr-parte`,
-  `resolver-catalogo`, `generar-personaje`, `ceria`) no.
+  `notificar-telegram-resumen-calidad`, `generar-informe-periodo`) se
+  despliegan con `--no-verify-jwt` (se autentican con el secreto compartido).
+  `ocr-parte` también está desplegada sin verificación de JWT y valida la
+  sesión por dentro (`auth.getUser`). Las demás (`resolver-catalogo`,
+  `generar-personaje`, `ceria`, `nora`, `admin-crear-usuario`,
+  `admin-cambiar-password`) llevan verificación de JWT. Comprobado contra el
+  despliegue el 03/10/2026.
 - **RLS**: helper `fn_rol_actual()`. Las políticas son permisivas y se
   suman con OR: para dar un permiso nuevo se crea una política nueva,
   nunca se amplía una existente. PostgREST **no da error** cuando un
@@ -148,6 +157,14 @@ Unidades — ver `17` y `18`.
   formato y la pantalla de fábrica lean agregados de tablas cuya RLS
   no cubre a esos roles. NUNCA poner `security_invoker = on` a una
   vista existente "por buenas prácticas".
+- **Tablas y vistas nuevas nacen abiertas**: por los privilegios por defecto de
+  Supabase, en `public` toda tabla o vista nueva da a `anon` y `authenticated` todos los
+  privilegios, y las tablas nacen sin RLS (comprobado el 03/10/2026). Cada migración que
+  cree una tabla debe llevar, en la misma migración, `enable row level security`,
+  `revoke all ... from public, anon, authenticated` y `grant select ... to authenticated`
+  solo si procede, además de sus políticas; a una vista nueva hay que revocarle `select`
+  a `anon`. Las funciones sí están ya corregidas (no nacen abiertas a `anon`/PUBLIC). Estado
+  completo y pendientes en `00` y `07`.
 - **Secretos**: nunca en migraciones ni en el repo. Secreto compartido
   BD↔Edge Functions en tabla `app_secrets` (sin acceso para
   anon/authenticated) y en los secrets de Edge Functions; deben
@@ -233,13 +250,13 @@ frontend/src/
     alimentacion/               AlimentacionPanel, FiltrosAlimentacion, NubesAlimentacion,
                                TemporalAlimentacion, TooltipAlimentacion (21)
     rectificado/                RectificadoApp, VistaRapida/VistaDetallada de rectificado
-    produccion/                 ProduccionApp (7 pestañas, reutiliza componentes de jefe/ y calidad/)
+    produccion/                 ProduccionApp (8 pestañas, reutiliza componentes de jefe/ y calidad/)
     mecanico/                   MecanicoApp, IncidenciasMecanicoScreen, AlmacenScreen, EngraseScreen
     pantalla/                  PantallaCarrusel + Slides (Produccion, Ranking, ReyesFormato, UltimosModelos, UltimosTurnos)
     ceria/                     CeriaScreen
     nora/                      NoraScreen (copiloto de averías por voz)
 supabase/
-  migrations/                  20260101000001 … 20260927130000
+  migrations/                  20260101000001 … 20261003142002 (169 migraciones)
   functions/
     _shared/                   anthropic.ts, openai.ts, openai_images.ts, deepseek_historia.ts,
                                cors.ts, cloudinary.ts, normalizacion.ts, formato.ts,

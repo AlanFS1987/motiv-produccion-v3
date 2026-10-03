@@ -271,8 +271,8 @@ Dos redes de seguridad ante un error humano (CSV equivocado):
 
 ## Frontend
 
-`JefeApp.tsx` gana una 8ª pestaña, **"Programación"**
-(`jefe/programacion/ProgramacionScreen.tsx`), con dos sub-vistas:
+`JefeApp.tsx` tiene una pestaña **"Programación"** (la 7.ª de sus 9;
+`jefe/programacion/ProgramacionScreen.tsx`), con dos sub-vistas:
 
 - **Revisar** (solo VALIDA; tono y calibre **ya no se rellenan aquí**, se hace en
   Consultar): si no hay CSV hoy (`existeCsvHoy`), muestra el textarea de pegar ahí

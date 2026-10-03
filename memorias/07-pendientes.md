@@ -38,28 +38,21 @@ ambigüedad `nivel_id` en `fn_otorgar_bonus_nivel`).)
 
 ## Verificaciones pendientes con casos reales
 
-1. Primer cierre real de ciclo: lunes 28/09/2026, 8:00 Madrid (ciclo
-   7). El cron `cerrar-ciclos-pendientes` ya corre los lunes sin error
-   (devuelve 0 filas porque los ciclos 1..6 ya tienen fila).
-
-2. Tras el lanzamiento del 31/08, con partes reales: Ranking del
+1. Tras el lanzamiento del 31/08, con partes reales: Ranking del
    ciclo actual (operario y responsable), Equipo, Historial del
    responsable, Vista Detallada del jefe, Logros (operario y
-   responsable).
+   responsable). El primer cierre de ciclo ya ocurrió (28/09/2026: el
+   cron corrió sin error y `historial_ciclos` e `historial_ciclo_responsable`
+   tienen los ciclos 1 a 7), así que el ciclo 7 ya se puede revisar en el
+   historial.
 
-3. Confirmar en el linter de Supabase (Database → Advisors) que tras
-   aplicar `..._fix_search_path_20_funciones.sql`,
-   `function_search_path_mutable` baja a 0 filas — la primera vez que
-   se intentó aplicar falló por colisión de nombre de migración
-   (`schema_migrations_pkey` duplicado, mismo prefijo `20260826` que
-   otra migración del mismo día) y se corrigió renombrando el
-   archivo, sin confirmar todavía que quedó aplicada. De paso probar
-   en real que los 4 flujos afectados por las restricciones de RPC
-   del 26/08/2026 siguen funcionando: generar personaje/avatar,
-   botón "otorgar generaciones" del admin, y el cierre de ciclo (vía
-   cron, la próxima vez que corra).
+2. Probar en real los flujos afectados por las restricciones de RPC del
+   26/08/2026: generar personaje/avatar y el botón "otorgar generaciones"
+   del admin (el cierre de ciclo ya se vio en real el 28/09). El linter de
+   Supabase marca hoy 7 funciones sin `search_path` fijo (lista en
+   «Seguridad — pendiente», punto 4).
 
-4. Cambio de la hora de revisión (20/09/2026): comprobar en una
+3. Cambio de la hora de revisión (20/09/2026): comprobar en una
    revisión real que el responsable ve el aviso con la hora de cierre y
    puede abrir "Nueva orden", "Continuar" y "Nuevo tono/calibre".
 
@@ -67,7 +60,8 @@ ambigüedad `nivel_id` en `fn_otorgar_bonus_nivel`).)
 
 - `extension_in_public`: `pg_trgm` vive en el esquema `public` en vez
   de uno propio (`extensions`). Cosmético, sin prisa (lint de
-  seguridad 26/08/2026, ver `06`).
+  seguridad 26/08/2026, ver `06`). Sus 31 funciones, al estar en `public`, son ejecutables por
+  `anon`/PUBLIC (son funciones puras de similitud de texto).
 - `auth_leaked_password_protection`: comprobación de contraseñas
   filtradas (HaveIBeenPwned) desactivada en Supabase Auth. Toggle en
   el panel, sin código — pendiente decidir si se activa (lint de
@@ -94,20 +88,27 @@ abiertos:
    y `lote` exijan `fn_rol_actual() is not null`, para que una cuenta sin
    perfil no lea nada. Sin hacer. Probar por rol antes (todos los roles del
    enum leen `turno` y `lote`).
-2. **`anon` conserva `GRANT SELECT` en 54 tablas de `public`** (solo las frena
-   la RLS; con `anon` `fn_rol_actual()` y `auth.role()` no dan acceso). Se
-   revocó en las vistas (ver `00`) y en las tablas de Programación (03/10/2026), pero
-   no en el resto. **Las tablas nuevas nacen abiertas** (comprobado el 03/10/2026 creando
-   una tabla de prueba en `public` y revirtiéndola): propietario `postgres`, **RLS
-   desactivada** y `anon` y `authenticated` con los 7 privilegios (`select, insert,
-   update, delete, truncate, references, trigger`) por los privilegios por defecto de
-   Supabase (`pg_default_acl`: `postgres` y `supabase_admin` en `public` dan `arwdDxtm` a
-   `anon`, `authenticated` y `service_role`). Las funciones sí están ya corregidas para
+2. **`anon` conserva todos los privilegios en 53 de las 61 tablas de `public`**
+   (SELECT, INSERT, UPDATE, DELETE, TRUNCATE…; no solo SELECT, como se anotó antes).
+   Solo los frena la RLS por la API: con `anon`, `fn_rol_actual()` y `auth.role()` no
+   dan acceso y no hay políticas de escritura para él. `TRUNCATE` no pasa por RLS,
+   aunque PostgREST no lo expone. Las 8 tablas sin ningún privilegio para `anon` son
+   `app_secrets`, las cuatro de Programación (`programacion_orden`,
+   `programacion_orden_historico`, `programacion_nota`, `programacion_nota_frase`), las
+   dos copias `_bak_20261002` y `stg_migracion_operario_v2`. Tarea: revocar todo a
+   `anon` en las 53 (la app no usa `anon` para nada) y cambiar los privilegios por
+   defecto para que las tablas y vistas nuevas no nazcan abiertas.
+   **Las tablas nuevas nacen abiertas** (comprobado el 03/10/2026 creando una tabla de
+   prueba en `public` y revirtiéndola): propietario `postgres`, **RLS desactivada** y
+   `anon` y `authenticated` con los 7 privilegios (`select, insert, update, delete,
+   truncate, references, trigger`) por los privilegios por defecto de Supabase
+   (`pg_default_acl`: `postgres` y `supabase_admin` en `public` dan `arwdDxtm` a `anon`,
+   `authenticated` y `service_role`). Las funciones sí están ya corregidas para
    `postgres` (M3), no para `supabase_admin`. Hasta cambiar esos privilegios por defecto
-   (como con las funciones: `alter default privileges for role postgres [in schema public]
-   revoke ... on tables from anon, authenticated`), **cada tabla nueva debe llevar en su
-   misma migración `enable row level security` + `revoke all ... from public, anon,
-   authenticated` + `grant select` solo si procede** (las de Programación lo hacen).
+   (`alter default privileges for role postgres [in schema public] revoke ... on tables
+   from anon, authenticated`), **cada tabla nueva debe llevar en su misma migración
+   `enable row level security` + `revoke all ... from public, anon, authenticated` +
+   `grant select` solo si procede** (las de Programación lo hacen).
 3. `fn_disparar_resumen_turno(uuid)` sigue ejecutable por `authenticated`:
    la llama un trigger NO `security definer`
    (`fn_trigger_resumen_turno_cierre`), que corre con los permisos de quien
@@ -115,7 +116,8 @@ abiertos:
    antes de restringirla sin romper el cierre manual. Hasta entonces
    cualquier usuario autenticado puede pedir un resumen de Telegram de
    cualquier turno.
-4. Funciones `security definer` sin `search_path` fijo (`calidad_*_por_fecha`,
+4. Funciones sin `search_path` fijo (7, todas `security invoker`:
+   `calidad_lote_por_fecha`, `calidad_linea_por_fecha`, `calidad_modelo_por_fecha`,
    `produccion_linea_por_fecha`, `fn_parte_validar_correccion`,
    `fn_incidencia_produccion_restringir_columnas_update`,
    `fn_almacen_pedido_linea_recibida`) y protección contra contraseñas
@@ -124,6 +126,8 @@ abiertos:
    `programacion_orden_historico_bak_20261002` a partir del 2026-10-16
    (ver `20`). Desde el 03/10/2026 **ya no representan la programación vigente** (la tabla se cargó con
    el Excel real del día anterior: 53 órdenes), así que no sirven para restaurar ni para verificar por hash.
+6. **Tablas con RLS y sin políticas** (lint `rls_enabled_no_policy`, nivel INFO): las dos copias
+   `_bak_20261002` (se borran el 16/10) y `stg_migracion_operario_v2` (ver «Por construir», squash).
 
 ## Programación — pendiente
 
@@ -166,27 +170,30 @@ Mejoras 1–4 implementadas el 03/10/2026 (`20`, `22`). Queda:
    `fn_otorgar_bonus_nivel`, ver `06`).
 2. Admin: fusión de modelos/marcas/productos/lotes duplicados (Edge
    Function con `service_role`).
-4. Pantalla de fábrica: diapositivas 4 (Ranking) y 5 (Reyes del
-   formato) — la mecánica y las vistas ya existen (`10`); ahora
-   incluiría también el ranking de responsables (`04`).
-5. Refactor de `TurnoScreen.tsx` (hook `useTurnoActual`, componentes
+3. Pantalla de fábrica: escribir el suscriptor de Realtime. La base de datos ya
+   publica `parte`, `turno` e `historial_ciclos` y `parte_select_todos` incluye a
+   `pantalla`, pero el componente `RefrescoPantalla.tsx` que cita la migración no existe
+   (ver `10`).
+4. Refactor de `TurnoScreen.tsx` (785 líneas hoy: hook `useTurnoActual`, componentes
    `EstadoTurnoBloqueado`, `TarjetaLinea`, máquina de estados pura).
-6. Tests unitarios (rotación, validaciones, normalización, tramos) y
+5. Tests unitarios (rotación, validaciones, normalización, tramos) y
    paquete de dominio compartido frontend/Deno para dejar de duplicar
    `normalizacion`/`formato`/informe.
-7. Migrar el interior de las pantallas al sistema de temas (lista en
+6. Migrar el interior de las pantallas al sistema de temas (lista en
    `12`).
-8. PWA; retención de 18 meses en Cloudinary (automatizar el borrado
-   de huérfanas requeriría Edge Function con `service_role`).
-9. Squash de migraciones — ya desbloqueado: las 3 tablas temporales
+7. Retención de 18 meses en Cloudinary (automatizar el borrado
+   de huérfanas requeriría Edge Function con `service_role`). La PWA ya está
+   construida (`manifest.json`, `sw.js`, `instalar.html`; ver `CLAUDE.md`).
+8. Squash de migraciones (169 hoy) — ya desbloqueado: las 3 tablas temporales
    del import v2 (`staging_responsable_v2`, `stg_migracion_v2`,
    `tmp_puntos_turno`) se borraron el 26/08/2026, confirmado que nada
-   dependía de ellas. Listo para ejecutar en cuanto se confirme el
-   punto 11 de arriba (mejor squashear con el esquema de seguridad ya
-   verificado en real, no a medias).
-11. Base de conocimiento de averías — en curso: NORA (copiloto por voz)
-    y `ceria_documentacion_maquina` (solo BS08). Pendientes propios en
-    `16` y `11`.
+   dependía de ellas. Queda `stg_migracion_operario_v2` (2.694 filas, sin
+   ninguna dependencia en la BD ni en el código, RLS sin políticas): decidir si se
+   borra antes del squash. Mejor squashear con el esquema de seguridad ya
+   verificado en real (`00`), no a medias.
+9. Base de conocimiento de averías — en curso: NORA (copiloto por voz)
+   y `ceria_documentacion_maquina` (solo BS08). Pendientes propios en
+   `16` y `11`.
 
 
 ## Pendientes que viven en su propio archivo
