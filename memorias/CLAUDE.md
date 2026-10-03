@@ -190,7 +190,7 @@ frontend/src/
     ciclo.ts                   ciclo actual/anterior calculado en cliente (28 días)
     programacion.ts            diff/confirmar/deshacer/consultar/validar programación de hornos
     programacion-notas.ts      notas por orden y frases frecuentes (RPC)
-    normalizar-pegado.ts       pegado de celdas de Excel → CSV con ; (verificado con muestra real reconstruida; falta el original)
+    normalizar-pegado.ts       pegado de celdas de Excel → CSV con ; (verificado con un Excel real el 03/10/2026)
     metros.ts                  metrosDeTexto: misma regla que fn_metros_entero (quita todo lo que no sea un dígito)
     admin-notas.ts              pegar CSV + histórico de programación (admin)
     almacen.ts                 almacén de repuestos (rol mecánico)

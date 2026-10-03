@@ -122,7 +122,8 @@ abiertos:
    filtradas desactivada (lint).
 5. Borrar las copias `programacion_orden_bak_20261002` y
    `programacion_orden_historico_bak_20261002` a partir del 2026-10-16
-   (ver `20`).
+   (ver `20`). Desde el 03/10/2026 **ya no representan la programación vigente** (la tabla se cargó con
+   el Excel real del día anterior: 53 órdenes), así que no sirven para restaurar ni para verificar por hash.
 
 ## Programación — pendiente
 
@@ -133,20 +134,15 @@ abiertos:
 
 Mejoras 1–4 implementadas el 03/10/2026 (`20`, `22`). Queda:
 
-1. **Guardar el archivo ORIGINAL de la muestra real de celdas de Excel**. El 03/10/2026 llegó la
-   muestra por el chat y el pegado directo (`lib/normalizar-pegado.ts`) dio el resultado esperado
-   (53 órdenes, 14/14/13/12; METROS enteros; `1118578` = 300; los 3 CEP con espacio salen no cepillados),
-   pero el chat convierte los tabuladores en grupos de 4 espacios y pierde los finales, así que el
-   fixture es una reconstrucción. Hay que guardar el original (Bloc de notas, UTF-8, sin editar) en
-   `privado/muestras/celdas_excel_real.txt` y pasar `node privado/muestras/verificar_muestra_real.mjs`
-   (comprueba que no se recorta nada, que se conserva la primera columna vacía y los tabuladores
-   finales, y cuenta las órdenes). Si vuelve a aparecer un duplicado en algún correo, guardar también esa muestra.
-2. **Pasada de UI** (fase D): guion preparado en
+1. **Pasada de UI** (fase D): guion preparado en
    `privado/backups/guion_pasada_ui_programacion.md`; se hace una vez, con el
-   usuario, y se limpia después (notas sintéticas, CSV sintético, verificación por hash contra
-   `programacion_orden_bak_20261002`, vigente hasta el 2026-10-16).
-3. **`parse_programacion` no entiende el formato del CSV guardado con fecha 2026-10-03**
-   (observado el 03/10/2026 en `admin_notas`, creado por el administrador): la cabecera es
+   usuario, y se limpia después (notas sintéticas, CSV sintético). **El guion está desactualizado:** su
+   estado base y la verificación por hash contra `programacion_orden_bak_20261002` ya no valen, porque la
+   tabla se cargó con el Excel real el 03/10/2026 (53 órdenes). Antes de hacerla hay que fijar un estado
+   base nuevo (foto de la tabla, historial y `admin_notas`).
+2. **`parse_programacion` no entiende el formato de un CSV guardado con fecha 2026-10-03**
+   (observado el 03/10/2026 en `admin_notas`, creado por el administrador; ese archivo fue
+   **sustituido ese mismo día** por el Excel real con la cabecera «Nº ORDEN», que sí se lee bien): la cabecera era
    `ORDEN;MODELO;METROS;Nº BOX;…` (sin «Nº» y sin la primera columna vacía), el número de orden
    va en la columna 1 y METROS llega como `4500` (sin punto de miles). El parser busca la
    cabecera con «Nº ORDEN» y lee el número en la columna 2, así que reconoce 0 órdenes: el
@@ -155,7 +151,7 @@ Mejoras 1–4 implementadas el 03/10/2026 (`20`, `22`). Queda:
    enseña el diff y bloquea confirmar (y el servidor rechaza una lista vacía). No se ha
    tocado el parser; hay que decidir si se admite ese formato (y entonces replicarlo en
    `validar_programacion`, ver `20`).
-4. Reglas de validación de tono/calibre (formato cerrado), sin las normas reales (`20`).
+3. Reglas de validación de tono/calibre (formato cerrado), sin las normas reales (`20`).
 
 ## Por construir (orden sugerido)
 

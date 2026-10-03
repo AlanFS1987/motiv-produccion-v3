@@ -241,6 +241,13 @@ marcas de tiempo) y el historial, y se verificó por hash que quedaron
 idénticos a la copia. **Borrar las dos tablas `_bak_20261002` a partir
 del 2026-10-16** si todo va bien (están marcadas con un comentario).
 
+> **03/10/2026 — las copias ya no representan la programación vigente.** `programacion_orden` se cargó con el
+> Excel real del día anterior (53 órdenes, `fecha_alta` 2026-10-03): 30 de las órdenes actuales no estaban en la
+> copia y 16 de las 39 de la copia (la programación del 30/09) ya no están. Las copias **ya no sirven para
+> restaurar el estado vigente ni para verificar por hash**; se borran a partir del 2026-10-16 (no hay nada que
+> conservar de ellas). El historial (`programacion_orden_historico`) tiene desde ese momento un snapshot de la
+> programación anterior.
+
 ## Por qué el diff es editable (y no un upsert automático)
 
 Decisión explícita de diseño: el proceso manual de hoy ya incluye al
@@ -278,10 +285,9 @@ Dos redes de seguridad ante un error humano (CSV equivocado):
   **normalizado**; el parser SQL no cambia. Avisa («Celdas copiadas de Excel
   detectadas») y, si la cabecera empieza en «Nº ORDEN» (se copió sin la columna
   anterior), no deja guardar: el parser lee el número en la 2.ª columna y no
-  reconocería ninguna orden. **Verificado con una muestra real** (03/10/2026, ver «Validado con
-  datos reales»), pero **sobre una reconstrucción**: el chat convierte los tabuladores en
-  grupos de 4 espacios y pierde los tabuladores finales, así que falta confirmarlo con el
-  archivo original (ver «Pendiente»).
+  reconocería ninguna orden. **Verificado con un Excel real el 03/10/2026**: el
+  usuario pegó directamente en Revisar el Excel del día anterior y funcionó perfecto (ver
+  «Validado con datos reales»).
   En cuanto hay CSV, carga el diff y `validar_programacion` en paralelo. Bloque
   **Avisos** antes de los hornos (`AvisosRevisar.tsx`): para cada número **repetido**,
   las apariciones en tarjetas lado a lado con los campos que difieren resaltados
@@ -405,22 +411,25 @@ primera columna vacía; la primera celda de las filas de datos es la etiqueta de
 formato o está vacía; METROS llega como `" 4.500   "` (punto de miles, con
 espacios) y otras columnas usan coma decimal (`9,4`).
 
-**03/10/2026 — muestra real de pegado de celdas** (muestra real recibida el 03/10/2026 por el chat (programación del 02/10/2026, 4 hornos): 53 órdenes (14, 14, 13 y 12), METROS enteros (mín. 300, máx. 13000; `1118578` = 300), 3 órdenes con el CEP formado por un espacio (no cepilladas), 2 sin ACABADO y una con ACABADO `1a/2b`; sin avisos de validación). Se pasó por
-`normalizarPegado` (sin recortar líneas, con la primera columna vacía y los tabuladores finales conservados, cabecera
-`;Nº ORDEN;MODELO;METROS;…`) y por `parse_programacion` en transacción revertida: 53 órdenes (h1=14, h2=14,
-h3=13, h4=12), idénticas por hash a un cálculo independiente en Python. Formato observado: cada sección tiene
-la cabecera «Nº ORDEN» con la primera columna vacía; METROS y Nº BOX llegan con relleno (` 3.300   `, ` 12   `);
-`ESP. PRENSA` usa coma decimal (`9,4`); la columna HORNO coincide con la sección; filas separadoras ` - `.
+**03/10/2026 — pegado directo verificado con un Excel real.** El usuario pegó en Revisar el Excel de la
+programación del 02/10/2026 (4 hornos) tal como sale de Excel, y funcionó perfecto: `admin_notas` guardó el
+texto normalizado (67 líneas, fecha 2026-10-03) y `programacion_orden` quedó cargada con **53 órdenes**
+(14, 14, 13 y 12 por horno) con `fecha_alta` = 2026-10-03 y un snapshot nuevo en el historial. **A partir de
+ese momento `programacion_orden` ya no es la programación del 30/09: las copias `_bak_20261002` no la
+representan** (ver «Copias de seguridad y restauración»).
+
+Antes de esa prueba se había comprobado el mismo Excel por SQL con una muestra recibida por el chat (reconstruida: el
+chat convierte los tabuladores en grupos de 4 espacios y pierde los finales): `normalizarPegado` sin recortar líneas
+(con la primera columna vacía y los tabuladores finales conservados, cabecera `;Nº ORDEN;MODELO;METROS;…`) y
+`parse_programacion` en transacción revertida dan 53 órdenes (h1=14, h2=14, h3=13, h4=12), idénticas por hash a
+un cálculo independiente en Python; METROS enteros (mín. 300, máx. 13000; `1118578` = 300); 3 órdenes con el CEP
+formado por un espacio (no cepilladas); 2 sin ACABADO y 2 con ACABADO `1a/2b`; sin avisos de validación. Formato
+observado: cada sección tiene la cabecera «Nº ORDEN» con la primera columna vacía; METROS y Nº BOX llegan con relleno
+(` 3.300   `, ` 12   `); `ESP. PRENSA` usa coma decimal (`9,4`); la columna HORNO coincide con la sección; filas
+separadoras ` - `.
 
 ## Pendiente
 
-- **Guardar el ARCHIVO ORIGINAL de la muestra real** de celdas de Excel en
-  `privado/muestras/celdas_excel_real.txt` (Bloc de notas, UTF-8, sin editar; no se puede
-  copiar por el chat sin perder los tabuladores) y pasar
-  `node privado/muestras/verificar_muestra_real.mjs`. Hasta entonces, lo que se sabe
-  viene de una reconstrucción (`privado/muestras/RECONSTRUIDA_desde_chat_NO_ES_EL_ORIGINAL.tsv`):
-  los tabuladores finales y las líneas vacías no están verificados byte a byte (no afectan
-  a `parse_programacion`, que lee hasta la columna 12).
 - **Pasada de UI** (fase D): guion preparado en `privado/backups/guion_pasada_ui_programacion.md`;
   se hace una vez, con el usuario, y se limpia después (notas, CSV sintético).
 - ~~`parse_programacion` fallaba con un METROS no numérico~~: resuelto el 03/10/2026 con
