@@ -139,12 +139,14 @@ que tocar esa RLS.
   restaurar. Ojo: `delete from programacion_orden` sin condición choca
   con la protección `safe-update` del proyecto ("DELETE requires a
   WHERE clause") — lleva `where true` explícito.
-- Las tres comprobaciones de rol de `diff`, `confirmar` y `deshacer`
-  usan `coalesce(fn_rol_actual()::text,'') not in (...)`: con rol nulo,
-  `NULL NOT IN (...)` es `NULL` y el `if` no saltaba. Las demás RPC de
-  programación (`parse`, `guardar_programacion_csv`,
-  `existe_csv_programacion`) y el resto del proyecto siguen con el
-  patrón antiguo hasta que se corrijan (pendiente).
+- Todas las RPC de programación (`parse`, `diff`, `confirmar`, `deshacer`,
+  `guardar_programacion_csv`, `existe_csv_programacion`) comprueban el rol con
+  `coalesce(fn_rol_actual()::text,) not in (...)`: con rol nulo,
+  `NULL NOT IN (...)` es `NULL` y el `if` no saltaba (corregido el
+  02/10/2026, migraciones `20261002164859` y `20261002183413`). Con la
+  migración `20261002191839` ninguna función propia de `public` es
+  ejecutable por `anon`/PUBLIC y las funciones nuevas ya no nacen abiertas
+  (privilegios por defecto revocados).
 
 RLS de `programacion_orden`: SELECT para `jefe, responsable,
 produccion, administrador`. Sin políticas de INSERT/UPDATE/DELETE

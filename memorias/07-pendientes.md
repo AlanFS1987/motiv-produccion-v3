@@ -79,18 +79,42 @@ ambigüedad `nivel_id` en `fn_otorgar_bonus_nivel`).)
   aviso con la hora exacta lo mitiga) o que el cron no toque partes con
   actividad reciente. Ver `02`.
 
-## Seguridad — pendiente de un refactor concreto
+## Seguridad — pendiente
 
-- `fn_disparar_resumen_turno(uuid)` sigue expuesta a `anon`/
-  `authenticated` vía RPC (lint de seguridad 26/08/2026, ver `06`). A
-  diferencia de las otras 10 funciones `security definer` señaladas
-  por el linter, esta la llama un trigger NO `security definer`
-  (`fn_trigger_resumen_turno_cierre`), que corre con los permisos de
-  quien cierra el turno de verdad — restringirla sin más rompería el
-  cierre manual de turno en producción. Requiere hacer también ese
-  trigger `security definer` antes de poder restringir la función sin
-  riesgo. Dejada fuera a propósito de la migración de seguridad del
-  26/08/2026, junto con las otras 10.
+Contexto: el 02/10/2026 se cerró el acceso de `anon`/PUBLIC a todas las
+funciones propias de `public` y se corrigió el patrón de rol nulo
+(`20261002191839_cerrar_funciones_anon_y_rol_nulo.sql`; ver `20` para
+Programación). Quedan abiertos:
+
+1. **Registro de usuarios abierto en Auth** (`disable_signup: false`,
+   email activo, sin autoconfirmación). Cualquiera con un email real puede
+   crear una cuenta `authenticated` SIN fila en `usuario` (`fn_rol_actual()`
+   nulo). Con una cuenta así se comprobó (02/10/2026) que se leen `usuario`
+   (33 filas), `turno` (98), `lote` (263) y las vistas `v_*`. Cerrarlo en
+   el panel de Supabase (Authentication → Sign In / Providers → "Allow new
+   users to sign up" desactivado); las altas siguen yendo por la Edge
+   Function `admin-crear-usuario` (service_role). No se puede hacer desde SQL.
+2. **Vistas `v_*` legibles por `anon`** (las 58 vistas corren como owner y
+   tienen `GRANT SELECT` a `anon`): con la clave anónima del frontend se
+   lee, p. ej., `v_produccion_turno` (97 filas). La app no usa `anon` para
+   nada (el login va por Auth y `AuthContext` lee con sesión), así que se
+   puede revocar `select` a `anon` en las vistas y tablas de `public`
+   (las tablas ya filtran por RLS). Sin hacer: probar por rol antes.
+3. `fn_disparar_resumen_turno(uuid)` sigue ejecutable por `authenticated`:
+   la llama un trigger NO `security definer`
+   (`fn_trigger_resumen_turno_cierre`), que corre con los permisos de quien
+   cierra el turno. Hay que hacer también ese trigger `security definer`
+   antes de restringirla sin romper el cierre manual. Hasta entonces
+   cualquier usuario autenticado puede pedir un resumen de Telegram de
+   cualquier turno.
+4. Funciones `security definer` sin `search_path` fijo (`calidad_*_por_fecha`,
+   `produccion_linea_por_fecha`, `fn_parte_validar_correccion`,
+   `fn_incidencia_produccion_restringir_columnas_update`,
+   `fn_almacen_pedido_linea_recibida`) y protección contra contraseñas
+   filtradas desactivada (lint).
+5. Borrar las copias `programacion_orden_bak_20261002` y
+   `programacion_orden_historico_bak_20261002` a partir del 2026-10-16
+   (ver `20`).
 
 ## Por construir (orden sugerido)
 
