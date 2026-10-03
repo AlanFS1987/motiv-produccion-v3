@@ -96,9 +96,18 @@ abiertos:
    enum leen `turno` y `lote`).
 2. **`anon` conserva `GRANT SELECT` en 54 tablas de `public`** (solo las frena
    la RLS; con `anon` `fn_rol_actual()` y `auth.role()` no dan acceso). Se
-   revocó en las vistas (ver `00`) pero no en las tablas. Revocarlo también y
-   cambiar los privilegios por defecto de tablas/vistas nuevas para que no
-   nazcan abiertas a `anon` (como ya se hizo con las funciones).
+   revocó en las vistas (ver `00`) y en las tablas de Programación (03/10/2026), pero
+   no en el resto. **Las tablas nuevas nacen abiertas** (comprobado el 03/10/2026 creando
+   una tabla de prueba en `public` y revirtiéndola): propietario `postgres`, **RLS
+   desactivada** y `anon` y `authenticated` con los 7 privilegios (`select, insert,
+   update, delete, truncate, references, trigger`) por los privilegios por defecto de
+   Supabase (`pg_default_acl`: `postgres` y `supabase_admin` en `public` dan `arwdDxtm` a
+   `anon`, `authenticated` y `service_role`). Las funciones sí están ya corregidas para
+   `postgres` (M3), no para `supabase_admin`. Hasta cambiar esos privilegios por defecto
+   (como con las funciones: `alter default privileges for role postgres [in schema public]
+   revoke ... on tables from anon, authenticated`), **cada tabla nueva debe llevar en su
+   misma migración `enable row level security` + `revoke all ... from public, anon,
+   authenticated` + `grant select` solo si procede** (las de Programación lo hacen).
 3. `fn_disparar_resumen_turno(uuid)` sigue ejecutable por `authenticated`:
    la llama un trigger NO `security definer`
    (`fn_trigger_resumen_turno_cierre`), que corre con los permisos de quien
@@ -114,12 +123,6 @@ abiertos:
 5. Borrar las copias `programacion_orden_bak_20261002` y
    `programacion_orden_historico_bak_20261002` a partir del 2026-10-16
    (ver `20`).
-6. **`programacion_orden_historico` conserva `INSERT/UPDATE/DELETE/TRUNCATE` para `anon`
-   y `authenticated`** (hallado el 03/10/2026; la migración `20261002131613` cerró solo
-   `programacion_orden`). Tiene RLS y ninguna política de escritura, así que por la API no
-   se puede escribir (y `TRUNCATE` no existe en PostgREST), pero los privilegios sobran:
-   `revoke all ... from anon, authenticated` + `grant select to authenticated`, como en
-   `programacion_orden`. Sin hacer (otra tarea).
 
 ## Programación — pendiente
 

@@ -137,7 +137,9 @@ que tocar esa RLS.
   vuelve a llamar al parser a ciegas — el jefe pudo excluir una
   eliminación, descartar un "nuevo" falso positivo, corregir algo).
   Rechaza (`raise exception`) un payload con `numero_orden` repetidos o
-  filas sin número/horno. Guarda primero un snapshot en
+  filas sin número/horno, y **una lista vacía** (`p_filas` = `[]`: borraría toda la
+  programación; mensaje «No se puede confirmar una programación vacía…», antes de tocar nada,
+  ni siquiera guarda el snapshot; migración `20261003032652`, 03/10/2026). Guarda primero un snapshot en
   `programacion_orden_historico` (incluye `fecha_alta`), luego hace
   reemplazo completo (`delete` de lo que sobra + `upsert` por
   `numero_orden`, que actualiza también `horno` y `posicion`).
@@ -292,7 +294,8 @@ Dos redes de seguridad ante un error humano (CSV equivocado):
   `parse_programacion` convierte con `::numeric` y da `invalid input syntax`) se
   explica con las líneas afectadas y se bloquea confirmar; antes, un diff fallido dejaba
   el botón activo y habría enviado una lista vacía (reemplazo completo = vaciar la
-  programación; recuperable con Deshacer).
+  programación; recuperable con Deshacer). Ahora el botón se bloquea **y** el servidor
+  rechaza la lista vacía.
 - **Consultar** (vista de trabajo, tras confirmar): la lista congelada de hoy,
   agrupada por horno, con badge de estado en vivo (pendiente/iniciado/finalizado),
   botón "copiar → copiado" junto a cada `Nº ORDEN` y "Exportar/Imprimir". Además
@@ -430,6 +433,12 @@ Superficie nueva de Programación, para recoger en `00-seguridad.md` cuando se r
   `pantalla`, `jefe_rectificado`), una cuenta sin fila en `usuario` (rol nulo) y `anon`:
   solo los roles previstos pueden; el resto recibe «No autorizado»; `anon`, «permission
   denied»; ninguna escritura directa en las tablas nuevas.
-- **Hallazgo previo, fuera de esta tarea** (en `07`): `programacion_orden_historico` conserva
-  `INSERT/UPDATE/DELETE/TRUNCATE` para `anon` y `authenticated`; la RLS (sin políticas de
-  escritura) bloquea las escrituras por la API, pero los privilegios sobran.
+- **Privilegios de tablas (cerrado 03/10/2026, `20261003033056`)**: `programacion_orden_historico`,
+  `programacion_nota` y `programacion_nota_frase` quedan con `revoke all` a `anon` y
+  `authenticated` y solo `SELECT` a `authenticated` (como `programacion_orden` desde M1).
+  `programacion_orden_historico` conservaba `INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER`
+  para ambos (privilegios por defecto; la RLS sin políticas de escritura bloqueaba la API, pero
+  `TRUNCATE` no pasa por RLS). Solo la escriben `confirmar_programacion` y
+  `deshacer_ultima_programacion` (security definer). Ver en `07` que las tablas nuevas siguen
+  naciendo con privilegios amplios por defecto.
+- **`confirmar_programacion`** rechaza `p_filas` vacío (`20261003032652`).
