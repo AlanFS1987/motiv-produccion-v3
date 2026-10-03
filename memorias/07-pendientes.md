@@ -114,6 +114,32 @@ abiertos:
 5. Borrar las copias `programacion_orden_bak_20261002` y
    `programacion_orden_historico_bak_20261002` a partir del 2026-10-16
    (ver `20`).
+6. **`programacion_orden_historico` conserva `INSERT/UPDATE/DELETE/TRUNCATE` para `anon`
+   y `authenticated`** (hallado el 03/10/2026; la migración `20261002131613` cerró solo
+   `programacion_orden`). Tiene RLS y ninguna política de escritura, así que por la API no
+   se puede escribir (y `TRUNCATE` no existe en PostgREST), pero los privilegios sobran:
+   `revoke all ... from anon, authenticated` + `grant select to authenticated`, como en
+   `programacion_orden`. Sin hacer (otra tarea).
+
+## Programación — pendiente
+
+Mejoras 1–4 implementadas el 03/10/2026 (`20`, `22`). Queda:
+
+1. **Muestra real de celdas copiadas de Excel**: el pegado directo
+   (`lib/normalizar-pegado.ts`) está **PROVISIONAL**. Hace falta, en el PC donde
+   llega el correo, copiar las celdas de las 4 secciones, pegarlas en el Bloc de notas y
+   guardarlas como `privado/muestras/celdas_excel_real.txt` (sin editar nada; si algún
+   dato es sensible, cambiar solo los dígitos de metros conservando el formato). Si
+   vuelve a aparecer un duplicado en algún correo, copiar también esa muestra. Con ella
+   se confirma cómo llegan `METROS` y las comillas y si llega la columna anterior a «Nº ORDEN».
+2. **Pasada de UI** (fase D): guion preparado en
+   `privado/backups/guion_pasada_ui_programacion.md`; se hace una vez, con el
+   usuario, y se limpia después (notas sintéticas, CSV sintético, verificación por hash contra
+   `programacion_orden_bak_20261002`, vigente hasta el 2026-10-16).
+3. `parse_programacion` convierte METROS con `::numeric` y falla con un valor no
+   numérico (p. ej. `5,5`). Revisar lo explica y bloquea la confirmación, pero no se puede
+   completar en pantalla; endurecer el parser lo haría posible.
+4. Reglas de validación de tono/calibre (formato cerrado), sin las normas reales (`20`).
 
 ## Por construir (orden sugerido)
 

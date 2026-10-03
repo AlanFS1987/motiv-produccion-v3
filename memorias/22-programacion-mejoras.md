@@ -1,8 +1,8 @@
 # 22 — Programación: mejoras acordadas con el jefe (v2)
 
-Estado (02/10/2026): **diseño acordado; implementado solo el cimiento de
-base de datos y la parte de duplicados del frontend** (ver "Estado de
-implementación"). El resto, pendiente.
+Estado (03/10/2026): **Mejoras 1–4 implementadas** (ver "Estado de
+implementación"). El pegado de celdas de Excel (Mejora 1) sigue **PROVISIONAL** a
+falta de una muestra real; la pasada de UI (guion preparado) está pendiente.
 Complementa a `20-programacion.md`, que describe lo que ya existe. Este
 documento recoge lo que se decidió en la conversación de diseño entre el
 usuario, Claude (chat) y, a partir de ahora, Claude Code. Las decisiones
@@ -18,6 +18,16 @@ datos) y deja trabajo manual repetido (notas escritas a mano en papel,
 una por orden).
 
 ## Mejora 1 — Pegar celdas directamente desde Excel
+
+> **Implementada el 03/10/2026, PROVISIONAL.** `lib/normalizar-pegado.ts`
+> (`normalizarPegado`, función pura aplicada antes de `guardarProgramacionCsv`; el parser
+> SQL no cambia y los CSV con `;` se siguen aceptando). Verificada con un script
+> desechable (TSV simple, comillas con salto de línea, `;` dentro de celda, mezcla de
+> líneas con y sin tabuladores, línea vacía final y las 4 secciones apiladas con sus
+> cabeceras) y con los CSV reales, **pero sin una muestra real de celdas pegadas**: no
+> hay ninguna guardada (`admin_notas` solo tiene las 8 programaciones en `;`, sin
+> `guardar_muestra_excel`). Se cierra cuando llegue la muestra (pasos en
+> `privado/programacion-liquidar.md`).
 
 **[acordado]** El jefe debe poder seleccionar celdas en Excel, copiar y
 pegar en el textarea, sin pasar por CSV ni txt.
@@ -37,6 +47,12 @@ pegar en el textarea, sin pasar por CSV ni txt.
   detectándose igual.
 
 ## Mejora 2 — Revisar solo valida (sin tono/calibre)
+
+> **Implementada el 03/10/2026.** `validar_programacion` (base de datos) y el bloque
+> «Avisos» de Revisar (`AvisosRevisar.tsx`): repetidas lado a lado sin preselección,
+> incompletas (completar o descartar) y líneas ignoradas (informativo); confirmar
+> bloqueado mientras haya repetidos sin resolver o incompletas incluidas. Tono y
+> calibre salen de Revisar. Detalle en `20`.
 
 **[acordado]** Tras "guardar y comparar" el jefe solo debe poder **validar**:
 decir "está bien", o corregir avisos. Tono y calibre salen de este paso.
@@ -72,6 +88,10 @@ conserva tono, calibre y fecha de alta.
 
 ## Mejora 3 — Consultar como vista de trabajo
 
+> **Implementada el 03/10/2026** (`ProgramacionConsultar.tsx`, `ConsultarFila.tsx`,
+> RPC `actualizar_tono_calibre`). Fecha de alta, «Nueva hoy», filtros, tono/calibre
+> editables en la fila, «Copiar nuevas de hoy». Detalle en `20`.
+
 **[acordado]** Tras confirmar, el jefe vuelve a Consultar y ve cómo quedó.
 Ahí rellena tono y calibre.
 
@@ -90,6 +110,10 @@ Ahí rellena tono y calibre.
   "Aparcado").
 
 ## Mejora 4 — Notas por orden
+
+> **Implementada el 03/10/2026** (`programacion_nota`, `programacion_nota_frase` y
+> RPC de notas y frases; selección múltiple y diálogo en Consultar; pantalla «Frases» del
+> admin). Detalle en `20`.
 
 **[acordado]** Hoy se escriben a mano sobre la hoja impresa de la orden.
 Solo el rol **jefe** las escribe (se mantiene también administrador por
@@ -125,9 +149,13 @@ usar más allá de esta pestaña).
 
 - Una muestra **real** de celdas copiadas desde un correo del Excel diario
   y pegadas en un bloc de notas (para validar la Mejora 1, sobre todo
-  `METROS` y comillas).
+  `METROS`, comillas y la columna anterior a «Nº ORDEN»). **Sigue sin existir.**
+  Pista, no prueba: en los CSV reales guardados METROS llega como `" 4.500   "`
+  (punto de miles y espacios) y otras columnas usan coma decimal (`9,4`).
 - Un caso real de número de orden duplicado (una fila buena y otra rota)
-  para probar la Mejora 2.
+  para probar la Mejora 2. Hay uno real, `1114132` en las programaciones del 29 y
+  30/09/2026, pero con las **dos filas idénticas**; el caso «buena y rota» sigue
+  sin ejemplo real (se probó con datos sintéticos).
 
 ## Aparcado (se habló pero no entra ahora)
 
@@ -196,11 +224,14 @@ conversación nueva.
 | Frontend de Revisar: `cambia_horno` informativo + bloqueo si hay repetidas | **Hecho 02/10/2026** |
 | Mensaje de resultado visible tras confirmar/deshacer (bug previo) | Hecho 02/10/2026, pendiente de ver en UI |
 | Cierre de acceso a `programacion_orden` (RLS) | **Hecho 02/10/2026** (`20261002131613`), ver 20 |
-| `actualizar_tono_calibre` (identifica por `numero_orden`, no por `id`: los `id` cambian en deshacer) | Pendiente |
-| `validar_programacion(fecha)` (devolver las dos filas crudas de cada repetido) y pantalla de resolución de duplicados | Pendiente (fase 2) |
-| Notas por orden y frases frecuentes | Pendiente |
-| Consultar: mostrar `fecha_alta`, filtro "solo las de hoy", edición de tono/calibre, copiar nuevas | Pendiente |
-| Quitar tono/calibre de Revisar; pegado de celdas con tabuladores | Pendiente (necesita datos reales) |
+| `actualizar_tono_calibre` (identifica por `numero_orden`, no por `id`: los `id` cambian en deshacer) | **Hecho 03/10/2026** (`20261003020941`) |
+| `validar_programacion(fecha)` (devuelve las filas crudas de cada repetido) y pantalla de resolución de duplicados | **Hecho 03/10/2026** (`20261003021650`; resolución en Revisar) |
+| Notas por orden y frases frecuentes (tablas con RLS + RPC) | **Hecho 03/10/2026** (`20261003021449`) |
+| Consultar: `fecha_alta`, «Nueva hoy», filtros, edición de tono/calibre, copiar nuevas, notas con selección múltiple | **Hecho 03/10/2026** |
+| Pantalla «Frases» del administrador | **Hecho 03/10/2026** |
+| Quitar tono/calibre de Revisar | **Hecho 03/10/2026** |
+| Pegado de celdas de Excel (tabuladores) | **Hecho 03/10/2026, PROVISIONAL** (falta una muestra real) |
+| Pasada de UI con el usuario (fase D) | Pendiente; guion en `privado/backups/guion_pasada_ui_programacion.md` |
 
 Decisiones tomadas en la implementación: `fecha_alta` en `null` para las
 existentes (la UI mostrará "—" y no las marca como de hoy);

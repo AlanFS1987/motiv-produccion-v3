@@ -76,6 +76,21 @@ filas.
 `programacion_orden` justo antes de cada `confirmar_programacion`, para
 poder deshacer una confirmación equivocada (ver más abajo).
 
+**`programacion_nota`** (03/10/2026) — notas por orden: `id`, `numero_orden`,
+`texto` (1–500 caracteres), `creado_por` (FK a `usuario`, `on delete set
+null`; el autor se muestra con `usuario.username`, como en el resto de la
+app), `created_at`, `updated_at`. Varias notas por orden. Se referencian por
+`numero_orden` **sin FK** a `programacion_orden`, a propósito: las notas
+sobreviven si la orden sale de programación (y por tanto **no se borran solas**:
+al limpiar datos de prueba hay que borrarlas aparte). RLS desde la creación;
+SELECT para `jefe, responsable, produccion, administrador`; sin permisos a
+`anon` y sin escritura directa (solo las RPC de abajo).
+
+**`programacion_nota_frase`** (03/10/2026) — frases frecuentes del desplegable:
+`id`, `texto` (único, 1–200), `activa`, `orden`. Siembra: «guardar 2 palets y
+una caja», «recordar sacar palet de revisión», «cuidado diseño UGL». Mismas RLS
+y permisos que la tabla de notas. Baja lógica con `activa = false`.
+
 ## Funciones (RPC, patrón de seguridad igual al resto del proyecto)
 
 Todas `security definer`, con `raise exception 'No autorizado'` si
@@ -139,8 +154,35 @@ que tocar esa RLS.
   restaurar. Ojo: `delete from programacion_orden` sin condición choca
   con la protección `safe-update` del proyecto ("DELETE requires a
   WHERE clause") — lleva `where true` explícito.
+- **`validar_programacion(fecha)`** (03/10/2026, solo lectura, jefe/administrador)
+  — los avisos que Revisar debe resolver, con los **campos crudos de cada
+  aparición** (`diff_programacion` solo devuelve una fila por número repetido).
+  `tipo`: `repetida` (mismo `numero_orden` más de una vez, mismo horno o
+  distinto; una fila por aparición), `incompleta` (número válido pero falta
+  MODELO o METROS: nulo/vacío/ilegible/≤ 0; `falta` dice cuál; **ACABADO y
+  CAJA vacíos NO se marcan**, hay órdenes legítimas sin acabado) y
+  `descartada` (línea que el parser ignora pero que parece una orden: número
+  con dígitos que no cumple `^[0-9]{6,8}$`, o sin número válido pero con modelo y
+  metros numéricos; el ruido conocido —títulos, huecos « - », cabeceras
+  repetidas, «CAMBIO DE FORMATO…», líneas vacías— no avisa). Devuelve `linea`
+  (nº de línea del texto guardado), `horno`, `posicion` (igual que el diff),
+  `modelo`, `metros`/`cep`/`acabado`/`caja` como texto crudo, `falta` y
+  `linea_cruda`. No toca `parse_programacion` ni `diff_programacion`. Con las 8
+  programaciones reales guardadas solo avisa del duplicado real descrito abajo.
+- **`actualizar_tono_calibre(numero_orden, tono, calibre)`** (03/10/2026,
+  jefe/administrador) — edita tono y calibre sin pasar por confirmar. Identifica
+  por `numero_orden` (los `id` cambian al deshacer). Texto vacío = `null`; recorta
+  espacios, máximo 20 caracteres, error claro si la orden no existe; sin
+  validación de formato. Devuelve la fila actualizada.
+- **`anadir_nota_ordenes(ordenes text[], texto)`** (jefe/administrador) — la misma
+  nota en varias órdenes, **todo o nada**: array no vacío (máx. 200), sin vacíos ni
+  duplicados, todas deben existir en `programacion_orden` (el error lista las
+  desconocidas), texto de 1–500 caracteres. Devuelve cuántas notas creó.
+  **`editar_nota(id, texto)`** y **`borrar_nota(id)`** (jefe/administrador).
+  **`guardar_frase(id, texto, activa, orden)`** (solo administrador): `id` nulo =
+  alta (activa y al final); en una edición, `activa`/`orden` nulos conservan el valor.
 - Todas las RPC de programación (`parse`, `diff`, `confirmar`, `deshacer`,
-  `guardar_programacion_csv`, `existe_csv_programacion`) comprueban el rol con
+  `guardar_programacion_csv`, `existe_csv_programacion`, y las nuevas de arriba) comprueban el rol con
   `coalesce(fn_rol_actual()::text,) not in (...)`: con rol nulo,
   `NULL NOT IN (...)` es `NULL` y el `if` no saltaba (corregido el
   02/10/2026, migraciones `20261002164859` y `20261002183413`). Con la
@@ -213,26 +255,70 @@ Dos redes de seguridad ante un error humano (CSV equivocado):
 `JefeApp.tsx` gana una 8ª pestaña, **"Programación"**
 (`jefe/programacion/ProgramacionScreen.tsx`), con dos sub-vistas:
 
-- **Revisar**: si no hay CSV hoy (`existeCsvHoy`), muestra el textarea
-  de pegar ahí mismo (fusionado, sin pestaña aparte — decisión de
-  sesión: "reduce complejidad"). En cuanto hay CSV, diff agrupado por
-  horno: `+ nuevo` (con inputs de tono/calibre), `− eliminado` (con
-  botón "mantener igualmente"), `~ reordenado`/`= sin cambios`
-  informativos, y `⇄ cambia de horno` (informativo, agrupado bajo el
-  horno nuevo con "viene del horno X"; **sí entra en el payload**, con
-  la posición dentro del horno nuevo). Si alguna fila viene `repetida`
-  hay un aviso rojo y **confirmar queda bloqueado**: hay que corregir el
-  archivo y usar «¿Archivo equivocado? Sustituir». El resultado de
-  confirmar/deshacer se muestra tras recargar el diff (`cargarDiff`
-  recibe el mensaje; antes la propia recarga lo borraba y solo se veía
-  el spinner). Botón "Confirmar y actualizar".
-- **Consultar**: la lista congelada de hoy, agrupada por horno, con
-  badge de estado en vivo (pendiente/iniciado/finalizado, colores
-  distintos), botón "copiar → copiado" junto a cada `Nº ORDEN`
-  (`navigator.clipboard`, sin dependencias), y "Exportar/Imprimir".
+- **Revisar** (solo VALIDA; tono y calibre **ya no se rellenan aquí**, se hace en
+  Consultar): si no hay CSV hoy (`existeCsvHoy`), muestra el textarea de pegar ahí
+  mismo. Acepta el CSV (`;`) **o las celdas copiadas directamente de Excel**
+  (tabuladores): `lib/normalizar-pegado.ts` (`normalizarPegado`, función pura) las
+  convierte antes de `guardarProgramacionCsv` —quita BOM y normaliza `\r\n`, las
+  líneas con tabuladores pasan a `;`, descomilla las celdas (`""` → `"`, saltos
+  internos → espacio), un `;` dentro de una celda pasa a `,`, y las líneas que ya usan
+  `;` sin tabuladores quedan intactas— y se guarda en `admin_notas` el texto
+  **normalizado**; el parser SQL no cambia. Avisa («Celdas copiadas de Excel
+  detectadas») y, si la cabecera empieza en «Nº ORDEN» (se copió sin la columna
+  anterior), no deja guardar: el parser lee el número en la 2.ª columna y no
+  reconocería ninguna orden. **⚠️ PROVISIONAL**: escrito sin una muestra real de celdas
+  pegadas (ver «Pendiente»); se verificó con un script desechable (20 casos) y con los
+  CSV reales.
+  En cuanto hay CSV, carga el diff y `validar_programacion` en paralelo. Bloque
+  **Avisos** antes de los hornos (`AvisosRevisar.tsx`): para cada número **repetido**,
+  las apariciones en tarjetas lado a lado con los campos que difieren resaltados
+  («Más completa» solo como pista, **nunca preselecciona**); el jefe elige «Quedarme con
+  esta» o «Editar y quedarme con esta», y la elegida sustituye en el payload a la fila
+  que devuelve el diff (se mueve de horno si hace falta; las demás se descartan).
+  «Resuelto» vive en el estado del cliente (el validador seguirá avisando del CSV crudo)
+  y se reaplica al recargar tras confirmar. Filas **incompletas**: se completan en la
+  fila (modelo/metros) o se descartan (si la orden ya estaba en programación, descartar
+  la elimina: el botón lo dice). Líneas **ignoradas por el parser**: lista informativa
+  con la línea cruda, no bloquea. Después, el diff agrupado por horno: `+ nuevo`,
+  `− eliminado` (botón "mantener igualmente"), `~ reordenado`/`= sin cambios`
+  informativos, y `⇄ cambia de horno` (informativo, agrupado bajo el horno nuevo con
+  "viene del horno X"; **sí entra en el payload**). **Confirmar queda bloqueado**
+  mientras haya repetidos sin resolver, filas incompletas incluidas, la validación
+  fallida o el diff sin poder leerse (el servidor sigue rechazando repetidos como red
+  de seguridad). Sin avisos: un solo botón. Conserva «Mantener igualmente»,
+  «Descartar», «¿Archivo equivocado? Sustituir» y «Deshacer última confirmación». El
+  resultado de confirmar/deshacer se muestra tras recargar el diff
+  (`cargarDiff(mensaje)`). **Si el diff falla** (p. ej. un METROS como `5,5`:
+  `parse_programacion` convierte con `::numeric` y da `invalid input syntax`) se
+  explica con las líneas afectadas y se bloquea confirmar; antes, un diff fallido dejaba
+  el botón activo y habría enviado una lista vacía (reemplazo completo = vaciar la
+  programación; recuperable con Deshacer).
+- **Consultar** (vista de trabajo, tras confirmar): la lista congelada de hoy,
+  agrupada por horno, con badge de estado en vivo (pendiente/iniciado/finalizado),
+  botón "copiar → copiado" junto a cada `Nº ORDEN` y "Exportar/Imprimir". Además
+  (03/10/2026): **fecha de alta** por fila (`—` si es null) e insignia **«Nueva hoy»**
+  (`fecha_alta` = hoy, con `hoyLocalISO`); filtros combinables **«Solo nuevas de hoy»**
+  y **«Sin tono/calibre»**; **tono y calibre editables en la fila** para
+  jefe/administrador (guardan al salir del campo con `actualizar_tono_calibre`, con
+  indicación de guardado/error; los vacíos se ven a simple vista con borde y chip
+  «falta tono/calibre»; el resto de roles los ve en solo lectura); **«Copiar nuevas de
+  hoy»** (números de orden por horno y posición, uno por línea; avisa si no hay);
+  **notas**: contador por orden con las notas (autor y fecha), **selección múltiple**
+  (casilla por fila, «seleccionar las N del horno», «seleccionar las visibles» que respeta
+  los filtros) y barra «N seleccionadas · Añadir nota» con un diálogo con desplegable de
+  frases activas **y** campo editable (elegir una frase la pone en el campo y el jefe
+  cambia la cantidad antes de aplicar), más editar y borrar una nota concreta. La hoja
+  impresa A4 **no cambia** (las notas y la fecha de alta no van en ella; usa siempre
+  todas las filas, no las filtradas en pantalla).
+- **Frases (admin)**: pestaña «Frases» de `AdminApp` (`admin/FrasesNotaScreen.tsx`,
+  mismo patrón que Engrase): alta, edición, activar/desactivar y orden de las frases
+  del desplegable. Guardan con `guardar_frase`.
 
 `lib/programacion.ts` — todas las llamadas RPC + tipos
-(`FilaDiff`, `FilaConEstado`, `FilaAConfirmar`) + `agruparPorHorno`.
+(`FilaDiff`, `FilaConEstado`, `FilaAConfirmar`, `AvisoProgramacion`) +
+`agruparPorHorno`, `validarProgramacion`, `actualizarTonoCalibre` y `metrosDeTexto`.
+`lib/programacion-notas.ts` — notas y frases. `lib/normalizar-pegado.ts` — pegado
+de celdas de Excel.
 
 **Admin (27/09/2026)**: la pestaña "Programación" de `AdminApp.tsx`
 reutiliza literalmente este mismo `jefe/programacion/ProgramacionScreen.tsx`
@@ -292,7 +378,25 @@ hoja del 25/09 aportada en la sesión (recuento por horno: 13/15/13/12).
 El ciclo confirmar→deshacer también se probó en vivo (53→48 filas,
 restaurando el estado exacto de antes).
 
+**03/10/2026.** `validar_programacion` sobre las 8 programaciones reales guardadas
+(22–30/09): sin avisos en las 6 primeras; el 29 y el 30/09 traen **un número repetido
+real, `1114132`, en el horno 2 (dos filas idénticas, modelo SL GLACIAR MATE
+60X120RC/CIF02_S, 4.500 m²)**. Es un duplicado exacto, no el caso de «una fila buena y otra
+rota». Datos reales de formato (de las filas guardadas): la cabecera empieza con una
+primera columna vacía; la primera celda de las filas de datos es la etiqueta de
+formato o está vacía; METROS llega como `" 4.500   "` (punto de miles, con
+espacios) y otras columnas usan coma decimal (`9,4`).
+
 ## Pendiente
+
+- **Muestra real de celdas copiadas de Excel** (para cerrar el pegado, hoy
+  PROVISIONAL): cómo llegan `METROS`, las comillas y la columna anterior a «Nº ORDEN». Pasos
+  al final de `privado/programacion-liquidar.md`. Mientras no esté, el pegado de celdas
+  puede fallar en casos no previstos (el CSV con `;` sigue funcionando como siempre).
+- **Pasada de UI** (fase D): guion preparado en `privado/backups/guion_pasada_ui_programacion.md`;
+  se hace una vez, con el usuario, y se limpia después (notas, CSV sintético).
+- `parse_programacion` convierte METROS con `::numeric` y falla con un valor no
+  numérico (p. ej. `5,5`); Revisar ya lo explica y bloquea, pero el parser no es robusto.
 
 - **Hoja de diseño** (el PDF tipo "CAJA 20x120 SL ARGENTA MATE REC
   5PZ APAISADO F5" que se grapa junto a la hoja de partida, con
@@ -304,3 +408,28 @@ restaurando el estado exacto de antes).
 - Reglas de validación de `tono`/`calibre` (formato cerrado en vez de
   texto libre) — con las normas reales de calibre/tono, cuando se
   quieran aplicar.
+
+## Resumen para `00-seguridad.md` (03/10/2026)
+
+Superficie nueva de Programación, para recoger en `00-seguridad.md` cuando se reescriba
+(esta sesión **no lo ha tocado**):
+
+- **Tablas** (RLS activa desde la creación, solo política de SELECT para `jefe`,
+  `responsable`, `produccion`, `administrador`; `revoke all` a `anon`/`authenticated` +
+  `grant select` a `authenticated`; **sin políticas de escritura**): `programacion_nota`
+  (referencia por `numero_orden` sin FK; FK de `creado_por` a `usuario`),
+  `programacion_nota_frase`.
+- **RPC** (todas `security definer`, `search_path = public`, guarda
+  `coalesce(fn_rol_actual()::text,'') not in (...)`, `revoke execute ... from public, anon`,
+  `grant ... to authenticated`): `actualizar_tono_calibre`, `anadir_nota_ordenes`,
+  `editar_nota`, `borrar_nota` (jefe/administrador); `guardar_frase` (solo administrador);
+  `validar_programacion` (solo lectura, jefe/administrador).
+- **Función de trigger**: `set_updated_at_programacion_nota` (`search_path` fijo).
+- Ensayadas en transacción revertida con un usuario real de cada rol (`jefe`,
+  `administrador`, `responsable`, `produccion`, `operario`, `calidad`, `mecanico`,
+  `pantalla`, `jefe_rectificado`), una cuenta sin fila en `usuario` (rol nulo) y `anon`:
+  solo los roles previstos pueden; el resto recibe «No autorizado»; `anon`, «permission
+  denied»; ninguna escritura directa en las tablas nuevas.
+- **Hallazgo previo, fuera de esta tarea** (en `07`): `programacion_orden_historico` conserva
+  `INSERT/UPDATE/DELETE/TRUNCATE` para `anon` y `authenticated`; la RLS (sin políticas de
+  escritura) bloquea las escrituras por la API, pero los privilegios sobran.

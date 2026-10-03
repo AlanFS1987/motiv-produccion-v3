@@ -188,7 +188,9 @@ frontend/src/
     operario.ts                Mi línea, limpieza, verificación del operario
     relevo.ts                  pestaña Relevo del responsable
     ciclo.ts                   ciclo actual/anterior calculado en cliente (28 días)
-    programacion.ts            diff/confirmar/deshacer/consultar programación de hornos
+    programacion.ts            diff/confirmar/deshacer/consultar/validar programación de hornos
+    programacion-notas.ts      notas por orden y frases frecuentes (RPC)
+    normalizar-pegado.ts       pegado de celdas de Excel → CSV con ; (PROVISIONAL, sin muestra real)
     admin-notas.ts              pegar CSV + histórico de programación (admin)
     almacen.ts                 almacén de repuestos (rol mecánico)
     mecanico-incidencias.ts / mecanico-engrase.ts   colas de incidencias y engrase (rol mecánico)
@@ -221,10 +223,10 @@ frontend/src/
                                EquipoScreen, HistorialResponsableScreen, RelevoScreen (04)
     operario/                  OperarioApp, InicioOperarioScreen (+Ranking/StatsAvatar/Logros), MiLinea, Historial, Limpieza, Verificacion*
     jefe/                      JefeApp, VistaRapida, VistaDetallada, Incidencias, Informes,
-                               jefe/programacion/ (Consultar/Revisar/Screen)
+                               jefe/programacion/ (Consultar/ConsultarFila/DialogoAnadirNota/Revisar/AvisosRevisar/Screen)
     admin/                     AdminApp, AjustarLetras, CorreccionPartes, PruebaCamara,
                                CierreFabrica, Checklist, GestionUsuarios, ChatAcceso,
-                               Gamificacion, Notas, PuntosEngrase, AdminNuevoParte
+                               Gamificacion, Notas, PuntosEngrase, FrasesNota, AdminNuevoParte
                                (Programación reutiliza jefe/programacion/ProgramacionScreen)
     calidad/                   CalidadApp, CalidadLotesScreen
     alimentacion/               AlimentacionPanel, FiltrosAlimentacion, NubesAlimentacion,
