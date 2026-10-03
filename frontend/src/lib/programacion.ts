@@ -194,13 +194,9 @@ export async function validarProgramacion(fecha: string = hoyISO()): Promise<Avi
   }));
 }
 
-/** METROS del CSV: el punto es separador de miles (5.500 = 5500). null si no se entiende o es ≤ 0. */
-export function metrosDeTexto(raw: string): number | null {
-  const limpio = raw.trim();
-  if (!/^[0-9][0-9.]*$/.test(limpio)) return null;
-  const n = Number(limpio.replace(/\./g, ""));
-  return n > 0 ? n : null;
-}
+// METROS: misma regla que la base de datos (fn_metros_entero: se quita todo lo que no sea un dígito).
+// Vive en lib/metros.ts (módulo puro); se reexporta aquí para no cambiar los imports existentes.
+export { metrosDeTexto } from "./metros";
 
 // ---------------------------------------------------------------
 // Consulta (vista móvil, estado en vivo)

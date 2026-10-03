@@ -97,6 +97,10 @@ export function ProgramacionRevisar() {
   // validar_programacion seguirá avisando del CSV crudo.
   const [elegidas, setElegidas] = useState<Record<string, CamposElegidos>>({});
   const [diffFallido, setDiffFallido] = useState(false);
+  // El archivo de hoy existe pero el lector no ha reconocido NINGUNA orden (otro formato, o se copió
+  // sin la columna anterior a «Nº ORDEN»). Se explica y se bloquea confirmar; no se enseña un diff
+  // que marcaría todo como «eliminado».
+  const [sinOrdenes, setSinOrdenes] = useState(false);
   const [validacionFallida, setValidacionFallida] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
   const [deshaciendo, setDeshaciendo] = useState(false);
@@ -120,6 +124,7 @@ export function ProgramacionRevisar() {
     setError(null);
     setResultado(null);
     setDiffFallido(false);
+    setSinOrdenes(false);
     Promise.allSettled([obtenerDiffProgramacion(fecha), validarProgramacion(fecha)])
       .then(([diff, validacion]) => {
         const lista = validacion.status === "fulfilled" ? validacion.value : [];
@@ -132,6 +137,10 @@ export function ProgramacionRevisar() {
           setError(mensajeDeErrorDiff(diff.reason, lista));
           return;
         }
+
+        // Órdenes que lee el parser del archivo: todo lo que el diff no marca como «eliminado»
+        // (eliminado = solo está en la tabla actual). Si no hay ninguna, el archivo no se ha entendido.
+        setSinOrdenes(diff.value.filter((f) => f.cambio !== "eliminado").length === 0);
 
         setFilas(
           diff.value.map((f) => {
@@ -219,7 +228,11 @@ export function ProgramacionRevisar() {
     (f) => f.incluida && f.cambio !== "eliminado" && numerosIncompletos.has(f.numeroOrden) && esIncompleta(f),
   );
   const bloqueado =
-    diffFallido || validacionFallida || repetidasSinResolver.length > 0 || incompletasIncluidas.length > 0;
+    diffFallido ||
+    sinOrdenes ||
+    validacionFallida ||
+    repetidasSinResolver.length > 0 ||
+    incompletasIncluidas.length > 0;
 
   function actualizarFila(numeroOrden: string, cambios: Partial<FilaEditable>) {
     setFilas((prev) => prev.map((f) => (f.numeroOrden === numeroOrden ? { ...f, ...cambios } : f)));
@@ -398,6 +411,72 @@ export function ProgramacionRevisar() {
             </button>
           )}
         </div>
+      </div>
+    );
+  }
+
+  // El archivo existe pero no se ha reconocido ninguna orden: error claro, sin diff y sin poder confirmar.
+  if (sinOrdenes) {
+    const ignoradas = avisos.filter((a) => a.tipo === "descartada").length;
+    return (
+      <div className="mx-auto max-w-3xl space-y-4 p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[var(--texto)]">Revisión — {fecha}</h2>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => cargarDiff()}
+              className="flex items-center gap-1 rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+            >
+              <RefreshCw size={12} aria-hidden /> Recargar
+            </button>
+            <button
+              type="button"
+              onClick={() => setSustituyendo(true)}
+              className="flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-700 hover:bg-amber-100"
+            >
+              <Upload size={12} aria-hidden /> ¿Archivo equivocado? Sustituir
+            </button>
+          </div>
+        </div>
+
+        {resultado && (
+          <div className="flex items-start gap-2 rounded-xl bg-green-50 p-3 text-sm text-green-700">
+            <Check size={16} className="mt-0.5 shrink-0" aria-hidden />
+            {resultado}
+          </div>
+        )}
+
+        <div role="alert" className="flex items-start gap-2 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />
+          <div className="space-y-1.5">
+            <p>
+              <strong>No se ha reconocido ninguna orden en el archivo de hoy.</strong> Confirmar está bloqueado y la
+              programación actual no se ha tocado.
+            </p>
+            <p>
+              El lector espera una cabecera con «Nº ORDEN» y «MODELO», y el número de orden (de 6 a 8 cifras) en la
+              <strong> segunda columna</strong>. Si copiaste desde Excel, incluye también la columna anterior a «Nº ORDEN»
+              (la del horno/formato). Pega el archivo de nuevo con «¿Archivo equivocado? Sustituir».
+            </p>
+            {ignoradas > 0 && (
+              <p>
+                {ignoradas} {ignoradas === 1 ? "línea parece" : "líneas parecen"} órdenes pero no se {ignoradas === 1 ? "ha" : "han"} podido
+                leer (abajo, informativo).
+              </p>
+            )}
+          </div>
+        </div>
+
+        <AvisosRevisar
+          avisos={avisos}
+          filas={[]}
+          resoluciones={{}}
+          onElegir={() => {}}
+          onDeshacerEleccion={() => {}}
+          onCompletar={() => {}}
+          onAlternarDescarte={() => {}}
+        />
       </div>
     );
   }
