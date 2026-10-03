@@ -1,91 +1,93 @@
-┌──── ○○○ ────┐
-│ Semgrep CLI │
-└─────────────┘
+# 00 — Seguridad
 
-⠹ Loading rules from registry...                                       
-Scanning 124 files (only git-tracked) with:
-                                      
-✔ Semgrep OSS
-  ✔ Basic security coverage for first-party code        
-vulnerabilities.                                                       
-                                              
-✘ Semgrep Code (SAST)
-  ✘ Find and fix vulnerabilities in the code you write  
-with advanced scanning and expert security rules.                      
-                                                     
-✘ Semgrep Supply Chain (SCA)
-  ✘ Find and fix the reachable vulnerabilities in your  
-OSS dependencies.                                                      
-                                                                       
-💎 Get started with all Semgrep products via `semgrep      
-login`.                                                             
-✨ Learn more at https://sg.run/cloud.                   
-                                                                       
-  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:04                                                                       
-                   
-                   
-┌─────────────────┐
-│ 2 Code Findings │
-└─────────────────┘
-                                                    
-    supabase\functions\ceria\index.ts
-     ❱ javascript.lang.security.audit.unsafe-formatstring.unsafe-
-       formatstring                                              
-          ❰❰ Blocking ❱❱
-          Detected string concatenation with a non-literal 
-          variable in a util.format / console.log function.
-          If an attacker injects a format specifier in the 
-          string, it will forge the log message. Try to use
-          constant values for the format string.           
-          Details: https://sg.run/7Y5R                     
-                                                           
-          152┆ if (error) console.error(`[ceria] error
-               guardando mensaje (${role}):`, error); 
-                                                    
-    supabase\functions\ceria\tools.ts
-     ❱ javascript.lang.security.audit.unsafe-formatstring.unsafe-
-       formatstring                                              
-          ❰❰ Blocking ❱❱
-          Detected string concatenation with a non-literal 
-          variable in a util.format / console.log function.
-          If an attacker injects a format specifier in the 
-          string, it will forge the log message. Try to use
-          constant values for the format string.           
-          Details: https://sg.run/7Y5R                     
-                                                           
-          220┆ console.log(`[ceria tool] ${toolName}`,
-               JSON.stringify(args));                 
+Estado de la superficie expuesta con la clave pública (`anon`) y de los
+análisis automáticos. Lo que sigue abierto vive en `07-pendientes.md`
+("Seguridad — pendiente"); aquí solo lo cerrado y cómo se comprobó.
 
-                
-                
-┌──────────────┐
-│ Scan Summary │
-└──────────────┘
-✅ Scan completed successfully.
- • Findings: 2 (2 blocking)
- • Rules run: 210
- • Targets scanned: 124
- • Parsed lines: ~100.0%
- • Scan was limited to files tracked by git
- • For a detailed list of skipped files and lines, run semgrep with the --verbose flag
-Ran 210 rules on 124 files: 2 findings.
-💎 Missed out on 1856 pro rules since you aren't logged in!
-⚡ Supercharge Semgrep OSS when you create a free account at https://sg.run/rules.
+## Superficie con la clave pública (estado al 03/10/2026)
 
+| Vía | Estado | Cerrado |
+|---|---|---|
+| Registro de usuarios en Auth (`/auth/v1/signup`) | **Cerrado**: 422 `signup_disabled` | 03/10/2026 |
+| Inicio de sesión anónimo | Cerrado: 422 `anonymous_provider_disabled` | antes del 03/10/2026 |
+| Vinculación manual de identidades | Desactivada | antes del 03/10/2026 |
+| Confirmación de email | Activa | — |
+| Funciones de `public` ejecutables por `anon`/PUBLIC | Cerradas, y los privilegios por defecto ya no las abren | 02/10/2026 (`20261002191839`) |
+| `SELECT` de `anon` en las vistas de `public` | **Revocado**: 0 de 58 legibles por `anon` | 03/10/2026 (`20261003015059`, `20261003015203`) |
+| `SELECT` de `anon` en tablas de `public` | Abierto (54 tablas), solo lo frena la RLS — pendiente en `07` | — |
 
-Semgrep findings aceptados:
+### Registro de usuarios
 
-1. index.ts:152
-   Regla: unsafe-formatstring
-   Motivo: role solo admite valores literales controlados por código.
+El registro **estuvo abierto** (`disable_signup: false`) hasta el
+03/10/2026: cualquiera con un email podía crear una cuenta `authenticated`
+sin fila en `usuario` (`fn_rol_actual()` nulo). El 02/10/2026 se comprobó
+que una cuenta así leía `usuario` (33 filas), `turno` (98), `lote` (263) y
+las vistas `v_*`. El 03/10/2026 se desactivó "Allow new users to sign up"
+en el panel (Authentication → Sign In / Providers). Las altas van solo por
+la Edge Function `admin-crear-usuario` (service_role), que crea la cuenta
+vía `/auth/v1/admin/users`; el signup público no se usa. No se puede
+cambiar desde SQL.
 
-2. tools.ts:220
-   Regla: unsafe-formatstring
-   Motivo: toolName procede del conjunto cerrado de herramientas
-   definido por la aplicación.
-________________________________________________________
-PS **C:\Users\lokur\Documents**\motiv-produccion-v3> npm audit
-found 0 vulnerabilities
+Comprobación del 03/10/2026 (solo lectura, con `curl`):
 
-PS **\motiv-produccion-v3\frontend> npm audit
-found 0 vulnerabilities
+- `POST /auth/v1/signup` con la clave publishable y con la anon legacy:
+  422 `signup_disabled` (visible en los `auth_logs`). Con signup anónimo:
+  422 `anonymous_provider_disabled`.
+- `auth.users` (34) frente a `usuario` (34): sin cuentas de Auth sin fila
+  en `usuario`, sin filas de `usuario` sin cuenta, 34 `identities`.
+- La última alta (`prueba`, 03/10/2026 01:44 UTC) sale de
+  `admin-crear-usuario`: en los logs, `/admin/users` lo llama service_role
+  y la fila de `usuario` se crea 0,3 s después. Los logs solo cubren 24 h:
+  de las altas anteriores solo consta que las dos tablas cuadran y que todas
+  tienen `email_confirmed_at` de su mismo día de creación.
+- Ninguna cuenta del 03/10/2026 corresponde a las pruebas de registro (se
+  rechazaron todas).
+
+Si algún día hay que reabrir el registro (p. ej. alta por invitación), hay
+que antes hacer que las políticas exijan `fn_rol_actual()` no nulo
+(`07`, punto 1).
+
+### Vistas
+
+Las vistas `v_*` y `operario_ledger` corren con permisos del propietario
+(NO `security_invoker`, y no hay que cambiarlo: es lo que permite que
+Ranking, Reyes del formato y la pantalla de fábrica lean agregados de
+tablas que la RLS no abre a esos roles; ver `CLAUDE.md`). Por eso la RLS de
+las tablas no las protege y el único control es el `GRANT`. Con la clave
+pública, `anon` leía datos reales (`v_produccion_turno`, `v_calidad_lote`,
+`v_almacen_stock`...). Hay 58 vistas en `public`: 56 con prefijo `v_`, más
+`operario_ledger` y `programacion_con_estado`. El 03/10/2026 se revocó
+`SELECT` a `anon` en las 56 `v_*` y en `operario_ledger`;
+`programacion_con_estado` nunca lo tuvo. Con la clave pública devuelven 401
+`permission denied`. `authenticated` y `service_role` conservan `SELECT` en
+las 58.
+
+Prueba de lectura por rol (03/10/2026, bloque `DO` con rol `authenticated`
+y claims del usuario, abortado con excepción para que no quede nada): un
+usuario real de cada uno de `jefe`, `administrador`, `responsable`,
+`produccion`, `operario`, `calidad`, `mecanico` y `pantalla` leyó las 58
+vistas sin ningún error. Las filas que ve cada rol coinciden con las del
+propietario salvo en `programacion_con_estado`, que filtra por
+`fn_rol_actual()` a propósito (jefe, administrador, responsable y
+producción ven 39 filas; el resto, 0). No cambia nada para `authenticated`.
+
+Antes de revocar se comprobó que ninguna pantalla consulta sin sesión:
+`App.tsx` solo monta `Login` mientras no hay sesión, `Login` y `auth.ts`
+solo llaman a `signInWithPassword`, el rol `pantalla` entra con una cuenta
+real (`pantalla@…`, con sesión) y fuera del cliente de Supabase solo hay
+un `fetch` a Cloudinary. `admin-crear-usuario` usa la clave anon solo para
+validar el JWT de quien llama. **Vistas nuevas**: los privilegios por
+defecto de tablas y vistas aún pueden darlas a `anon` — revocar a mano o
+cerrarlo en `07`, punto 2.
+
+## Análisis automáticos
+
+**Semgrep OSS** (210 reglas, 124 ficheros): 2 hallazgos aceptados, ambos
+`unsafe-formatstring`:
+
+1. `supabase/functions/ceria/index.ts:152` — `role` solo admite valores
+   literales controlados por código.
+2. `supabase/functions/ceria/tools.ts:220` — `toolName` procede del
+   conjunto cerrado de herramientas definido por la aplicación.
+
+**`npm audit`**: 0 vulnerabilidades en la raíz y en `frontend/`.

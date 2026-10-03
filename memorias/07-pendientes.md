@@ -81,25 +81,24 @@ ambigüedad `nivel_id` en `fn_otorgar_bonus_nivel`).)
 
 ## Seguridad — pendiente
 
-Contexto: el 02/10/2026 se cerró el acceso de `anon`/PUBLIC a todas las
-funciones propias de `public` y se corrigió el patrón de rol nulo
-(`20261002191839_cerrar_funciones_anon_y_rol_nulo.sql`; ver `20` para
-Programación). Quedan abiertos:
+Contexto: estado de seguridad y lo cerrado en `00-seguridad.md`. Quedan
+abiertos:
 
-1. **Registro de usuarios abierto en Auth** (`disable_signup: false`,
-   email activo, sin autoconfirmación). Cualquiera con un email real puede
-   crear una cuenta `authenticated` SIN fila en `usuario` (`fn_rol_actual()`
-   nulo). Con una cuenta así se comprobó (02/10/2026) que se leen `usuario`
-   (33 filas), `turno` (98), `lote` (263) y las vistas `v_*`. Cerrarlo en
-   el panel de Supabase (Authentication → Sign In / Providers → "Allow new
-   users to sign up" desactivado); las altas siguen yendo por la Edge
-   Function `admin-crear-usuario` (service_role). No se puede hacer desde SQL.
-2. **Vistas `v_*` legibles por `anon`** (las 58 vistas corren como owner y
-   tienen `GRANT SELECT` a `anon`): con la clave anónima del frontend se
-   lee, p. ej., `v_produccion_turno` (97 filas). La app no usa `anon` para
-   nada (el login va por Auth y `AuthContext` lee con sesión), así que se
-   puede revocar `select` a `anon` en las vistas y tablas de `public`
-   (las tablas ya filtran por RLS). Sin hacer: probar por rol antes.
+1. **Políticas que dejan leer a una cuenta sin fila en `usuario`.** Cerrado el
+   registro (ver `00`), una cuenta de Auth sin perfil solo puede existir si
+   alguien la crea a mano en el panel o por un fallo de `admin-crear-usuario`.
+   Aun así, `turno_select_autenticados` y `lote_select_autenticados` usan
+   `auth.role() = 'authenticated'`, que no mira `fn_rol_actual()`; y
+   `usuario_select_propio` / `usuario_select_roles_conocidos` conviven con
+   otras permisivas. Tarea: que las políticas de SELECT de `usuario`, `turno`
+   y `lote` exijan `fn_rol_actual() is not null`, para que una cuenta sin
+   perfil no lea nada. Sin hacer. Probar por rol antes (todos los roles del
+   enum leen `turno` y `lote`).
+2. **`anon` conserva `GRANT SELECT` en 54 tablas de `public`** (solo las frena
+   la RLS; con `anon` `fn_rol_actual()` y `auth.role()` no dan acceso). Se
+   revocó en las vistas (ver `00`) pero no en las tablas. Revocarlo también y
+   cambiar los privilegios por defecto de tablas/vistas nuevas para que no
+   nazcan abiertas a `anon` (como ya se hizo con las funciones).
 3. `fn_disparar_resumen_turno(uuid)` sigue ejecutable por `authenticated`:
    la llama un trigger NO `security definer`
    (`fn_trigger_resumen_turno_cierre`), que corre con los permisos de quien
