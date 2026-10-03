@@ -278,9 +278,10 @@ Dos redes de seguridad ante un error humano (CSV equivocado):
   **normalizado**; el parser SQL no cambia. Avisa («Celdas copiadas de Excel
   detectadas») y, si la cabecera empieza en «Nº ORDEN» (se copió sin la columna
   anterior), no deja guardar: el parser lee el número en la 2.ª columna y no
-  reconocería ninguna orden. **⚠️ PROVISIONAL**: escrito sin una muestra real de celdas
-  pegadas (ver «Pendiente»); se verificó con un script desechable (20 casos) y con los
-  CSV reales.
+  reconocería ninguna orden. **Verificado con una muestra real** (03/10/2026, ver «Validado con
+  datos reales»), pero **sobre una reconstrucción**: el chat convierte los tabuladores en
+  grupos de 4 espacios y pierde los tabuladores finales, así que falta confirmarlo con el
+  archivo original (ver «Pendiente»).
   En cuanto hay CSV, carga el diff y `validar_programacion` en paralelo. Bloque
   **Avisos** antes de los hornos (`AvisosRevisar.tsx`): para cada número **repetido**,
   las apariciones en tarjetas lado a lado con los campos que difieren resaltados
@@ -297,7 +298,10 @@ Dos redes de seguridad ante un error humano (CSV equivocado):
   "viene del horno X"; **sí entra en el payload**). **Confirmar queda bloqueado**
   mientras haya repetidos sin resolver, filas incompletas incluidas, la validación
   fallida o el diff sin poder leerse (el servidor sigue rechazando repetidos como red
-  de seguridad). Sin avisos: un solo botón. Conserva «Mantener igualmente»,
+  de seguridad). **Si el archivo existe pero el lector no reconoce ninguna orden** (el diff no trae ninguna fila que no sea
+  «eliminado»: otro formato, o se copió sin la columna anterior a «Nº ORDEN»), Revisar muestra un error claro
+  («No se ha reconocido ninguna orden en el archivo de hoy…»), sin diff, con confirmar bloqueado y con las
+  líneas «ignoradas» como pista; la programación actual no se toca. Sin avisos: un solo botón. Conserva «Mantener igualmente»,
   «Descartar», «¿Archivo equivocado? Sustituir» y «Deshacer última confirmación». El
   resultado de confirmar/deshacer se muestra tras recargar el diff
   (`cargarDiff(mensaje)`). **Si el diff falla** (desde `fn_metros_entero` un METROS
@@ -401,18 +405,28 @@ primera columna vacía; la primera celda de las filas de datos es la etiqueta de
 formato o está vacía; METROS llega como `" 4.500   "` (punto de miles, con
 espacios) y otras columnas usan coma decimal (`9,4`).
 
+**03/10/2026 — muestra real de pegado de celdas** (muestra real recibida el 03/10/2026 por el chat (programación del 02/10/2026, 4 hornos): 53 órdenes (14, 14, 13 y 12), METROS enteros (mín. 300, máx. 13000; `1118578` = 300), 3 órdenes con el CEP formado por un espacio (no cepilladas), 2 sin ACABADO y una con ACABADO `1a/2b`; sin avisos de validación). Se pasó por
+`normalizarPegado` (sin recortar líneas, con la primera columna vacía y los tabuladores finales conservados, cabecera
+`;Nº ORDEN;MODELO;METROS;…`) y por `parse_programacion` en transacción revertida: 53 órdenes (h1=14, h2=14,
+h3=13, h4=12), idénticas por hash a un cálculo independiente en Python. Formato observado: cada sección tiene
+la cabecera «Nº ORDEN» con la primera columna vacía; METROS y Nº BOX llegan con relleno (` 3.300   `, ` 12   `);
+`ESP. PRENSA` usa coma decimal (`9,4`); la columna HORNO coincide con la sección; filas separadoras ` - `.
+
 ## Pendiente
 
-- **Muestra real de celdas copiadas de Excel** (para cerrar el pegado, hoy
-  PROVISIONAL): cómo llegan `METROS`, las comillas y la columna anterior a «Nº ORDEN». Pasos
-  al final de `privado/programacion-liquidar.md`. Mientras no esté, el pegado de celdas
-  puede fallar en casos no previstos (el CSV con `;` sigue funcionando como siempre).
+- **Guardar el ARCHIVO ORIGINAL de la muestra real** de celdas de Excel en
+  `privado/muestras/celdas_excel_real.txt` (Bloc de notas, UTF-8, sin editar; no se puede
+  copiar por el chat sin perder los tabuladores) y pasar
+  `node privado/muestras/verificar_muestra_real.mjs`. Hasta entonces, lo que se sabe
+  viene de una reconstrucción (`privado/muestras/RECONSTRUIDA_desde_chat_NO_ES_EL_ORIGINAL.tsv`):
+  los tabuladores finales y las líneas vacías no están verificados byte a byte (no afectan
+  a `parse_programacion`, que lee hasta la columna 12).
 - **Pasada de UI** (fase D): guion preparado en `privado/backups/guion_pasada_ui_programacion.md`;
   se hace una vez, con el usuario, y se limpia después (notas, CSV sintético).
 - ~~`parse_programacion` fallaba con un METROS no numérico~~: resuelto el 03/10/2026 con
-  `fn_metros_entero` (ver arriba). Queda por alinear el frontend: `metrosDeTexto`
-  (`lib/programacion.ts`, usado en las tarjetas de avisos) sigue con la regla antigua
-  (`^[0-9][0-9.]*$`) y no entiende `5,500`.
+  `fn_metros_entero`. El frontend usa la misma regla: `metrosDeTexto` vive en `lib/metros.ts`
+  (reexportada desde `lib/programacion.ts`) y quita todo lo que no sea un dígito; solo difiere
+  en que un valor ≤ 0 devuelve `null` (la base de datos trata `coalesce(metros,0) <= 0` como «falta»).
 
 - **Hoja de diseño** (el PDF tipo "CAJA 20x120 SL ARGENTA MATE REC
   5PZ APAISADO F5" que se grapa junto a la hoja de partida, con

@@ -133,13 +133,14 @@ abiertos:
 
 Mejoras 1–4 implementadas el 03/10/2026 (`20`, `22`). Queda:
 
-1. **Muestra real de celdas copiadas de Excel**: el pegado directo
-   (`lib/normalizar-pegado.ts`) está **PROVISIONAL**. Hace falta, en el PC donde
-   llega el correo, copiar las celdas de las 4 secciones, pegarlas en el Bloc de notas y
-   guardarlas como `privado/muestras/celdas_excel_real.txt` (sin editar nada; si algún
-   dato es sensible, cambiar solo los dígitos de metros conservando el formato). Si
-   vuelve a aparecer un duplicado en algún correo, copiar también esa muestra. Con ella
-   se confirma cómo llegan `METROS` y las comillas y si llega la columna anterior a «Nº ORDEN».
+1. **Guardar el archivo ORIGINAL de la muestra real de celdas de Excel**. El 03/10/2026 llegó la
+   muestra por el chat y el pegado directo (`lib/normalizar-pegado.ts`) dio el resultado esperado
+   (53 órdenes, 14/14/13/12; METROS enteros; `1118578` = 300; los 3 CEP con espacio salen no cepillados),
+   pero el chat convierte los tabuladores en grupos de 4 espacios y pierde los finales, así que el
+   fixture es una reconstrucción. Hay que guardar el original (Bloc de notas, UTF-8, sin editar) en
+   `privado/muestras/celdas_excel_real.txt` y pasar `node privado/muestras/verificar_muestra_real.mjs`
+   (comprueba que no se recorta nada, que se conserva la primera columna vacía y los tabuladores
+   finales, y cuenta las órdenes). Si vuelve a aparecer un duplicado en algún correo, guardar también esa muestra.
 2. **Pasada de UI** (fase D): guion preparado en
    `privado/backups/guion_pasada_ui_programacion.md`; se hace una vez, con el
    usuario, y se limpia después (notas sintéticas, CSV sintético, verificación por hash contra
@@ -150,14 +151,11 @@ Mejoras 1–4 implementadas el 03/10/2026 (`20`, `22`). Queda:
    va en la columna 1 y METROS llega como `4500` (sin punto de miles). El parser busca la
    cabecera con «Nº ORDEN» y lee el número en la columna 2, así que reconoce 0 órdenes: el
    diff marca como «eliminadas» las 48 de `programacion_orden` y `validar_programacion` da 50
-   avisos de «línea ignorada». Confirmar sin órdenes queda rechazado por el servidor. No se ha
+   avisos de «línea ignorada». Desde el 03/10/2026 Revisar lo explica con un error claro, no
+   enseña el diff y bloquea confirmar (y el servidor rechaza una lista vacía). No se ha
    tocado el parser; hay que decidir si se admite ese formato (y entonces replicarlo en
    `validar_programacion`, ver `20`).
-4. `metrosDeTexto` (`frontend/src/lib/programacion.ts`) sigue con la regla antigua de METROS
-   (`^[0-9][0-9.]*$`); la regla de la base de datos es ahora `fn_metros_entero` (quita todo lo que
-   no sea un dígito: `5,500` = 5500). Las tarjetas de avisos de Revisar mostrarían «falta metros»
-   para un METROS con coma que el servidor sí lee. Alinear en una tarea aparte.
-5. Reglas de validación de tono/calibre (formato cerrado), sin las normas reales (`20`).
+4. Reglas de validación de tono/calibre (formato cerrado), sin las normas reales (`20`).
 
 ## Por construir (orden sugerido)
 

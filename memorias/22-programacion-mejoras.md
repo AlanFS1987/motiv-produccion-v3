@@ -2,7 +2,7 @@
 
 Estado (03/10/2026): **Mejoras 1–4 implementadas** (ver "Estado de
 implementación"). El pegado de celdas de Excel (Mejora 1) sigue **PROVISIONAL** a
-falta de una muestra real; la pasada de UI (guion preparado) está pendiente.
+falta de guardar el archivo original de la muestra real; la pasada de UI (guion preparado) está pendiente.
 Complementa a `20-programacion.md`, que describe lo que ya existe. Este
 documento recoge lo que se decidió en la conversación de diseño entre el
 usuario, Claude (chat) y, a partir de ahora, Claude Code. Las decisiones
@@ -19,15 +19,16 @@ una por orden).
 
 ## Mejora 1 — Pegar celdas directamente desde Excel
 
-> **Implementada el 03/10/2026, PROVISIONAL.** `lib/normalizar-pegado.ts`
+> **Implementada el 03/10/2026; verificada con una muestra real (reconstruida desde el chat), falta
+> confirmar con el archivo original.** `lib/normalizar-pegado.ts`
 > (`normalizarPegado`, función pura aplicada antes de `guardarProgramacionCsv`; el parser
 > SQL no cambia y los CSV con `;` se siguen aceptando). Verificada con un script
 > desechable (TSV simple, comillas con salto de línea, `;` dentro de celda, mezcla de
 > líneas con y sin tabuladores, línea vacía final y las 4 secciones apiladas con sus
-> cabeceras) y con los CSV reales, **pero sin una muestra real de celdas pegadas**: no
-> hay ninguna guardada (`admin_notas` solo tiene las 8 programaciones en `;`, sin
-> `guardar_muestra_excel`). Se cierra cuando llegue la muestra (pasos en
-> `privado/programacion-liquidar.md`).
+> cabeceras) y con los CSV reales. El 03/10/2026 llegó una **muestra real** de celdas pegadas
+> (53 órdenes, ver `20`): `normalizarPegado` + `parse_programacion` dan el resultado esperado. Como el chat
+> convierte los tabuladores en espacios, el fixture es una reconstrucción; se cierra del todo guardando el
+> original en `privado/muestras/celdas_excel_real.txt` y pasando `verificar_muestra_real.mjs`.
 
 **[acordado]** El jefe debe poder seleccionar celdas en Excel, copiar y
 pegar en el textarea, sin pasar por CSV ni txt.
@@ -230,7 +231,7 @@ conversación nueva.
 | Consultar: `fecha_alta`, «Nueva hoy», filtros, edición de tono/calibre, copiar nuevas, notas con selección múltiple | **Hecho 03/10/2026** |
 | Pantalla «Frases» del administrador | **Hecho 03/10/2026** |
 | Quitar tono/calibre de Revisar | **Hecho 03/10/2026** |
-| Pegado de celdas de Excel (tabuladores) | **Hecho 03/10/2026, PROVISIONAL** (falta una muestra real) |
+| Pegado de celdas de Excel (tabuladores) | **Hecho 03/10/2026**; verificado con una muestra real reconstruida (falta el archivo original) |
 | Pasada de UI con el usuario (fase D) | Pendiente; guion en `privado/backups/guion_pasada_ui_programacion.md` |
 
 Decisiones tomadas en la implementación: `fecha_alta` en `null` para las
