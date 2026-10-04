@@ -93,7 +93,7 @@ Unidades — ver `17` y `18`.
 | Corrección de parte por doble entrada, ventana 1 h del responsable; admin sin límite | Construido |
 | Cierre manual de turno + informe (pestaña Resumen, botón Copiar) | Construido |
 | Cierre automático de turno (cron) + envío del informe a Telegram | Construido; el camino automático se ha visto en real |
-| Gestión de lotes (todos los abiertos, cierre automático al cumplir el objetivo, Finalizar manual) | Construido en local; migración pendiente de aplicar |
+| Gestión de lotes (todos los abiertos, cierre automático al cumplir el objetivo, Finalizar manual) | Construido; migración 20261004121330 aplicada |
 | Telegram: incidencias calidad, incidencias producción, nuevos lotes, resumen de turno, resumen calidad | Construido |
 | Operario: Inicio (Inicio / Ranking / Stats+Avatar / Logros), Mi línea, Historial, Limpieza, Chat | Construido y probado en real |
 | Gamificación operario: puntos (rendimiento+piezas+limpieza), niveles, cierre de ciclo, stats, 19 logros sembrados, personaje RPG, datos de v2 migrados | **Construido** (`04`) |
@@ -256,7 +256,7 @@ frontend/src/
     ceria/                     CeriaScreen
     nora/                      NoraScreen (copiloto de averías por voz)
 supabase/
-  migrations/                  20260101000001 … 20261003142002 (169 migraciones)
+  migrations/                  20260101000001 … 20261004121330 (170 migraciones)
   functions/
     _shared/                   anthropic.ts, openai.ts, openai_images.ts, deepseek_historia.ts,
                                cors.ts, cloudinary.ts, normalizacion.ts, formato.ts,
