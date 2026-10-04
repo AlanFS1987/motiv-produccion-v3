@@ -168,19 +168,30 @@ Lógica pura en `lib/validar-orden.ts` (copia idéntica en
   Ejemplos: `3000000`→3.000, `4`→4.000, `4000002`→4.000, `111604`→rojo.
 - **Cruce** (RPC `cruzar_orden_captura`, security definer, roles
   responsable/suplente/jefe/produccion/administrador; `programacion_orden` no la
-  puede leer el suplente por RLS): (a) si el lote ya existe con otro modelo
-  (normalizado, uno contenido en el otro) → aviso "Esta orden ya existe como X y
-  has leído Y" con "Usar la orden existente" (copia el modelo) / "Corregir el
-  número"; Confirmar bloqueado hasta que coincidan. (b) Si está en programación,
-  se enseña su modelo; si no está en ningún sitio pero hay una orden a un dígito
-  de distancia (lotes o programación) se sugiere "¿1114136?". Si la RPC falla,
-  no bloquea.
-- **Servidor:** `resolver-catalogo` devuelve 422 si `numero_orden` no cumple el
-  patrón o `objetivo_m2` (entero) no queda en 100–50.000 tras normalizar; guarda
-  el valor normalizado. Sigue ignorando el modelo leído si el lote existe: el
-  aviso (a) vive solo en el cliente.
-- Pendiente de desplegar: migración `20261004100000_cruzar_orden_captura.sql` y
-  la edge function `resolver-catalogo` (hasta entonces el cruce no aparece).
+  puede leer el suplente por RLS). Lógica pura en `lib/cruce-orden-logica.ts`; si la RPC falla, no bloquea.
+  - **Comparar modelos:** IGUALDAD EXACTA tras normalizar (mayúsculas, sin acentos, sin espacios ni
+    signos; en programación se corta antes del primer «(»). Nunca «uno contenido en el otro»: hay
+    modelos distintos que solo se diferencian por un sufijo (CALA DESERT / CALA DESERT ANT, SL LIVIA
+    CREAM / … LM, CLASS AVORIO / … PL, SL MIDTOWN CREAM / … NPL, SL NEUTRA CREAM / … AN).
+    `normalizarTexto` no sirve (conserva acentos y `- / . &`): se usa `normalizarModeloComparable`.
+  - **Lote existente con otro modelo:** ámbar «Esta orden ya existe como X y has leído Y», con «Usar
+    la orden existente» / «Corregir el número». Hoy SOLO AVISA: `BLOQUEAR_CRUCE_MODELO = false` (único
+    sitio, `cruce-orden-logica.ts`); a `true` bloquea Confirmar hasta que coincidan (ver `07`). Como
+    `resolver-catalogo` usa el producto del lote existente, el aviso sirve para detectar un NÚMERO mal.
+  - **Lote existente → objetivo:** de solo lectura con el valor del lote; no se valida lo leído y el
+    cliente no lo exige (envía `null`).
+  - **Programación:** si el número está, se enseña su modelo; si no coincide (igualdad exacta), ámbar,
+    sin bloquear.
+  - **Sugerencia «¿1114136?»:** solo si el número leído NO tiene lote y hay una orden a un dígito que
+    sea el MISMO PRODUCTO: modelo + marca + formato en lotes; en programación (sin marca propia; el
+    formato va en el texto del modelo, p. ej. «60X120RC») modelo + formato. Mismo modelo con otro
+    formato o marca no se sugiere. No hay comprobación de marca en el cruce de modelos. Nunca bloquea.
+- **Servidor:** `resolver-catalogo` valida `numero_orden` SIEMPRE (422); valida y normaliza
+  `objetivo_m2` (100–50.000, entero) SOLO cuando va a CREAR el lote (antes de crear modelo/marca/
+  producto, para no dejar huérfanos); si el lote existe lo ignora. Mismo código en
+  `_shared/validacion-orden.ts`. **Orden de despliegue:** primero el cliente (Vercel Ready), después
+  la función (con servidor nuevo y cliente viejo, objetivos como 11000000 darían 422).
+- Pendiente de aplicar/desplegar: migración `cruzar_orden_captura` y `resolver-catalogo`.
 
 ### Paso tono
 Formulario tono (obligatorio, patrón `[A-ZÑ0-9]`) y calibre.

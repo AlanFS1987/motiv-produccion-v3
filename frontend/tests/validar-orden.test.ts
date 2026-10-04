@@ -53,10 +53,22 @@ for (const [nombre, m] of [["frontend", front], ["servidor", back]] as const) {
     assert.equal(m.normalizarObjetivoNumero("2000").valor, null);
   });
 
-  test(`${nombre}: modelos`, () => {
-    const n = (t: string) => t.toUpperCase().trim();
-    assert.ok(m.modelosCoinciden("SL IRON DARK", "IRON DARK", n));
-    assert.ok(!m.modelosCoinciden("ORION", "IRON DARK", n));
-    assert.ok(!m.modelosCoinciden("", "IRON", n));
+  test(`${nombre}: modelos (igualdad exacta normalizada)`, () => {
+    assert.ok(m.modelosIguales("SL Irati-Taupe ", "SL IRATI TAUPE"));
+    assert.ok(m.modelosIguales("Cálá  Désert", "CALA DESERT"));
+    assert.ok(m.modelosIguales(m.modeloDeProgramacion("SL IRATI TAUPE (PRC) 30X120RC /DST04_S"), "SL IRATI TAUPE"));
+    assert.ok(m.modelosIguales(m.modeloDeProgramacion("SL IRATI TAUPE(PRC)30X120RC/DST04_S"), "SL IRATI TAUPE"));
+    for (const [x, y] of [
+      ["CALA DESERT", "CALA DESERT ANT"],
+      ["SL LIVIA CREAM", "SL LIVIA CREAM LM"],
+      ["CLASS AVORIO", "CLASS AVORIO PL"],
+      ["SL MIDTOWN CREAM", "SL MIDTOWN CREAM NPL"],
+      ["SL NEUTRA CREAM", "SL NEUTRA CREAM AN"],
+    ]) {
+      assert.ok(!m.modelosIguales(x, y), `${x} != ${y}`);
+      assert.ok(!m.modelosIguales(y, x));
+    }
+    assert.ok(!m.modelosIguales("", ""));
+    assert.ok(!m.modelosIguales(null, "X"));
   });
 }

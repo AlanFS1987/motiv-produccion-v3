@@ -107,18 +107,33 @@ Deno.serve(async (req: Request) => {
   }
 
   // Segunda barrera (la primera es la revisión de la Foto 1): datos reales — los lotes
-  // tienen 7 dígitos y empiezan por 11; el objetivo va de 100 a 50.000 m², entero.
+  // tienen 7 dígitos y empiezan por 11. numero_orden se valida SIEMPRE.
   if (typeof numero_orden !== "string" || !PATRON_NUMERO_ORDEN.test(numero_orden)) {
     return jsonError(`numero_orden="${numero_orden}" no es válido: ${MENSAJE_ORDEN_INVALIDA}`, 422);
   }
-  const objetivoNorm = normalizarObjetivoNumero(objetivo_m2_recibido);
-  if (objetivoNorm.valor === null) {
-    return jsonError(
-      `objetivo_m2="${objetivo_m2_recibido}" no es válido: ${objetivoNorm.error}`,
-      422,
-    );
+
+  // objetivo_m2 (100-50.000 m², entero) se valida y normaliza SOLO si se va a CREAR el lote; si el
+  // lote existe se ignora (el del lote manda). Se comprueba antes de crear modelo/marca/producto
+  // para no dejar registros huérfanos si el objetivo es inválido.
+  const { data: loteYaExiste, error: loteYaExisteErr } = await supabase
+    .from("lote")
+    .select("id")
+    .eq("numero_orden", numero_orden)
+    .maybeSingle();
+  if (loteYaExisteErr) {
+    return jsonError(loteYaExisteErr.message, 500);
   }
-  const objetivo_m2 = objetivoNorm.valor;
+  let objetivo_m2: number | null = null;
+  if (!loteYaExiste) {
+    const objetivoNorm = normalizarObjetivoNumero(objetivo_m2_recibido);
+    if (objetivoNorm.valor === null) {
+      return jsonError(
+        `objetivo_m2="${objetivo_m2_recibido}" no es válido para crear el lote: ${objetivoNorm.error}`,
+        422,
+      );
+    }
+    objetivo_m2 = objetivoNorm.valor;
+  }
 
   try {
     // ---- Paso 1/2 — resolver o crear modelo ----

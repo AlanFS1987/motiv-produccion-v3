@@ -96,10 +96,31 @@ export function normalizarObjetivoNumero(n: unknown): ResultadoCampo<number> {
   return { valor: r.valor, corregido: r.corregido, original: String(n), error: null };
 }
 
-/** Modelos «coincidentes»: normalizados y uno contenido en el otro (ninguno vacío). */
-export function modelosCoinciden(a: string, b: string, normalizar: (t: string) => string): boolean {
-  const x = normalizar(a);
-  const y = normalizar(b);
-  if (x === "" || y === "") return false;
-  return x.includes(y) || y.includes(x);
+/**
+ * Forma comparable de un modelo: mayúsculas, sin acentos, sin espacios ni signos (solo A-Z y 0-9).
+ * Ojo: normalizarTexto (lib/normalizacion.ts) NO sirve para esto: conserva acentos y los símbolos
+ * - / . & , así que "SL Irati-Taupe" no daría "SL IRATI TAUPE".
+ */
+export function normalizarModeloComparable(texto: string | null | undefined): string {
+  return (texto ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+/** Los modelos de programación llevan el código técnico tras el primer "(": se corta antes. */
+export function modeloDeProgramacion(texto: string | null | undefined): string {
+  const t = texto ?? "";
+  const i = t.indexOf("(");
+  return (i === -1 ? t : t.slice(0, i)).trim();
+}
+
+/**
+ * IGUALDAD EXACTA tras normalizar. Nunca «uno contenido en el otro»: hay modelos distintos que solo
+ * se diferencian por un sufijo (CALA DESERT / CALA DESERT ANT, SL LIVIA CREAM / SL LIVIA CREAM LM).
+ */
+export function modelosIguales(a: string | null | undefined, b: string | null | undefined): boolean {
+  const x = normalizarModeloComparable(a);
+  return x !== "" && x === normalizarModeloComparable(b);
 }

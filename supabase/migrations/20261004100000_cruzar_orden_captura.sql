@@ -3,9 +3,11 @@
 -- Contexto: programacion_orden solo es legible por jefe/responsable/produccion/administrador (RLS) y
 -- la captura la hace también el suplente. lote/producto/modelo son legibles por cualquier autenticado.
 -- Esta RPC (solo lectura, security definer) devuelve lo mínimo para avisar en la revisión de la Foto 1:
---   lote:         lote existente con ese numero_orden y su modelo (o null)
---   programacion: fila de programacion_orden con ese numero_orden y su modelo (o null)
---   parecidos:    hasta 3 órdenes (lotes o programación) de la misma longitud que difieren en UN dígito
+--   lote:         lote existente con ese numero_orden: modelo y objetivo_m2 (o null)
+--   programacion: fila de programacion_orden con ese numero_orden y su modelo crudo (o null)
+--   parecidos:    hasta 10 órdenes (lotes o programación) de la misma longitud que difieren en UN dígito,
+--                 con modelo y, si son lotes, marca y formato (el cliente filtra por «mismo producto»;
+--                 programacion_orden no tiene marca ni formato propios: el formato va en el texto del modelo)
 -- Guarda con coalesce de rol (rol nulo no pasa); anon sin EXECUTE. Aditiva.
 
 create or replace function cruzar_orden_captura(p_numero_orden text)
@@ -30,7 +32,7 @@ begin
     raise exception 'Número de orden no válido';
   end if;
 
-  select jsonb_build_object('numero_orden', l.numero_orden, 'modelo', m.nombre)
+  select jsonb_build_object('numero_orden', l.numero_orden, 'modelo', m.nombre, 'objetivo_m2', l.objetivo_m2)
     into v_lote
     from lote l
     join producto p on p.id = l.producto_id
@@ -45,14 +47,16 @@ begin
   select coalesce(jsonb_agg(x order by x.numero_orden), '[]'::jsonb)
     into v_parecidos
     from (
-      select distinct on (c.numero_orden) c.numero_orden, c.modelo, c.origen
+      select distinct on (c.numero_orden) c.numero_orden, c.modelo, c.marca, c.formato, c.origen
         from (
-          select l.numero_orden, m.nombre as modelo, 'lote'::text as origen
+          select l.numero_orden, m.nombre as modelo, ma.nombre as marca, f.nombre as formato, 'lote'::text as origen
             from lote l
             join producto p on p.id = l.producto_id
             join modelo m on m.id = p.modelo_id
+            join marca ma on ma.id = p.marca_id
+            join formato f on f.id = p.formato_id
           union all
-          select po.numero_orden, po.modelo, 'programacion'::text
+          select po.numero_orden, po.modelo, null::text, null::text, 'programacion'::text
             from programacion_orden po
         ) c
        where c.numero_orden <> v_num
@@ -60,7 +64,7 @@ begin
          and (select count(*) from generate_series(1, 7) i
                where substr(c.numero_orden, i, 1) <> substr(v_num, i, 1)) = 1
        order by c.numero_orden, c.origen
-       limit 3
+       limit 10
     ) x;
 
   return jsonb_build_object('lote', v_lote, 'programacion', v_prog, 'parecidos', v_parecidos);

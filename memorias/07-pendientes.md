@@ -128,6 +128,13 @@ abiertos:
    el Excel real del día anterior: 53 órdenes), así que no sirven para restaurar ni para verificar por hash.
 6. **Tablas con RLS y sin políticas** (lint `rls_enabled_no_policy`, nivel INFO): las dos copias
    `_bak_20261002` (se borran el 16/10) y `stg_migracion_operario_v2` (ver «Por construir», squash).
+7. **Cruce de la Foto 1 en modo aviso:** pasar `BLOQUEAR_CRUCE_MODELO` a `true`
+   (`frontend/src/lib/cruce-orden-logica.ts`) tras ~2 semanas de observación
+   (revisar el 2026-10-18). Hoy el aviso «Esta orden ya existe como X y has leído Y» no bloquea
+   Confirmar (ver `02`).
+8. Borrar las copias `bak_20261004_*` (`bak_20261004_lote`, `bak_20261004_parte`,
+   `bak_20261004_producto`, …; las creó `privado/limpieza_lotes_20261004.sql`) a partir del
+   2026-10-18, y entonces quitarlas también de las tablas «RLS sin políticas» si salen en el lint.
 
 ## Programación — pendiente
 

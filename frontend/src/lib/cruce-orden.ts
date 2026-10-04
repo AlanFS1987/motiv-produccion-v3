@@ -1,10 +1,5 @@
 import { supabase } from "./supabase-client";
-
-export interface CruceOrden {
-  lote: { numero_orden: string; modelo: string } | null;
-  programacion: { numero_orden: string; modelo: string } | null;
-  parecidos: { numero_orden: string; modelo: string | null; origen: "lote" | "programacion" }[];
-}
+import type { CruceOrden } from "./cruce-orden-logica";
 
 /** Cruza un Nº de orden válido contra lotes y programación (RPC cruzar_orden_captura). */
 export async function cruzarOrden(numeroOrden: string): Promise<CruceOrden> {

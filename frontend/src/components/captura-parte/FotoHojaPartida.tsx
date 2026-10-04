@@ -12,18 +12,20 @@ import { subirACloudinary, construirPublicId } from "../../lib/cloudinary";
 import { ocrParte, resolverCatalogo } from "../../lib/supabase-functions";
 import {
   normalizarTexto,
+  normalizarFormato,
   sugerirTonoSiguiente,
   esTonoCalibreValido,
   limpiarEntradaTonoCalibre,
   extraerModeloVisible,
 } from "../../lib/normalizacion";
 import {
-  modelosCoinciden,
+  modeloDeProgramacion,
   normalizarNumeroOrden,
   normalizarObjetivoM2,
   textoCorreccionObjetivo,
 } from "../../lib/validar-orden";
-import { cruzarOrden, type CruceOrden } from "../../lib/cruce-orden";
+import { cruzarOrden } from "../../lib/cruce-orden";
+import { evaluarCruce, type CruceOrden } from "../../lib/cruce-orden-logica";
 import { crearParteInicial, type DatosOcrHojaPartida, type LoteResuelto } from "../../lib/parte";
 
 type Fase = "capturando" | "procesando" | "revisando" | "resolviendo" | "error";
@@ -179,15 +181,17 @@ export function FotoHojaPartida({ turnoId, lineaId, responsableId, onResuelto, o
   const calibreValido = calibre.trim() === "" || esTonoCalibreValido(calibre);
   const cruceActual = cruce && cruce.orden === orden.valor ? cruce.datos : null;
   const cruceCargando = orden.valor !== null && (cruce === null || cruce.orden !== orden.valor);
-  const loteExistente = cruceActual?.lote ?? null;
-  const conflictoModelo =
-    datos !== null && loteExistente !== null && !modelosCoinciden(datos.modelo, loteExistente.modelo, normalizarTexto);
+  const evaluacion = evaluarCruce(
+    cruceActual,
+    { modelo: datos?.modelo ?? "", marca: datos?.marca ?? "", formato: datos?.formato ?? "" },
+    normalizarFormato,
+  );
   const formularioValido =
     datos !== null &&
     orden.valor !== null &&
-    objetivo.valor !== null &&
+    (evaluacion.objetivoSoloLectura || objetivo.valor !== null) &&
     !cruceCargando &&
-    !conflictoModelo &&
+    !evaluacion.bloquea &&
     datos.modelo.trim() !== "" &&
     datos.marca.trim() !== "" &&
     datos.formato.trim() !== "" &&
@@ -211,7 +215,8 @@ export function FotoHojaPartida({ turnoId, lineaId, responsableId, onResuelto, o
         espesor_mm: datos.espesor_mm,
         tipo_palet: datos.tipo_palet,
         pza_caja: datos.pza_caja,
-        objetivo_m2: objetivo.valor!,
+        // Si el lote existe, resolver-catalogo usa el del lote y no exige este valor.
+        objetivo_m2: evaluacion.objetivoSoloLectura ? null : objetivo.valor,
         codbar_caja: datos.codbar_caja,
         codbar_pieza: datos.codbar_pieza,
         cod_upec: datos.cod_upec,
@@ -336,33 +341,35 @@ export function FotoHojaPartida({ turnoId, lineaId, responsableId, onResuelto, o
         {orden.valor && orden.corregido && (
           <p className="mt-1 text-xs text-amber-700">Corregido de «{orden.original}» a {orden.valor}</p>
         )}
-        {cruceActual?.programacion && (
-          <p className="mt-1 text-xs text-slate-500">En programación: {cruceActual.programacion.modelo}</p>
+        {evaluacion.programacionModelo && (
+          <p className={`mt-1 text-xs ${evaluacion.programacionDistinta ? "text-amber-700" : "text-slate-500"}`}>
+            En programación: {modeloDeProgramacion(evaluacion.programacionModelo)}
+            {evaluacion.programacionDistinta && ` — no coincide con el modelo leído (${datos.modelo})`}
+          </p>
         )}
-        {cruceActual && !loteExistente && !cruceActual.programacion && cruceActual.parecidos.length > 0 && (
+        {evaluacion.sugerencias.length > 0 && (
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-amber-700">
-            <span>No está en programación ni en lotes.</span>
-            {cruceActual.parecidos.map((p) => (
+            {evaluacion.sugerencias.map((p) => (
               <button
                 key={`${p.origen}-${p.numero_orden}`}
                 type="button"
                 onClick={() => setOrdenTexto(p.numero_orden)}
                 className="rounded-full border border-amber-400 bg-amber-50 px-2 py-0.5 font-medium"
               >
-                ¿{p.numero_orden}?{p.modelo ? ` ${p.modelo}` : ""}
+                ¿{p.numero_orden}?
               </button>
             ))}
           </div>
         )}
-        {conflictoModelo && loteExistente && (
-          <div className="mt-2 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        {evaluacion.modeloLoteDistinto && (
+          <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
             <p className="font-medium">
-              Esta orden ya existe como {loteExistente.modelo} y has leído {datos.modelo}.
+              Esta orden ya existe como {evaluacion.modeloLoteDistinto} y has leído {datos.modelo}.
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => actualizarCampo("modelo", loteExistente.modelo)}
+                onClick={() => actualizarCampo("modelo", evaluacion.modeloLoteDistinto!)}
                 className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white"
               >
                 Usar la orden existente
@@ -409,19 +416,31 @@ export function FotoHojaPartida({ turnoId, lineaId, responsableId, onResuelto, o
       <CampoNumerico etiqueta="Espesor (mm)" valor={datos.espesor_mm} onChange={(v) => actualizarCampo("espesor_mm", v)} />
       <CampoTexto etiqueta="Tipo de palet" valor={datos.tipo_palet ?? ""} onChange={(v) => actualizarCampo("tipo_palet", v || null)} />
       <CampoNumerico etiqueta="Piezas por caja" valor={datos.pza_caja} onChange={(v) => actualizarCampo("pza_caja", v)} />
-      <div className="mb-3">
-        <label className="mb-1 block text-sm font-medium text-slate-600">Objetivo (m²)</label>
-        <input
-          value={objetivoTexto}
-          onChange={(e) => setObjetivoTexto(e.target.value)}
-          inputMode="numeric"
-          className={`w-full rounded-lg border p-2 text-sm ${objetivo.error ? "border-red-400" : objetivo.corregido ? "border-amber-400" : "border-slate-300"}`}
-        />
-        {objetivo.error && <p className="mt-1 text-xs text-red-600">{objetivo.error}</p>}
-        {objetivo.valor !== null && objetivo.corregido && (
-          <p className="mt-1 text-xs text-amber-700">{textoCorreccionObjetivo(objetivo.original, objetivo.valor)}</p>
-        )}
-      </div>
+      {evaluacion.objetivoSoloLectura ? (
+        <div className="mb-3">
+          <label className="mb-1 block text-sm font-medium text-slate-600">Objetivo (m²)</label>
+          <input
+            readOnly
+            value={evaluacion.objetivoLote ?? "—"}
+            className="w-full rounded-lg border border-slate-200 bg-slate-100 p-2 text-sm text-slate-600"
+          />
+          <p className="mt-1 text-xs text-slate-500">Valor del lote existente (no se modifica).</p>
+        </div>
+      ) : (
+        <div className="mb-3">
+          <label className="mb-1 block text-sm font-medium text-slate-600">Objetivo (m²)</label>
+          <input
+            value={objetivoTexto}
+            onChange={(e) => setObjetivoTexto(e.target.value)}
+            inputMode="numeric"
+            className={`w-full rounded-lg border p-2 text-sm ${objetivo.error ? "border-red-400" : objetivo.corregido ? "border-amber-400" : "border-slate-300"}`}
+          />
+          {objetivo.error && <p className="mt-1 text-xs text-red-600">{objetivo.error}</p>}
+          {objetivo.valor !== null && objetivo.corregido && (
+            <p className="mt-1 text-xs text-amber-700">{textoCorreccionObjetivo(objetivo.original, objetivo.valor)}</p>
+          )}
+        </div>
+      )}
       <CampoTexto etiqueta="Cód. barras caja" valor={datos.codbar_caja ?? ""} onChange={(v) => actualizarCampo("codbar_caja", v || null)} />
       <CampoTexto etiqueta="Cód. barras pieza" valor={datos.codbar_pieza ?? ""} onChange={(v) => actualizarCampo("codbar_pieza", v || null)} />
       <CampoTexto etiqueta="Cód. UPEC" valor={datos.cod_upec ?? ""} onChange={(v) => actualizarCampo("cod_upec", v || null)} />
