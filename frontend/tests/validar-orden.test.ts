@@ -53,6 +53,14 @@ for (const [nombre, m] of [["frontend", front], ["servidor", back]] as const) {
     assert.equal(m.normalizarObjetivoNumero("2000").valor, null);
   });
 
+  test(`${nombre}: normalizarModeloComparable da el resultado literal (flag u, letras M y p intactas)`, () => {
+    assert.equal(m.normalizarModeloComparable("Cálá Désert Ánt"), "CALADESERTANT");
+    assert.equal(m.normalizarModeloComparable("SL Mapa-Pampa M (PRC)"), "SLMAPAPAMPAMPRC");
+    assert.equal(m.normalizarModeloComparable("pM p{M} Mp"), "PMPMMP");
+    assert.equal(m.normalizarModeloComparable("Crème  Brûlée"), "CREMEBRULEE");
+    assert.equal(m.normalizarModeloComparable(null), "");
+  });
+
   test(`${nombre}: modelos (igualdad exacta normalizada)`, () => {
     assert.ok(m.modelosIguales("SL Irati-Taupe ", "SL IRATI TAUPE"));
     assert.ok(m.modelosIguales("Cálá  Désert", "CALA DESERT"));
