@@ -650,7 +650,7 @@ Todas `security definer`, `search_path = public`, guarda de rol con `coalesce(fn
 | `confirmar_programacion(fecha, filas jsonb)` | jefe, administrador | reemplazo completo con snapshot previo; rechaza repetidos, filas sin número/horno y **lista vacía** |
 | `deshacer_ultima_programacion()` | jefe, administrador | restaura la última foto del historial y la consume |
 | `actualizar_tono_calibre(numero_orden, tono, calibre)` | jefe, administrador | edita tono/calibre; vacío = null; ≤ 20 caracteres |
-| `cruzar_orden_captura(numero_orden)` | responsable, suplente, jefe, produccion, administrador | solo lectura: `lote` (modelo + `objetivo_m2`), `programacion` (modelo crudo) y hasta 10 órdenes a un dígito (lotes con marca y formato; programación sin ellos) como jsonb; para el cruce de la Foto 1 (`02`). Rol nulo/otros: «No autorizado»; número no 7 dígitos: error |
+| `cruzar_orden_captura(numero_orden)` | responsable, suplente, jefe, produccion, administrador | solo lectura: `lote` (modelo + `objetivo_m2`), `programacion` (modelo crudo) y todas las órdenes a un dígito (sin límite; máx. 63) (lotes con marca y formato; programación sin ellos) como jsonb; para el cruce de la Foto 1 (`02`). Rol nulo/otros: «No autorizado»; número no 7 dígitos: error |
 | `anadir_nota_ordenes(ordenes[], texto)` | jefe, administrador | la misma nota en varias órdenes, todo o nada (máx. 200) |
 | `editar_nota(id, texto)` / `borrar_nota(id)` | jefe, administrador | |
 | `guardar_frase(id, texto, activa, orden)` | solo administrador | alta (`id` nulo) o edición; baja lógica |
