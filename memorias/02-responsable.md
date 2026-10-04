@@ -258,10 +258,20 @@ Si el turno no está cerrado se marca como provisional. Botón
 que envía `generar-resumen-turno`, calculada aparte en el cliente.
 
 ## Pestaña Lotes (`GestionLotes.tsx`)
-Últimos 15 lotes por actividad, con modelo/marca/formato/número de
-orden y estado. Botón **Finalizar** / **Reabrir**. Reabrir a mano no
-limpia `resumen_calidad_enviado_at` (solo la reapertura automática por
-parte nuevo lo hace).
+Todos los lotes **iniciados** (sin límite), de `v_lote_gestion`, con la
+actividad más reciente primero. Cada tarjeta: modelo/marca, orden,
+pendiente (m² y piezas), % del objetivo, "hace N días" y la etiqueta
+"En producción" si hay un parte abierto. Sin sección de cerrados.
+
+Cierre automático: el trigger `trg_parte_z_cerrar_lote_completo` finaliza
+el lote al completarse un parte si está `iniciado`, su `objetivo_m2` está
+entre 100 y 50.000, `m2_pendiente = 0` (v_lote_pendiente) y no queda ningún
+parte vigente sin completar. Un parte nuevo lo reabre solo
+(`trg_parte_reabre_lote`, que también limpia `resumen_calidad_enviado_at`)
+y se reevalúa al completarse; se puede cerrar y reabrir las veces que haga
+falta. El nombre del trigger debe ordenarse DESPUÉS de
+`trg_parte_reabre_lote` (orden alfabético). Botón **Finalizar** manual con
+confirmación; no hay Reabrir manual.
 
 ## Pestaña Historial y botón Progreso
 

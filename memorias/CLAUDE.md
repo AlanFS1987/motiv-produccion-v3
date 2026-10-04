@@ -93,7 +93,7 @@ Unidades — ver `17` y `18`.
 | Corrección de parte por doble entrada, ventana 1 h del responsable; admin sin límite | Construido |
 | Cierre manual de turno + informe (pestaña Resumen, botón Copiar) | Construido |
 | Cierre automático de turno (cron) + envío del informe a Telegram | Construido; el camino automático se ha visto en real |
-| Gestión de lotes (lista, Finalizar/Reabrir) | Construido |
+| Gestión de lotes (todos los abiertos, cierre automático al cumplir el objetivo, Finalizar manual) | Construido en local; migración pendiente de aplicar |
 | Telegram: incidencias calidad, incidencias producción, nuevos lotes, resumen de turno, resumen calidad | Construido |
 | Operario: Inicio (Inicio / Ranking / Stats+Avatar / Logros), Mi línea, Historial, Limpieza, Chat | Construido y probado en real |
 | Gamificación operario: puntos (rendimiento+piezas+limpieza), niveles, cierre de ciclo, stats, 19 logros sembrados, personaje RPG, datos de v2 migrados | **Construido** (`04`) |
@@ -201,7 +201,7 @@ frontend/src/
     rotacion.ts                rotación, franjas, estado del turno, próximo cambio
     turno.ts                   abrir turno, asignaciones, refuerzo, cerrar turno
     parte.ts                   crear/completar/corregir partes, sugerencias, lotes del turno anterior
-    lote.ts                    gestión de lotes
+    lote.ts / lote-logica.ts   gestión de lotes (consulta v_lote_gestion + lógica pura)
     operario.ts                Mi línea, limpieza, verificación del operario
     relevo.ts                  pestaña Relevo del responsable
     ciclo.ts                   ciclo actual/anterior calculado en cliente (28 días)
