@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FileCheck2, RotateCcw } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { SelectorFoto } from "../SelectorFoto";
@@ -16,8 +16,14 @@ import {
   esTonoCalibreValido,
   limpiarEntradaTonoCalibre,
   extraerModeloVisible,
-  parsearNumeroEspanol,
 } from "../../lib/normalizacion";
+import {
+  modelosCoinciden,
+  normalizarNumeroOrden,
+  normalizarObjetivoM2,
+  textoCorreccionObjetivo,
+} from "../../lib/validar-orden";
+import { cruzarOrden, type CruceOrden } from "../../lib/cruce-orden";
 import { crearParteInicial, type DatosOcrHojaPartida, type LoteResuelto } from "../../lib/parte";
 
 type Fase = "capturando" | "procesando" | "revisando" | "resolviendo" | "error";
@@ -81,7 +87,27 @@ export function FotoHojaPartida({ turnoId, lineaId, responsableId, onResuelto, o
   const [tono, setTono] = useState("");
   const [calibre, setCalibre] = useState("");
   const [tonoEsSugerencia, setTonoEsSugerencia] = useState(false);
-  const [objetivoM2, setObjetivoM2] = useState<number | null>(null);
+  // Nº de orden y objetivo se editan como TEXTO; el valor normalizado se deriva (ver lib/validar-orden).
+  const [ordenTexto, setOrdenTexto] = useState("");
+  const [objetivoTexto, setObjetivoTexto] = useState("");
+  const [cruce, setCruce] = useState<{ orden: string; datos: CruceOrden | null } | null>(null);
+  const ordenRef = useRef<HTMLInputElement>(null);
+
+  const orden = normalizarNumeroOrden(ordenTexto);
+  const objetivo = normalizarObjetivoM2(objetivoTexto);
+
+  // Cruce con lotes y programación cada vez que el Nº de orden es válido. Si falla, no bloquea.
+  useEffect(() => {
+    const valor = orden.valor;
+    if (fase !== "revisando" || !valor) return;
+    let cancelado = false;
+    cruzarOrden(valor)
+      .then((datosCruce) => !cancelado && setCruce({ orden: valor, datos: datosCruce }))
+      .catch(() => !cancelado && setCruce({ orden: valor, datos: null }));
+    return () => {
+      cancelado = true;
+    };
+  }, [orden.valor, fase]);
 
   async function manejarArchivo(archivo: File) {
     setFase("procesando");
@@ -120,7 +146,9 @@ export function FotoHojaPartida({ turnoId, lineaId, responsableId, onResuelto, o
       const leido = respuesta.datos as unknown as DatosOcrHojaPartida;
       leido.modelo = extraerModeloVisible(leido.modelo);
       setDatos(leido);
-      setObjetivoM2(parsearNumeroEspanol(leido.objetivo_m2_texto));
+      setOrdenTexto(leido.numero_orden ?? "");
+      setObjetivoTexto(leido.objetivo_m2_texto ?? "");
+      setCruce(null);
 
       const sugerencia = sugerirTonoSiguiente(leido.tono_ant);
       setTono(sugerencia ?? "");
@@ -149,12 +177,20 @@ export function FotoHojaPartida({ turnoId, lineaId, responsableId, onResuelto, o
 
   const tonoValido = tono.trim() !== "" && esTonoCalibreValido(tono);
   const calibreValido = calibre.trim() === "" || esTonoCalibreValido(calibre);
+  const cruceActual = cruce && cruce.orden === orden.valor ? cruce.datos : null;
+  const cruceCargando = orden.valor !== null && (cruce === null || cruce.orden !== orden.valor);
+  const loteExistente = cruceActual?.lote ?? null;
+  const conflictoModelo =
+    datos !== null && loteExistente !== null && !modelosCoinciden(datos.modelo, loteExistente.modelo, normalizarTexto);
   const formularioValido =
     datos !== null &&
+    orden.valor !== null &&
+    objetivo.valor !== null &&
+    !cruceCargando &&
+    !conflictoModelo &&
     datos.modelo.trim() !== "" &&
     datos.marca.trim() !== "" &&
     datos.formato.trim() !== "" &&
-    datos.numero_orden.trim() !== "" &&
     tonoValido &&
     calibreValido;
 
@@ -168,14 +204,14 @@ export function FotoHojaPartida({ turnoId, lineaId, responsableId, onResuelto, o
         marca_texto: datos.marca.trim(),
         formato_nombre: datos.formato.trim(),
         formato_alternativo_texto: datos.formato_alternativo_texto ?? null,
-        numero_orden: datos.numero_orden.trim(),
+        numero_orden: orden.valor!,
         acabado_codigo: datos.acabado_codigo,
         acabado_tipo: datos.acabado_tipo,
         acabado_nombre: datos.acabado_nombre,
         espesor_mm: datos.espesor_mm,
         tipo_palet: datos.tipo_palet,
         pza_caja: datos.pza_caja,
-        objetivo_m2: objetivoM2,
+        objetivo_m2: objetivo.valor!,
         codbar_caja: datos.codbar_caja,
         codbar_pieza: datos.codbar_pieza,
         cod_upec: datos.cod_upec,
@@ -192,7 +228,7 @@ export function FotoHojaPartida({ turnoId, lineaId, responsableId, onResuelto, o
         loteCreado: respuesta.lote_creado,
         loteReabierto: respuesta.lote_reabierto,
         formatoNombre: datos.formato.trim(),
-        numeroOrden: datos.numero_orden.trim(),
+        numeroOrden: orden.valor!,
         tono: tono.trim(),
         calibre: calibre.trim(),
         marcaTextoNormalizado: normalizarTexto(datos.marca),
@@ -287,7 +323,64 @@ export function FotoHojaPartida({ turnoId, lineaId, responsableId, onResuelto, o
       <CampoTexto etiqueta="Modelo" valor={datos.modelo} onChange={(v) => actualizarCampo("modelo", v)} requerido />
       <CampoTexto etiqueta="Marca" valor={datos.marca} onChange={(v) => actualizarCampo("marca", v)} requerido />
       <CampoTexto etiqueta="Formato" valor={datos.formato} onChange={(v) => actualizarCampo("formato", v)} requerido />
-      <CampoTexto etiqueta="Nº de orden" valor={datos.numero_orden} onChange={(v) => actualizarCampo("numero_orden", v)} requerido />
+      <div className="mb-3">
+        <label className="mb-1 block text-sm font-medium text-slate-600">Nº de orden</label>
+        <input
+          ref={ordenRef}
+          value={ordenTexto}
+          onChange={(e) => setOrdenTexto(e.target.value)}
+          inputMode="numeric"
+          className={`w-full rounded-lg border p-2 text-sm ${orden.error ? "border-red-400" : orden.corregido ? "border-amber-400" : "border-slate-300"}`}
+        />
+        {orden.error && <p className="mt-1 text-xs text-red-600">{orden.error}</p>}
+        {orden.valor && orden.corregido && (
+          <p className="mt-1 text-xs text-amber-700">Corregido de «{orden.original}» a {orden.valor}</p>
+        )}
+        {cruceActual?.programacion && (
+          <p className="mt-1 text-xs text-slate-500">En programación: {cruceActual.programacion.modelo}</p>
+        )}
+        {cruceActual && !loteExistente && !cruceActual.programacion && cruceActual.parecidos.length > 0 && (
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-amber-700">
+            <span>No está en programación ni en lotes.</span>
+            {cruceActual.parecidos.map((p) => (
+              <button
+                key={`${p.origen}-${p.numero_orden}`}
+                type="button"
+                onClick={() => setOrdenTexto(p.numero_orden)}
+                className="rounded-full border border-amber-400 bg-amber-50 px-2 py-0.5 font-medium"
+              >
+                ¿{p.numero_orden}?{p.modelo ? ` ${p.modelo}` : ""}
+              </button>
+            ))}
+          </div>
+        )}
+        {conflictoModelo && loteExistente && (
+          <div className="mt-2 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+            <p className="font-medium">
+              Esta orden ya existe como {loteExistente.modelo} y has leído {datos.modelo}.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => actualizarCampo("modelo", loteExistente.modelo)}
+                className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white"
+              >
+                Usar la orden existente
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  ordenRef.current?.focus();
+                  ordenRef.current?.select();
+                }}
+                className="rounded-lg border border-slate-400 bg-white px-3 py-1.5 text-xs font-medium text-slate-700"
+              >
+                Corregir el número
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="mb-3">
         <label className="mb-1 block text-sm font-medium text-slate-600">
@@ -316,7 +409,19 @@ export function FotoHojaPartida({ turnoId, lineaId, responsableId, onResuelto, o
       <CampoNumerico etiqueta="Espesor (mm)" valor={datos.espesor_mm} onChange={(v) => actualizarCampo("espesor_mm", v)} />
       <CampoTexto etiqueta="Tipo de palet" valor={datos.tipo_palet ?? ""} onChange={(v) => actualizarCampo("tipo_palet", v || null)} />
       <CampoNumerico etiqueta="Piezas por caja" valor={datos.pza_caja} onChange={(v) => actualizarCampo("pza_caja", v)} />
-      <CampoNumerico etiqueta="Objetivo (m²)" valor={objetivoM2} onChange={setObjetivoM2} />
+      <div className="mb-3">
+        <label className="mb-1 block text-sm font-medium text-slate-600">Objetivo (m²)</label>
+        <input
+          value={objetivoTexto}
+          onChange={(e) => setObjetivoTexto(e.target.value)}
+          inputMode="numeric"
+          className={`w-full rounded-lg border p-2 text-sm ${objetivo.error ? "border-red-400" : objetivo.corregido ? "border-amber-400" : "border-slate-300"}`}
+        />
+        {objetivo.error && <p className="mt-1 text-xs text-red-600">{objetivo.error}</p>}
+        {objetivo.valor !== null && objetivo.corregido && (
+          <p className="mt-1 text-xs text-amber-700">{textoCorreccionObjetivo(objetivo.original, objetivo.valor)}</p>
+        )}
+      </div>
       <CampoTexto etiqueta="Cód. barras caja" valor={datos.codbar_caja ?? ""} onChange={(v) => actualizarCampo("codbar_caja", v || null)} />
       <CampoTexto etiqueta="Cód. barras pieza" valor={datos.codbar_pieza ?? ""} onChange={(v) => actualizarCampo("codbar_pieza", v || null)} />
       <CampoTexto etiqueta="Cód. UPEC" valor={datos.cod_upec ?? ""} onChange={(v) => actualizarCampo("cod_upec", v || null)} />

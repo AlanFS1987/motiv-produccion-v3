@@ -153,6 +153,35 @@ de lado. Resultado: número de orden mal leído por el OCR y un lote duplicado
 (lotes `1117222` y `11172222`, mismo modelo SL IRATI TAUPE; el primero quedó
 iniciado con 1 parte y el segundo finalizado con 2).
 
+**Validación en la revisión (04/10/2026).** Datos reales: los 264 lotes tienen 7
+dígitos y empiezan por 11; el objetivo va de 100 a 50.000 m², siempre entero.
+Lógica pura en `lib/validar-orden.ts` (copia idéntica en
+`functions/_shared/validacion-orden.ts`; tests: `node --test frontend/tests/validar-orden.test.ts`).
+- **Nº de orden:** se quitan los no-dígitos y se exige `/^11\d{5}$/`. Si tras
+  limpiar cumple, se corrige y se enseña en ámbar ("Corregido de «11.147.69»");
+  si no, rojo "7 dígitos y empieza por 11" y Confirmar deshabilitado
+  (`11172222`, `1.16640`, `M-14 CAL`, `843559203684` bloquean).
+- **Objetivo m²:** primero el formato español impreso ("2.000,000" → 2000, sin
+  aviso); si no da un entero en rango, se limpia a dígitos: ≥ 1.000.000 → ÷1000
+  y redondeo; 1–99 → ×1000; solo si cae en 100–50.000, y se enseña en ámbar
+  ("Corregido: 11.000.000 -> 11.000"). Fuera de rango o vacío: rojo y bloquea.
+  Ejemplos: `3000000`→3.000, `4`→4.000, `4000002`→4.000, `111604`→rojo.
+- **Cruce** (RPC `cruzar_orden_captura`, security definer, roles
+  responsable/suplente/jefe/produccion/administrador; `programacion_orden` no la
+  puede leer el suplente por RLS): (a) si el lote ya existe con otro modelo
+  (normalizado, uno contenido en el otro) → aviso "Esta orden ya existe como X y
+  has leído Y" con "Usar la orden existente" (copia el modelo) / "Corregir el
+  número"; Confirmar bloqueado hasta que coincidan. (b) Si está en programación,
+  se enseña su modelo; si no está en ningún sitio pero hay una orden a un dígito
+  de distancia (lotes o programación) se sugiere "¿1114136?". Si la RPC falla,
+  no bloquea.
+- **Servidor:** `resolver-catalogo` devuelve 422 si `numero_orden` no cumple el
+  patrón o `objetivo_m2` (entero) no queda en 100–50.000 tras normalizar; guarda
+  el valor normalizado. Sigue ignorando el modelo leído si el lote existe: el
+  aviso (a) vive solo en el cliente.
+- Pendiente de desplegar: migración `20261004100000_cruzar_orden_captura.sql` y
+  la edge function `resolver-catalogo` (hasta entonces el cruce no aparece).
+
 ### Paso tono
 Formulario tono (obligatorio, patrón `[A-ZÑ0-9]`) y calibre.
 

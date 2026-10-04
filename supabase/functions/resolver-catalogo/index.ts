@@ -19,6 +19,11 @@ import {
   normalizarFormato,
   normalizarTexto,
 } from "../_shared/normalizacion.ts";
+import {
+  MENSAJE_ORDEN_INVALIDA,
+  normalizarObjetivoNumero,
+  PATRON_NUMERO_ORDEN,
+} from "../_shared/validacion-orden.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -85,7 +90,7 @@ Deno.serve(async (req: Request) => {
     espesor_mm = null,
     tipo_palet = null,
     pza_caja = null,
-    objetivo_m2 = null,
+    objetivo_m2: objetivo_m2_recibido = null,
     codbar_caja = null,
     codbar_pieza = null,
     cod_upec = null,
@@ -100,6 +105,20 @@ Deno.serve(async (req: Request) => {
       400,
     );
   }
+
+  // Segunda barrera (la primera es la revisión de la Foto 1): datos reales — los lotes
+  // tienen 7 dígitos y empiezan por 11; el objetivo va de 100 a 50.000 m², entero.
+  if (typeof numero_orden !== "string" || !PATRON_NUMERO_ORDEN.test(numero_orden)) {
+    return jsonError(`numero_orden="${numero_orden}" no es válido: ${MENSAJE_ORDEN_INVALIDA}`, 422);
+  }
+  const objetivoNorm = normalizarObjetivoNumero(objetivo_m2_recibido);
+  if (objetivoNorm.valor === null) {
+    return jsonError(
+      `objetivo_m2="${objetivo_m2_recibido}" no es válido: ${objetivoNorm.error}`,
+      422,
+    );
+  }
+  const objetivo_m2 = objetivoNorm.valor;
 
   try {
     // ---- Paso 1/2 — resolver o crear modelo ----

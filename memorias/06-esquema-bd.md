@@ -650,6 +650,7 @@ Todas `security definer`, `search_path = public`, guarda de rol con `coalesce(fn
 | `confirmar_programacion(fecha, filas jsonb)` | jefe, administrador | reemplazo completo con snapshot previo; rechaza repetidos, filas sin número/horno y **lista vacía** |
 | `deshacer_ultima_programacion()` | jefe, administrador | restaura la última foto del historial y la consume |
 | `actualizar_tono_calibre(numero_orden, tono, calibre)` | jefe, administrador | edita tono/calibre; vacío = null; ≤ 20 caracteres |
+| `cruzar_orden_captura(numero_orden)` | responsable, suplente, jefe, produccion, administrador | solo lectura: lote y programación con ese número (con su modelo) y hasta 3 órdenes a un dígito; para el cruce de la Foto 1 (`02`) |
 | `anadir_nota_ordenes(ordenes[], texto)` | jefe, administrador | la misma nota en varias órdenes, todo o nada (máx. 200) |
 | `editar_nota(id, texto)` / `borrar_nota(id)` | jefe, administrador | |
 | `guardar_frase(id, texto, activa, orden)` | solo administrador | alta (`id` nulo) o edición; baja lógica |
