@@ -104,7 +104,7 @@ export function normalizarObjetivoNumero(n: unknown): ResultadoCampo<number> {
 export function normalizarModeloComparable(texto: string | null | undefined): string {
   return (texto ?? "")
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/\p{M}/gu, "")
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
 }
