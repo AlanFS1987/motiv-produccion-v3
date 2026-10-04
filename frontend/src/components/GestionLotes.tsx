@@ -1,20 +1,23 @@
 // frontend/src/components/GestionLotes.tsx
 //
-// Pestaña "Lotes" (01-rol-responsable.md 3.10). Lista los últimos 15
-// lotes por fecha de última actividad, con botón Finalizar/Reabrir.
-// El estado NUNCA bloquea nada técnicamente (ver 05-modelo-de-datos.md
-// 7.1) — es puramente una etiqueta de gestión, decisión siempre
-// humana. Visible para cualquier responsable, no filtrado por turno
-// (un lote puede producirse en varias líneas a la vez).
+// Pestaña "Lotes" (01-rol-responsable.md 3.10). Lista TODOS los lotes
+// iniciados (v_lote_gestion), con la actividad más reciente primero.
+// Un lote se finaliza solo cuando se completa su último parte y se
+// alcanza el objetivo (trigger en BD) y se reabre solo si entra un
+// parte nuevo; aquí queda el Finalizar manual, con confirmación, para
+// órdenes que se produjeron por debajo de lo programado. El estado
+// NUNCA bloquea nada técnicamente (ver 05-modelo-de-datos.md 7.1).
+// Visible para cualquier responsable, no filtrado por turno (un lote
+// puede producirse en varias líneas a la vez).
 //
-// Cada tarjeta muestra también el pendiente (m² y piezas que faltan
-// por producir, ver lib/lote.ts / v_lote_pendiente) — null cuando el
-// lote no tiene objetivo_m2 capturado, en cuyo caso no se pinta nada
-// en vez de mostrar un "0" engañoso.
+// Pendiente y % del objetivo son null cuando el lote no tiene
+// objetivo_m2 capturado — en ese caso no se pinta nada en vez de
+// mostrar un "0" engañoso.
 
 import { useEffect, useState } from "react";
-import { Package, RotateCcw, Lock } from "lucide-react";
-import { listarUltimosLotes, finalizarLote, reabrirLote, type LoteGestion } from "../lib/lote";
+import { Package, Lock } from "lucide-react";
+import { listarLotesAbiertos, finalizarLote } from "../lib/lote";
+import { formatPendiente, textoHace, textoPctObjetivo, type LoteGestion } from "../lib/lote-logica";
 
 export function GestionLotes() {
   const [lotes, setLotes] = useState<LoteGestion[]>([]);
@@ -30,8 +33,7 @@ export function GestionLotes() {
     setCargando(true);
     setError(null);
     try {
-      const datos = await listarUltimosLotes();
-      setLotes(datos);
+      setLotes(await listarLotesAbiertos());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -51,33 +53,21 @@ export function GestionLotes() {
     }
   }
 
-  async function manejarReabrir(loteId: string) {
-    setProcesandoId(loteId);
-    try {
-      await reabrirLote(loteId);
-      await cargar();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setProcesandoId(null);
-    }
-  }
-
   if (cargando) {
     return <div className="p-6 text-center text-sm text-slate-500">Cargando lotes...</div>;
   }
 
   return (
-    <div className="mx-auto max-w-md">
+    <div className="mx-auto max-w-md pb-6">
       <div className="mb-4 flex items-center gap-2">
         <Package size={20} className="text-slate-400" aria-hidden />
-        <h2 className="text-sm font-medium text-slate-700">Gestión de lotes</h2>
+        <h2 className="text-sm font-medium text-slate-700">Lotes abiertos ({lotes.length})</h2>
       </div>
 
       {error && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
       {lotes.length === 0 ? (
-        <p className="text-center text-sm text-slate-400">Todavía no hay ningún lote con actividad.</p>
+        <p className="text-center text-sm text-slate-400">No hay ningún lote abierto.</p>
       ) : (
         <div className="space-y-3">
           {lotes.map((lote) => (
@@ -86,7 +76,6 @@ export function GestionLotes() {
               lote={lote}
               procesando={procesandoId === lote.id}
               onFinalizar={() => manejarFinalizar(lote.id)}
-              onReabrir={() => manejarReabrir(lote.id)}
             />
           ))}
         </div>
@@ -95,37 +84,18 @@ export function GestionLotes() {
   );
 }
 
-function formatFecha(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString("es-ES", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-/** m² con 1 decimal, piezas como entero — mismo criterio que el resto de pantallas de producción. */
-function formatPendiente(m2: number, piezas: number): string {
-  const m2Fmt = m2.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  const piezasFmt = Math.round(piezas).toLocaleString("es-ES");
-  return `${m2Fmt} m² · ${piezasFmt} piezas`;
-}
-
 function FilaLote({
   lote,
   procesando,
   onFinalizar,
-  onReabrir,
 }: {
   lote: LoteGestion;
   procesando: boolean;
   onFinalizar: () => void;
-  onReabrir: () => void;
 }) {
-  const finalizado = lote.estado === "finalizado";
+  const [confirmando, setConfirmando] = useState(false);
   const tienePendiente = lote.m2Pendiente !== null && lote.piezasPendiente !== null;
-  const completado = tienePendiente && lote.m2Pendiente === 0;
+  const pct = textoPctObjetivo(lote.pctObjetivo);
 
   return (
     <div className="rounded-xl bg-white p-4 shadow-sm">
@@ -135,37 +105,54 @@ function FilaLote({
             {lote.modeloNombre} · {lote.marcaNombre}
           </p>
           <p className="text-xs text-slate-400">Orden {lote.numeroOrden}</p>
-          <p className="mt-1 text-xs text-slate-400">Última actividad: {formatFecha(lote.ultimaActividad)}</p>
         </div>
 
-        <span
-          className={`shrink-0 rounded-full px-2 py-1 text-xs font-medium ${
-            finalizado ? "bg-slate-100 text-slate-500" : "bg-emerald-50 text-emerald-700"
-          }`}
-        >
-          {finalizado ? "Finalizado" : "Iniciado"}
-        </span>
+        {lote.tieneParteAbierto && (
+          <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
+            En producción
+          </span>
+        )}
       </div>
 
       {tienePendiente && (
-        <p className={`mt-2 text-xs font-medium ${completado ? "text-emerald-600" : "text-amber-700"}`}>
-          {completado
-            ? "Objetivo completado"
-            : `Pendiente: ${formatPendiente(lote.m2Pendiente as number, lote.piezasPendiente as number)}`}
+        <p className="mt-2 text-xs font-medium text-amber-700">
+          Pendiente: {formatPendiente(lote.m2Pendiente as number, lote.piezasPendiente as number)}
         </p>
       )}
+      <p className="mt-1 text-xs text-slate-400">
+        {pct !== null && <>{pct} del objetivo · </>}
+        {textoHace(lote.ultimaActividad)}
+      </p>
 
-      <button
-        type="button"
-        disabled={procesando}
-        onClick={finalizado ? onReabrir : onFinalizar}
-        className={`mt-3 flex w-full items-center justify-center gap-1 rounded-lg border py-2 text-xs font-medium disabled:opacity-50 ${
-          finalizado ? "border-slate-300 text-slate-600" : "border-red-300 text-red-700"
-        }`}
-      >
-        {finalizado ? <RotateCcw size={14} aria-hidden /> : <Lock size={14} aria-hidden />}
-        {procesando ? "Guardando..." : finalizado ? "Reabrir" : "Finalizar"}
-      </button>
+      {confirmando ? (
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            type="button"
+            disabled={procesando}
+            onClick={() => setConfirmando(false)}
+            className="flex-1 rounded-lg border border-slate-300 py-2 text-xs font-medium text-slate-600 disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={procesando}
+            onClick={onFinalizar}
+            className="flex-1 rounded-lg bg-red-600 py-2 text-xs font-medium text-white disabled:opacity-50"
+          >
+            {procesando ? "Guardando..." : "Sí, finalizar"}
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setConfirmando(true)}
+          className="mt-3 flex w-full items-center justify-center gap-1 rounded-lg border border-red-300 py-2 text-xs font-medium text-red-700"
+        >
+          <Lock size={14} aria-hidden />
+          Finalizar
+        </button>
+      )}
     </div>
   );
 }
