@@ -191,7 +191,7 @@ Lógica pura en `lib/validar-orden.ts` (copia idéntica en
   producto, para no dejar huérfanos); si el lote existe lo ignora. Mismo código en
   `_shared/validacion-orden.ts`. **Orden de despliegue:** primero el cliente (Vercel Ready), después
   la función (con servidor nuevo y cliente viejo, objetivos como 11000000 darían 422).
-- Pendiente de aplicar/desplegar: migración `cruzar_orden_captura` y `resolver-catalogo`.
+- Migración `cruzar_orden_captura` aplicada (04/10/2026, versión 20261004053508). Pendiente de desplegar: `resolver-catalogo` (tras Vercel Ready).
 
 ### Paso tono
 Formulario tono (obligatorio, patrón `[A-ZÑ0-9]`) y calibre.
