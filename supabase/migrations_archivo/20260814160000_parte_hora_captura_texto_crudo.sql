@@ -1,4 +1,4 @@
--- supabase/migrations/20260814160000_parte_hora_captura_texto_crudo.sql
+-- supabase/migrations_archivo/20260814160000_parte_hora_captura_texto_crudo.sql
 alter table public.parte
   add column hora_captura_pantalla_texto_crudo text null;
 

@@ -131,7 +131,17 @@ Unidades — ver `17` y `18`.
 
 - **Migraciones**: `supabase/migrations/AAAAMMDDHHMMSS_nombre.sql`. No
   se edita una migración ya aplicada: se añade otra. Todo el SQL debe
-  ser idempotente (`if not exists`, `create or replace`).
+  ser idempotente (`if not exists`, `create or replace`). La versión es SIEMPRE
+  de 14 dígitos con fecha y hora válidas (`date +%Y%m%d%H%M%S`). Prohibido aplicar SQL
+  en producción desde el SQL Editor sin su archivo de migración. Antes de cada
+  `supabase db push`, `supabase db push --dry-run`, y parar si aparece algo
+  inesperado. Desde el 06/10/2026 `supabase/migrations/` contiene solo la baseline
+  `20261006204519_baseline.sql`; las migraciones anteriores están en
+  `supabase/migrations_archivo/` (ahí hay que buscar cualquier referencia a una
+  migración anterior a esa fecha). Ver `23`.
+- **Entorno local**: `supabase start` / `db reset` con servicios no necesarios
+  desactivados y el cron apagado justo después (`update cron.job set active = false;`
+  como `supabase_admin`). Procedimiento completo y comprobación de deriva en `23`.
 - **Despliegue**: `supabase db push` (migraciones) y
   `supabase functions deploy <nombre>` (funciones), siempre desde la
   raíz del repo. Las funciones que llama la BD vía `pg_net` o un cron
@@ -256,7 +266,10 @@ frontend/src/
     ceria/                     CeriaScreen
     nora/                      NoraScreen (copiloto de averías por voz)
 supabase/
-  migrations/                  20260101000001 … 20261004121330 (170 migraciones)
+  migrations/                  20261006204519_baseline.sql (baseline única; ver 23)
+  migrations_archivo/          las 173 migraciones anteriores al 06/10/2026 (la CLI no las lee)
+  scripts/                     inventario.sql, acl_resumen.sql (comparar local y producción; ver 23)
+  seed.sql                     catálogo para local (solo se aplica en db reset)
   functions/
     _shared/                   anthropic.ts, openai.ts, openai_images.ts, deepseek_historia.ts,
                                cors.ts, cloudinary.ts, normalizacion.ts, formato.ts,

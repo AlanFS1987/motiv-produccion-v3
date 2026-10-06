@@ -1,4 +1,4 @@
--- supabase/migrations/20260814180000_parte_completado_at_y_correccion.sql
+-- supabase/migrations_archivo/20260814180000_parte_completado_at_y_correccion.sql
 alter table public.parte
   add column completado_at timestamptz null;
 

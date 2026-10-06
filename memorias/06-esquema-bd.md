@@ -1,8 +1,8 @@
 # 06 — Esquema de base de datos
 
-Contrastado con la BD real el 03/10/2026 (169 migraciones, hasta
-`20261003142002`: 61 tablas, 58 vistas, 59 funciones propias en `public`, 112
-políticas RLS, 4 trabajos de `pg_cron`). Las secciones de abajo se escribieron por
+Contrastado con la BD real el 06/10/2026 (baseline `20261006204519`, que sustituye a
+173 migraciones; ver `23`): 58 tablas, 59 vistas, 61 funciones propias en `public`, 114
+políticas RLS, 19 triggers, 4 trabajos de `pg_cron`. Las secciones de abajo se escribieron por
 etapas; los bloques «Rol mecánico», «Programación» y «Otros objetos no descritos
 arriba» van al final.
 Extensiones instaladas: `pg_trgm` (en `public`), `pgcrypto`, `pg_cron`, `pg_net`,
@@ -203,15 +203,13 @@ en vez de dejarla con `puede_ver=false`. Solo `general` usa
 `staging_responsable_v2`, `stg_migracion_v2`, `tmp_puntos_turno`
 cumplieron su función de backfill (ver `04`, `historial_ciclo_responsable`)
 y no formaban parte del diseño de v3. Verificado antes de borrar que
-ningún objeto (vista/función/trigger) dependía de ellas. Deja el
-camino libre para el squash de migraciones (`07`).
+ningún objeto (vista/función/trigger) dependía de ellas. Dejó el
+camino libre para el squash de migraciones (`23`).
 
-**Queda otra tabla de staging del import v2: `stg_migracion_operario_v2`**
-(operario_nombre, fecha, formato, piezas, m², minutos y turno/línea — 2.694 filas).
-No la citaba ninguna memoria. Comprobado el 03/10/2026 que ninguna función, vista ni
-trigger de la BD la usa, ni el frontend, las Edge Functions o las migraciones. Tiene RLS
-activa y ninguna política (el linter la marca `rls_enabled_no_policy`). Pendiente de
-decidir si se borra antes del squash (`07`).
+**`stg_migracion_operario_v2` — eliminada el 06/10/2026** (staging del import v2: operario_nombre,
+fecha, formato, piezas, m², minutos y turno/línea, 2.694 filas). Ninguna función, vista, trigger,
+frontend ni Edge Function la usaba. Se borró junto con las copias `bak_*` antes del squash
+(`23`); respaldo en `privado/backups/squash/bak_tablas_20261006.sql`.
 
 ## Vistas
 
@@ -438,7 +436,8 @@ Otros avisos del linter el 03/10/2026 (resumen completo en `00`): `function_sear
 en 7 funciones (`calidad_lote_por_fecha`, `calidad_linea_por_fecha`, `calidad_modelo_por_fecha`,
 `produccion_linea_por_fecha`, `fn_parte_validar_correccion`,
 `fn_incidencia_produccion_restringir_columnas_update`, `fn_almacen_pedido_linea_recibida`) y
-`rls_enabled_no_policy` en las dos copias `_bak_20261002` y en `stg_migracion_operario_v2`.
+`rls_enabled_no_policy` en las tablas de copia ya borradas el 06/10/2026 (respaldo en
+`privado/backups/squash/`); el lint ya no las marca.
 
 ## Referencias cruzadas
 
@@ -624,9 +623,8 @@ guarda el texto crudo del Excel/CSV diario (una fila por fecha, índice único p
 `nota` las notas sueltas (también `muestra_excel: …`, de `guardar_muestra_excel`). RLS: solo
 administrador (`admin_notas_admin_todo`, `for all`); el jefe escribe a través de las RPC.
 
-**programacion_orden_bak_20261002** y **programacion_orden_historico_bak_20261002** — copias
-del 02/10/2026 (RLS activa, sin políticas). **Ya no representan la programación vigente**
-(la tabla se cargó con el Excel real el 03/10/2026). Borrar a partir del 2026-10-16.
+Las copias `programacion_orden_bak_20261002` y `programacion_orden_historico_bak_20261002`
+(02/10/2026) se **borraron el 06/10/2026** (respaldo en `privado/backups/squash/`; ver `23`).
 
 ### Vista
 
@@ -686,4 +684,4 @@ su archivo de área).
   Las dos sin `search_path` fijo (lint).
 - **fn_set_nombre_normalizado_marca** / **fn_set_nombre_normalizado_modelo** — triggers
   (`BEFORE INSERT OR UPDATE OF nombre`) que rellenan `nombre_normalizado` con `fn_normalizar_texto`.
-- **stg_migracion_operario_v2** — staging del import v2 (ver arriba, «Tablas temporales»).
+- `stg_migracion_operario_v2` — staging del import v2, **borrada el 06/10/2026** (ver arriba, «Tablas temporales»).

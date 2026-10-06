@@ -161,7 +161,7 @@ desplegar nada", aunque conceptualmente sean dos sistemas distintos.
 
 ## Archivos
 
-`supabase/migrations/20260907120000_notificaciones_in_app_fase1.sql`,
+`supabase/migrations_archivo/20260907120000_notificaciones_in_app_fase1.sql`,
 `20260907130000_notificaciones_fanout_fase2.sql`,
 `20260907150000_chat_esquema_rls_fase4.sql`,
 `20260907170000_notificaciones_canal_por_tipo_esquema.sql`,

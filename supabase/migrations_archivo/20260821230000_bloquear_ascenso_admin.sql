@@ -1,4 +1,4 @@
--- supabase/migrations/20260821230000_bloquear_ascenso_admin.sql
+-- supabase/migrations_archivo/20260821230000_bloquear_ascenso_admin.sql
 -- Refuerzo de la decisión ya tomada en 09-administrador.md ("Alta de
 -- usuarios desde la app" descartada por riesgo): el rol admin solo se
 -- asigna por SQL a mano. Este trigger bloquea que un UPDATE sobre

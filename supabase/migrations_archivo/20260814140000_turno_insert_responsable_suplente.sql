@@ -1,4 +1,4 @@
--- supabase/migrations/20260814140000_turno_insert_responsable_suplente.sql
+-- supabase/migrations_archivo/20260814140000_turno_insert_responsable_suplente.sql
 create policy "turno_insert_responsable_suplente"
   on public.turno
   for insert

@@ -1,4 +1,4 @@
--- supabase/migrations/20260927130000_trigger_validar_correccion_parte.sql
+-- supabase/migrations_archivo/20260927130000_trigger_validar_correccion_parte.sql
 --
 -- Blindaje en BD de las reglas de corrección de partes. Complementa
 -- el arreglo de frontend del 27/09/2026 (corregirParte hereda

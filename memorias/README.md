@@ -32,6 +32,7 @@ solo remite a él con el número (`ver 04`).
 | `20-programacion.md` | Programación diaria de hornos: parser CSV, diff editable, confirmación con historial/deshacer, pestaña Programación del jefe |
 | `21-alimentacion.md` | Pestaña Alimentación: rendimiento vs velocidad de alimentación, vista SQL propia, nubes y evolución temporal |
 | `22-programacion-mejoras.md` | Mejoras acordadas de Programación (pegado de celdas, avisos de validación, Consultar de trabajo, notas) y estado de implementación; incluye lo aparcado (SAP, SASO, hoja de partida) |
+| `23-squash-migraciones.md` | Historial de migraciones (baseline única desde el 06/10/2026), entorno local (`config.toml`, cron apagado), cómo comprobar la deriva con producción y receta del squash con sus trampas |
 
 Marcas usadas:
 - `[VERIFICAR]` — descrito a partir de migraciones/código, no contrastado con la BD real.

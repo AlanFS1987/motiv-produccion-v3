@@ -118,7 +118,7 @@ fila propia, debajo de Ceria, con icono de micrófono en vez de robot.
 
 ## Archivos (11-12/09/2026)
 
-- `supabase/migrations/20260912120000_chat_acceso_nora.sql`
+- `supabase/migrations_archivo/20260912120000_chat_acceso_nora.sql`
 - `supabase/functions/nora/index.ts`
 - `frontend/src/lib/nora.ts`
 - `frontend/src/components/nora/NoraScreen.tsx`

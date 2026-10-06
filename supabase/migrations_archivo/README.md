@@ -1,3 +1,6 @@
+> **Carpeta histórica**: la CLI de Supabase no ejecuta estos archivos (solo lee `supabase/migrations/`).
+> El esquema vigente es la baseline `20261006204519_baseline.sql`; ver `memorias/23-squash-migraciones.md`.
+
 > **Nota (27/09/2026)**: este README describe el estado de la PRIMERA
 > entrega (enero 2026) y está desactualizado en partes concretas — por
 > ejemplo, aquí dice que OpenAI es el extractor OCR principal y

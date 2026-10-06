@@ -1,4 +1,4 @@
--- supabase/migrations/20260814170000_parte_completado.sql
+-- supabase/migrations_archivo/20260814170000_parte_completado.sql
 alter table public.parte
   add column completado boolean not null default false;
 

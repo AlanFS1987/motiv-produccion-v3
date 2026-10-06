@@ -88,14 +88,13 @@ abiertos:
    y `lote` exijan `fn_rol_actual() is not null`, para que una cuenta sin
    perfil no lea nada. Sin hacer. Probar por rol antes (todos los roles del
    enum leen `turno` y `lote`).
-2. **`anon` conserva todos los privilegios en 53 de las 61 tablas de `public`**
+2. **`anon` conserva todos los privilegios en 53 de las 58 tablas de `public`**
    (SELECT, INSERT, UPDATE, DELETE, TRUNCATE…; no solo SELECT, como se anotó antes).
    Solo los frena la RLS por la API: con `anon`, `fn_rol_actual()` y `auth.role()` no
    dan acceso y no hay políticas de escritura para él. `TRUNCATE` no pasa por RLS,
-   aunque PostgREST no lo expone. Las 8 tablas sin ningún privilegio para `anon` son
-   `app_secrets`, las cuatro de Programación (`programacion_orden`,
-   `programacion_orden_historico`, `programacion_nota`, `programacion_nota_frase`), las
-   dos copias `_bak_20261002` y `stg_migracion_operario_v2`. Tarea: revocar todo a
+   aunque PostgREST no lo expone. Las 5 tablas sin ningún privilegio para `anon` son
+   `app_secrets` y las cuatro de Programación (`programacion_orden`,
+   `programacion_orden_historico`, `programacion_nota`, `programacion_nota_frase`). Tarea: revocar todo a
    `anon` en las 53 (la app no usa `anon` para nada) y cambiar los privilegios por
    defecto para que las tablas y vistas nuevas no nazcan abiertas.
    **Las tablas nuevas nacen abiertas** (comprobado el 03/10/2026 creando una tabla de
@@ -122,19 +121,10 @@ abiertos:
    `fn_incidencia_produccion_restringir_columnas_update`,
    `fn_almacen_pedido_linea_recibida`) y protección contra contraseñas
    filtradas desactivada (lint).
-5. Borrar las copias `programacion_orden_bak_20261002` y
-   `programacion_orden_historico_bak_20261002` a partir del 2026-10-16
-   (ver `20`). Desde el 03/10/2026 **ya no representan la programación vigente** (la tabla se cargó con
-   el Excel real del día anterior: 53 órdenes), así que no sirven para restaurar ni para verificar por hash.
-6. **Tablas con RLS y sin políticas** (lint `rls_enabled_no_policy`, nivel INFO): las dos copias
-   `_bak_20261002` (se borran el 16/10) y `stg_migracion_operario_v2` (ver «Por construir», squash).
-7. **Cruce de la Foto 1 en modo aviso:** pasar `BLOQUEAR_CRUCE_MODELO` a `true`
+5. **Cruce de la Foto 1 en modo aviso:** pasar `BLOQUEAR_CRUCE_MODELO` a `true`
    (`frontend/src/lib/cruce-orden-logica.ts`) tras ~2 semanas de observación
    (revisar el 2026-10-18). Hoy el aviso «Esta orden ya existe como X y has leído Y» no bloquea
    Confirmar (ver `02`).
-8. Borrar las copias `bak_20261004_*` (`bak_20261004_lote`, `bak_20261004_parte`,
-   `bak_20261004_producto`, …; las creó `privado/limpieza_lotes_20261004.sql`) a partir del
-   2026-10-18, y entonces quitarlas también de las tablas «RLS sin políticas» si salen en el lint.
 
 ## Programación — pendiente
 
@@ -148,7 +138,7 @@ Mejoras 1–4 implementadas el 03/10/2026 (`20`, `22`). Queda:
 1. **Pasada de UI** (fase D): guion preparado en
    `privado/backups/guion_pasada_ui_programacion.md`; se hace una vez, con el
    usuario, y se limpia después (notas sintéticas, CSV sintético). **El guion está desactualizado:** su
-   estado base y la verificación por hash contra `programacion_orden_bak_20261002` ya no valen, porque la
+   estado base y la verificación por hash contra la copia de seguridad (ya borrada) ya no valen, porque la
    tabla se cargó con el Excel real el 03/10/2026 (53 órdenes). Antes de hacerla hay que fijar un estado
    base nuevo (foto de la tabla, historial y `admin_notas`).
 2. **`parse_programacion` no entiende el formato de un CSV guardado con fecha 2026-10-03**
@@ -191,14 +181,7 @@ Mejoras 1–4 implementadas el 03/10/2026 (`20`, `22`). Queda:
 7. Retención de 18 meses en Cloudinary (automatizar el borrado
    de huérfanas requeriría Edge Function con `service_role`). La PWA ya está
    construida (`manifest.json`, `sw.js`, `instalar.html`; ver `CLAUDE.md`).
-8. Squash de migraciones (169 hoy) — ya desbloqueado: las 3 tablas temporales
-   del import v2 (`staging_responsable_v2`, `stg_migracion_v2`,
-   `tmp_puntos_turno`) se borraron el 26/08/2026, confirmado que nada
-   dependía de ellas. Queda `stg_migracion_operario_v2` (2.694 filas, sin
-   ninguna dependencia en la BD ni en el código, RLS sin políticas): decidir si se
-   borra antes del squash. Mejor squashear con el esquema de seguridad ya
-   verificado en real (`00`), no a medias.
-9. Base de conocimiento de averías — en curso: NORA (copiloto por voz)
+8. Base de conocimiento de averías — en curso: NORA (copiloto por voz)
    y `ceria_documentacion_maquina` (solo BS08). Pendientes propios en
    `16` y `11`.
 
