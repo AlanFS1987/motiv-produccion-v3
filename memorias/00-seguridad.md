@@ -15,7 +15,7 @@ cómo se comprobó y el estado actual de cada vía.
 | Confirmación de email | Activa | — |
 | Funciones de `public` ejecutables por `anon`/PUBLIC | Cerradas, y los privilegios por defecto ya no las abren | 02/10/2026 (`20261002191839`) |
 | `SELECT` de `anon` en las vistas de `public` | **Revocado**: 0 de 58 legibles por `anon` | 03/10/2026 (`20261003015059`, `20261003015203`) |
-| Privilegios de `anon` en tablas de `public` | **Abierto**: 53 de 61 tablas con **todos** los privilegios (SELECT, INSERT, UPDATE, DELETE, TRUNCATE…); solo los frena la RLS — pendiente en `07` | — |
+| Privilegios de `anon` en tablas de `public` | **Abierto**: 53 de 58 tablas con **todos** los privilegios (SELECT, INSERT, UPDATE, DELETE, TRUNCATE…); solo los frena la RLS — pendiente en `07` | — |
 | Privilegios de las tablas de Programación (`programacion_orden`, `_historico`, `programacion_nota`, `programacion_nota_frase`) | **Cerrados**: solo `SELECT` para `authenticated` (el historial conservaba los siete para `anon` y `authenticated`) | 02/10/2026 (`programacion_orden`, `20261002131613`) y 03/10/2026 (resto, `20261003033056`) |
 | `confirmar_programacion` con lista vacía | Rechazada (antes borraba toda la programación) | 03/10/2026 (`20261003032652`) |
 | `fn_metros_entero` | Sin `EXECUTE` para `public`, `anon` y `authenticated` (la llaman funciones `security definer`) | 03/10/2026 (`20261003142002`) |
@@ -91,15 +91,18 @@ cerrarlo en `07`, punto 2.
   Los privilegios por defecto de `postgres` ya no abren las funciones nuevas a `anon`/PUBLIC (M3).
   Excepción: las 31 funciones de la extensión `pg_trgm`, instalada en `public`, sí son ejecutables
   por `anon`/PUBLIC (son funciones puras de similitud de texto; ver `extension_in_public`).
-- **Tablas**: 53 de las 61 tablas tienen todos los privilegios para `anon` y `authenticated`
-  (los privilegios por defecto de Supabase) y se apoyan solo en la RLS. Las 8 sin ningún privilegio
-  para `anon` son `app_secrets` (única sin RLS, sin acceso para `anon` ni `authenticated`), las cuatro
-  de Programación, las dos copias `_bak_20261002` y `stg_migracion_operario_v2`.
+- **Tablas**: 53 de las 58 tablas tienen todos los privilegios para `anon` y `authenticated`
+  (los privilegios por defecto de Supabase) y se apoyan solo en la RLS. Las 5 sin ningún privilegio
+  para `anon` son `app_secrets` (única sin RLS, sin acceso para `anon` ni `authenticated`) y las cuatro
+  de Programación. Las copias `_bak_20261002`, `bak_20261004*` y `stg_migracion_operario_v2` se borraron el
+  06/10/2026 (migración `20261006203944`, archivada; respaldo en `privado/backups/squash/bak_tablas_20261006.sql`).
+  Para comprobar los privilegios reales de local y producción: `supabase/scripts/acl_resumen.sql` y `23`.
 - **Tablas y vistas nuevas nacen abiertas**: propietario `postgres`, sin RLS y con los siete privilegios
   para `anon` y `authenticated`. Cada migración que cree una tabla debe cerrarlo en la misma migración
   (`enable row level security`, `revoke all ... from public, anon, authenticated`, `grant select` si
   procede); a una vista nueva hay que revocarle `select` a `anon`. Pendiente: cambiar los privilegios por
-  defecto (`07`, punto 2).
+  defecto (`07`, punto 2). Para comprobar que local y producción tienen los mismos permisos,
+  `supabase/scripts/acl_resumen.sql` (ver `23`).
 
 ### Programación: superficie nueva (03/10/2026)
 
@@ -130,7 +133,7 @@ Detalle del esquema en `06` y de los flujos en `20`.
 | `function_search_path_mutable` | WARN | 7 | Las 7 son `security invoker`; lista en `07`, punto 4 |
 | `extension_in_public` | WARN | 1 | `pg_trgm`; pendiente de decidir (`07`) |
 | `auth_leaked_password_protection` | WARN | 1 | Desactivada en el panel de Auth; pendiente de decidir (`07`) |
-| `rls_enabled_no_policy` | INFO | 3 | Las dos copias `_bak_20261002` y `stg_migracion_operario_v2` (`07`) |
+| `rls_enabled_no_policy` | INFO | 0 | Eran las copias `_bak_20261002`, `bak_20261004*` y `stg_migracion_operario_v2`, borradas el 06/10/2026 (respaldo en `privado/backups/squash/`) |
 
 ## Análisis automáticos
 

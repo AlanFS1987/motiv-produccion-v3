@@ -233,18 +233,19 @@ Antes de la migración de la clave se hizo copia de las dos tablas:
 `programacion_orden_historico_bak_20261002` (RLS activo, sin acceso para
 `anon`/`authenticated`), más el archivo
 `privado/backups/programacion_pre_M2_20261002.json` (fuera de git y de
-`supabase/migrations/`). **La copia en BD es la fiable para restaurar**;
+`supabase/migrations/`). **La copia en BD era la fiable para restaurar**;
 el JSON es solo una copia de conveniencia (en una fila el `modelo` pierde
 unos espacios finales al transcribirlo). Se usó una vez, tras la prueba
 de UI del 02/10/2026: se restauró `programacion_orden` (con sus `id` y
 marcas de tiempo) y el historial, y se verificó por hash que quedaron
-idénticos a la copia. **Borrar las dos tablas `_bak_20261002` a partir
-del 2026-10-16** si todo va bien (están marcadas con un comentario).
+idénticos a la copia. **Las dos tablas `_bak_20261002` se borraron el
+06/10/2026** (migración `20261006203944`, archivada; respaldo en
+`privado/backups/squash/bak_tablas_20261006.sql`).
 
 > **03/10/2026 — las copias ya no representan la programación vigente.** `programacion_orden` se cargó con el
 > Excel real del día anterior (53 órdenes, `fecha_alta` 2026-10-03): 30 de las órdenes actuales no estaban en la
 > copia y 16 de las 39 de la copia (la programación del 30/09) ya no están. Las copias **ya no sirven para
-> restaurar el estado vigente ni para verificar por hash**; se borran a partir del 2026-10-16 (no hay nada que
+> restaurar el estado vigente ni para verificar por hash**; se borraron el 06/10/2026 (no había nada que
 > conservar de ellas). El historial (`programacion_orden_historico`) tiene desde ese momento un snapshot de la
 > programación anterior.
 
@@ -415,7 +416,7 @@ espacios) y otras columnas usan coma decimal (`9,4`).
 programación del 02/10/2026 (4 hornos) tal como sale de Excel, y funcionó perfecto: `admin_notas` guardó el
 texto normalizado (67 líneas, fecha 2026-10-03) y `programacion_orden` quedó cargada con **53 órdenes**
 (14, 14, 13 y 12 por horno) con `fecha_alta` = 2026-10-03 y un snapshot nuevo en el historial. **A partir de
-ese momento `programacion_orden` ya no es la programación del 30/09: las copias `_bak_20261002` no la
+ese momento `programacion_orden` ya no es la programación del 30/09: las copias `_bak_20261002` (hoy borradas) no la
 representan** (ver «Copias de seguridad y restauración»).
 
 Antes de esa prueba se había comprobado el mismo Excel por SQL con una muestra recibida por el chat (reconstruida: el
@@ -482,5 +483,6 @@ Superficie nueva de Programación, para recoger en `00-seguridad.md` cuando se r
   para ambos (privilegios por defecto; la RLS sin políticas de escritura bloqueaba la API, pero
   `TRUNCATE` no pasa por RLS). Solo la escriben `confirmar_programacion` y
   `deshacer_ultima_programacion` (security definer). Ver en `07` que las tablas nuevas siguen
-  naciendo con privilegios amplios por defecto.
+  naciendo con privilegios amplios por defecto; los permisos reales se comprueban con
+  `supabase/scripts/acl_resumen.sql` (ver `23`).
 - **`confirmar_programacion`** rechaza `p_filas` vacío (`20261003032652`).
