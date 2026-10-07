@@ -47,6 +47,10 @@ funciones SQL `fn_notificar_telegram`, `fn_disparar_resumen_turno`,
 El secreto compartido vive en `app_secrets` (`telegram_webhook_secret`)
 y en el secret `TELEGRAM_WEBHOOK_SECRET`; si no coinciden las funciones
 devuelven 401 y no envían nada (falla cerrado).
+Desde el 07/10/2026 `generar-resumen-turno` también exige `x-webhook-secret` igual a
+`TELEGRAM_WEBHOOK_SECRET` (antes no comprobaba nada); si la variable no está configurada
+rechaza todo. Desplegada con `--no-verify-jwt`. Ninguna función SQL inserta ya en
+`notificaciones`: quien lo hace es la Edge Function, y lo hace antes de confirmar el envío: el resumen duplicado del 01/10/2026 fue de la Edge Function, no de SQL.
 
 ## Cron (`pg_cron`, horario en UTC — confirmado en `cron.job`)
 

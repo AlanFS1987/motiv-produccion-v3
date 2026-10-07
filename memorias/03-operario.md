@@ -61,7 +61,10 @@ independientes de las del responsable).
   hay ventana posterior.
 - Solo puede hacerlo el operario cuyo `id = parte.operario_id`
   (política RLS). Si el parte se creó con la línea sin operario,
-  `operario_id` es null y nadie puede verificar desde Mi línea.
+  `operario_id` es null y nadie puede verificar desde Mi línea **solo hasta que se
+  asigne la línea**: al asignarla, el trigger `trg_asignacion_rellena_operario`
+  rellena los partes vigentes de ese turno+línea y el parte aparece en Mi línea
+  (ver `01`). Si la línea nunca llega a asignarse, sigue sin operario (ver `07`).
 - Sin parte activo (o sin ningún parte suyo en el turno): la línea
   simplemente no aparece en la lista.
 

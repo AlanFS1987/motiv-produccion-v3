@@ -134,9 +134,17 @@ formato ┘
 línea en producción tiene exactamente un operario; sin operario = fuera
 de producción.
 
-Es puramente la **semilla**: al crear un parte se copia el operario
-vigente en ese momento a `parte.operario_id` (nullable), y a partir de
-ahí `asignacion_operario_linea` deja de leerse — ni "Mi línea" ni el
+Es la **semilla**: al crear un parte se copia el operario
+vigente en ese momento a `parte.operario_id` (nullable). Desde el 06/10/2026
+el trigger `trg_asignacion_rellena_operario` (AFTER INSERT OR UPDATE OF
+`operario_id` en `asignacion_operario_linea`, función
+`fn_asignacion_rellena_operario_en_partes`, security definer) además rellena
+retroactivamente `parte.operario_id` en los partes VIGENTES de ese turno+línea
+que lo tengan nulo (caso: el responsable asigna la línea después de crear el
+parte; antes el parte quedaba sin operario para siempre). **Nunca pisa un
+operario ya puesto**: reasignar a mitad de turno no cambia partes ya asignados.
+Es security definer porque la RLS de `parte` limita la edición del responsable
+a 1 h tras completar. Aparte de eso `asignacion_operario_linea` deja de leerse — ni "Mi línea" ni el
 cálculo de puntos vuelven a consultarla. Todo lo que "cuenta" (quién
 puede verificar el parte, a quién se atribuyen los puntos) usa siempre
 `parte.operario_id` (decisión sesión 19/08/2026; cómo se reparten los

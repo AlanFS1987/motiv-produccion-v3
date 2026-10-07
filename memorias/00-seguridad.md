@@ -20,6 +20,24 @@ cómo se comprobó y el estado actual de cada vía.
 | `confirmar_programacion` con lista vacía | Rechazada (antes borraba toda la programación) | 03/10/2026 (`20261003032652`) |
 | `fn_metros_entero` | Sin `EXECUTE` para `public`, `anon` y `authenticated` (la llaman funciones `security definer`) | 03/10/2026 (`20261003142002`) |
 
+### Endurecimiento del 07/10/2026 (`20261007000722` + Edge Function)
+
+- **`app_secrets`**: RLS activada SIN políticas. Era la única tabla de `public` sin RLS y solo la
+  protegía la falta de GRANT. Ya no queda ninguna tabla de `public` sin RLS. Las 4 funciones que la leen
+  (`fn_disparar_resumen_turno`, `fn_disparar_resumen_calidad`, `fn_disparar_informe_periodo`,
+  `fn_notificar_telegram`) son security definer de `postgres`, que salta la RLS: no cambia nada.
+- **`fn_disparar_resumen_turno`**: `EXECUTE` revocado a public/anon/authenticated (antes cualquier
+  usuario autenticado podía forzar el reenvío de un resumen por RPC). La llaman el trigger de cierre y
+  el cron, ambos como `postgres`.
+- **ORDEN CRÍTICO**: `fn_trigger_resumen_turno_cierre` pasó a security definer (`search_path
+  public,pg_temp`) ANTES del revoke. Antes corría con los permisos de quien cierra el turno; con solo
+  el revoke, cerrar un turno fallaba con «permission denied» (probado en transacción revertida).
+- **`generar-resumen-turno`** exige la cabecera `x-webhook-secret` = `TELEGRAM_WEBHOOK_SECRET` (la misma
+  de `notificar-telegram` y `notificar-telegram-resumen-calidad`); sin la variable rechaza todo.
+  Probado: sin secreto 401; con el de `app_secrets` pasa (500 con `turno_id` inexistente, sin enviar nada).
+- Comprobado con grep: ningún código del frontend llama a `generar-resumen-turno` ni a
+  `fn_disparar_resumen_turno`, ni usa `.rpc` con `fn_disparar*`/`fn_encolar*`.
+
 ### Registro de usuarios
 
 El registro **estuvo abierto** (`disable_signup: false`) hasta el
@@ -93,7 +111,7 @@ cerrarlo en `07`, punto 2.
   por `anon`/PUBLIC (son funciones puras de similitud de texto; ver `extension_in_public`).
 - **Tablas**: 53 de las 58 tablas tienen todos los privilegios para `anon` y `authenticated`
   (los privilegios por defecto de Supabase) y se apoyan solo en la RLS. Las 5 sin ningún privilegio
-  para `anon` son `app_secrets` (única sin RLS, sin acceso para `anon` ni `authenticated`) y las cuatro
+  para `anon` son `app_secrets` (RLS activada sin políticas desde el 07/10/2026, y sin acceso para `anon` ni `authenticated`) y las cuatro
   de Programación. Las copias `_bak_20261002`, `bak_20261004*` y `stg_migracion_operario_v2` se borraron el
   06/10/2026 (migración `20261006203944`, archivada; respaldo en `privado/backups/squash/bak_tablas_20261006.sql`).
   Para comprobar los privilegios reales de local y producción: `supabase/scripts/acl_resumen.sql` y `23`.

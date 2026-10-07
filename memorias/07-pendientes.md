@@ -7,12 +7,15 @@ verificaciones, decisiones y construcción.
 
 ## Bugs y huecos conocidos
 
-1. Posible notificación duplicada del resumen de turno: la versión de
-   `fn_disparar_resumen_turno` de `20260907130000` inserta una fila en
-   `notificaciones` y `generar-resumen-turno` inserta otra. Si esa
-   función no se actualizó después, cada resumen aparece dos veces en la
-   campana. Comprobar con
-   `select prosrc from pg_proc where proname = 'fn_disparar_resumen_turno';`
+1. **Partes sin operario (caso residual).** Desde el 06/10/2026 el trigger
+   `trg_asignacion_rellena_operario` rellena `parte.operario_id` nulo al asignar la línea
+   (ver `01`), pero si la línea nunca llega a asignarse el parte sigue sin operario: el
+   trigger no puede deducirlo y el operario no lo ve en «Mi línea» ni recibe los puntos.
+   Los datos mostraban que los casos recientes los generan responsables que crean partes
+   al final del turno. Backfill del 06/10/2026: 29 partes rellenados y 10 resueltos a mano
+   creando 8 asignaciones (turno, línea) con SQL directo; resultado 0. Vigilancia: revisar
+   cada mañana `supabase/scripts/partes_sin_operario.sql` (debe dar 0 filas). Aviso no
+   bloqueante en la captura del parte: **pendiente**, decidido no tocar el frontend de momento.
 2. `ProgramacionConsultar.tsx` (hoja de impresión): el `<caption>`
    muestra la fecha de HOY aunque los datos impresos sean del último
    `confirmar_programacion` (puede ser de un día anterior si el CSV de
@@ -25,6 +28,13 @@ verificaciones, decisiones y construcción.
    caería al mismo fallback erróneo de "hoy". Necesita antes una
    migración RLS (fuera del alcance de un cambio "solo archivos, sin
    tocar BD").
+
+3. `fn_cerrar_ciclos_pendientes` recalcula y sobrescribe TODOS los ciclos anteriores con
+   datos en vivo (sin `not exists`) y pisa `fecha_cierre`.
+4. El cron del 28/09 falló (columna `pts.puntos_piezas`) y el ciclo 7 no se cerró hasta el
+   05/10/2026.
+5. Los puntos de partes recuperados con el backfill del 06/10/2026 no se reflejan en
+   `historial_ciclos` hasta que se recalcule.
 
 (Histórico: los 6 bugs que había antes — cuenta `suplente`, migración
 RLS sin confirmar, código muerto en `gamificacion.ts`,
@@ -58,6 +68,8 @@ ambigüedad `nivel_id` en `fn_otorgar_bonus_nivel`).)
 
 ## Decisiones por tomar
 
+- Dejar o no `supabase/migrations_archivo/` en GitHub (173 migraciones anteriores al squash).
+  Alternativas: tag `historial-migraciones-pre-squash` o repo privado de archivo. Ver `23`.
 - `extension_in_public`: `pg_trgm` vive en el esquema `public` en vez
   de uno propio (`extensions`). Cosmético, sin prisa (lint de
   seguridad 26/08/2026, ver `06`). Sus 31 funciones, al estar en `public`, son ejecutables por
@@ -108,23 +120,33 @@ abiertos:
    from anon, authenticated`), **cada tabla nueva debe llevar en su misma migración
    `enable row level security` + `revoke all ... from public, anon, authenticated` +
    `grant select` solo si procede** (las de Programación lo hacen).
-3. `fn_disparar_resumen_turno(uuid)` sigue ejecutable por `authenticated`:
-   la llama un trigger NO `security definer`
-   (`fn_trigger_resumen_turno_cierre`), que corre con los permisos de quien
-   cierra el turno. Hay que hacer también ese trigger `security definer`
-   antes de restringirla sin romper el cierre manual. Hasta entonces
-   cualquier usuario autenticado puede pedir un resumen de Telegram de
-   cualquier turno.
-4. Funciones sin `search_path` fijo (7, todas `security invoker`:
+3. Funciones sin `search_path` fijo (7, todas `security invoker`:
    `calidad_lote_por_fecha`, `calidad_linea_por_fecha`, `calidad_modelo_por_fecha`,
    `produccion_linea_por_fecha`, `fn_parte_validar_correccion`,
    `fn_incidencia_produccion_restringir_columnas_update`,
    `fn_almacen_pedido_linea_recibida`) y protección contra contraseñas
    filtradas desactivada (lint).
-5. **Cruce de la Foto 1 en modo aviso:** pasar `BLOQUEAR_CRUCE_MODELO` a `true`
+4. **Cruce de la Foto 1 en modo aviso:** pasar `BLOQUEAR_CRUCE_MODELO` a `true`
    (`frontend/src/lib/cruce-orden-logica.ts`) tras ~2 semanas de observación
    (revisar el 2026-10-18). Hoy el aviso «Esta orden ya existe como X y has leído Y» no bloquea
    Confirmar (ver `02`).
+
+5. **Funciones Edge sin control de rol/host:** `resolver-catalogo` sin comprobación de rol;
+   `ocr-parte` sin rol ni restricción de host de la URL; CORS `*` en todas las funciones.
+6. **RLS de escritura demasiado laxa:** `parte_insert_responsable` solo comprueba el rol (se
+   pueden atribuir partes a otro responsable/operario) y el UPDATE de un parte pendiente no
+   restringe columnas; `lote_update_responsable` permite tocar cualquier columna.
+7. **Auth:** MFA del administrador sin activar; contraseñas filtradas (HIBP) sin activar (ver
+   «Decisiones por tomar»); cuenta «prueba» activa.
+8. **Las 59 vistas** son legibles por cualquier `authenticated`.
+9. **Secreto del webhook** de 19 caracteres: rotar a 32+ (en `app_secrets` y en el secret
+   `TELEGRAM_WEBHOOK_SECRET` a la vez) y comparar en tiempo constante (hoy `!==`).
+10. `notificar-telegram` no escapa HTML ni comprueba `res.ok`.
+11. Ceria renderiza imágenes https arbitrarias (`img-src`).
+12. **Limpieza:** funciones aparentemente sin uso (`fn_consumir_generacion`,
+    `fn_otorgar_generaciones_por_nivel`, `fn_buscar_*_similar`) a verificar antes de borrar;
+    rol `suplente` sin uso; `pg_trgm` en `public` (ver «Decisiones por tomar»). Las 7 funciones
+    sin `search_path` fijo (punto 3) no son security definer: riesgo bajo.
 
 ## Programación — pendiente
 

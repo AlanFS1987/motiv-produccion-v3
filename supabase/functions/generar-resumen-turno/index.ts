@@ -56,6 +56,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
 const TELEGRAM_CHAT_RESUMEN_TURNO = Deno.env.get("TELEGRAM_CHAT_RESUMEN_TURNO");
+const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET");
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -124,6 +125,13 @@ Deno.serve(async (req: Request) => {
   }
   if (req.method !== "POST") {
     return jsonError("Método no permitido, usa POST", 405);
+  }
+
+  // Solo la base de datos (fn_disparar_resumen_turno, vía pg_net) debe llamar a esta función.
+  // Mismo secreto compartido que notificar-telegram. Si no está configurado, se rechaza todo.
+  const secretRecibido = req.headers.get("x-webhook-secret");
+  if (!WEBHOOK_SECRET || secretRecibido !== WEBHOOK_SECRET) {
+    return jsonError("No autorizado", 401);
   }
 
   let body: RequestBody;

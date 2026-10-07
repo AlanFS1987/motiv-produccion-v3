@@ -90,6 +90,15 @@ para las ACL se usa la consulta SQL del proyecto (herramienta MCP de Supabase o 
   `\\(un)?restrict`, usar `awk`.
 - Archivos del CLI: `supabase/.gitignore` ignora `.branches` y `.temp`.
 
+## Migraciones posteriores a la baseline
+
+Ya existen dos: `20261006230657_parte_operario_desde_asignacion.sql` (trigger `trg_asignacion_rellena_operario`,
+ver `01`) y `20261007000722_endurecer_resumen_turno_y_app_secrets.sql` (ver `00`). Local y remoto coinciden
+(`supabase migration list`, `db push --dry-run` sin cambios, 07/10/2026). Tras un squash o una migración
+nueva hay que verificar privilegios con `supabase/scripts/acl_resumen.sql` (ver «Comprobar la deriva»). Los
+valores de referencia de arriba son los de la baseline: con esas dos migraciones pasan a 62 funciones y 20
+triggers, y el hash de ACL cambia (RLS en `app_secrets`, `EXECUTE` revocado en `fn_disparar_resumen_turno`).
+
 ## Referencias
 
 - `supabase/scripts/inventario.sql` — inventario de objetos y datos de catálogo.

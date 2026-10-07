@@ -135,10 +135,15 @@ Unidades — ver `17` y `18`.
   de 14 dígitos con fecha y hora válidas (`date +%Y%m%d%H%M%S`). Prohibido aplicar SQL
   en producción desde el SQL Editor sin su archivo de migración. Antes de cada
   `supabase db push`, `supabase db push --dry-run`, y parar si aparece algo
-  inesperado. Desde el 06/10/2026 `supabase/migrations/` contiene solo la baseline
-  `20261006204519_baseline.sql`; las migraciones anteriores están en
+  inesperado. Desde el 06/10/2026 `supabase/migrations/` contiene la baseline
+  `20261006204519_baseline.sql` y las posteriores (`20261006230657`, `20261007000722`); las migraciones anteriores están en
   `supabase/migrations_archivo/` (ahí hay que buscar cualquier referencia a una
   migración anterior a esa fecha). Ver `23`.
+  Si una migración se aplica desde otra herramienta (p. ej. el conector de Supabase de Claude),
+  el archivo debe añadirse al repo con la MISMA versión registrada en
+  `supabase_migrations.schema_migrations`; después, comprobar con `supabase migration list` y
+  `supabase db push --dry-run`. Los datos puntuales (como las 8 asignaciones del 06/10/2026) se
+  aplican con SQL directo y se documentan en la memoria correspondiente, no como migración.
 - **Entorno local**: `supabase start` / `db reset` con servicios no necesarios
   desactivados y el cron apagado justo después (`update cron.job set active = false;`
   como `supabase_admin`). Procedimiento completo y comprobación de deriva en `23`.

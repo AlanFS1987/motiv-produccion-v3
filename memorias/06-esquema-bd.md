@@ -288,6 +288,7 @@ no lo tenían (lint `function_search_path_mutable`). `ALTER FUNCTION
 | `fn_parte_restringir_columnas_update()` | trigger before update en parte (`05`) |
 | `fn_parte_set_formato_id()` | trigger before insert en parte |
 | `fn_calcular_calibre_com_pct()` | trigger before insert/update en parte |
+| `fn_asignacion_rellena_operario_en_partes()` | security definer, `search_path public,pg_temp`, sin EXECUTE para public/anon/authenticated. Trigger `trg_asignacion_rellena_operario` AFTER INSERT OR UPDATE OF `operario_id` en `asignacion_operario_linea`: rellena `parte.operario_id` nulo en partes vigentes del turno+línea; nunca pisa uno ya puesto (`01`; migración `20261006230657`) |
 | `fn_buscar_modelo_similar`, `fn_buscar_marca_similar` | pg_trgm, top 5 |
 | `fn_notificar_telegram()` | security definer, lee app_secrets, `net.http_post` (`05`). Extendida el 07/09/2026 para, además de la llamada HTTP a Telegram, hacer INSERT en `notificaciones` con título/cuerpo enriquecidos (línea + turno). Hubo un vaivén de diseño el mismo día: un intento intermedio reconstruía el texto completo en PL/pgSQL aparte del que arma la Edge Function para Telegram — se revirtió al detectar que ambas versiones se desincronizaban (una línea que faltaba en una de las dos); el texto vive en un solo sitio (`15`) |
 | `fn_disparar_resumen_calidad()` | security definer, lee app_secrets, `net.http_post`. Tras el vaivén del 07/09/2026 **vuelve a ser solo el disparo HTTP** — el INSERT en `notificaciones` para `resumen_calidad` lo hace directamente la Edge Function `notificar-telegram-resumen-calidad`, no la función SQL |
@@ -333,7 +334,7 @@ llama):
 
 Auditoría completa de las 11 funciones `security definer` señaladas
 por el linter de Supabase (26/08/2026): 5 reparadas (arriba), 1
-pendiente (`fn_disparar_resumen_turno`), y 5 sin acción por ser
+cerrada el 07/10/2026 (`fn_disparar_resumen_turno`, ver `00`), y 5 sin acción por ser
 seguras tal cual o no ser invocables por RPC en la práctica —
 `fn_seleccionar_personaje` y `fn_rol_actual` (ya usan `auth.uid()`
 correctamente); `fn_notificar_telegram`, `fn_marcar_corregido_no_vigente`
@@ -351,7 +352,7 @@ arriba: la barrera vive dentro de la función porque el llamador legítimo es un
 `authenticated`); 3 son funciones de trigger (`fn_bloquear_ascenso_admin`,
 `fn_marcar_corregido_no_vigente`, `fn_notificar_telegram`); y 5 anteriores:
 `fn_otorgar_bonus_nivel` (guarda interna de administrador), `fn_disparar_resumen_turno`
-(pendiente, `07`), `fn_seleccionar_personaje` y `fn_rol_actual` (usan `auth.uid()`) y
+(cerrada el 07/10/2026, `00`), `fn_seleccionar_personaje` y `fn_rol_actual` (usan `auth.uid()`) y
 `fn_chat_acceso` (consulta `chat_acceso`; la usan las políticas RLS). Las funciones que solo
 llaman Edge Functions o el cron son `service_role`-only y no aparecen en este aviso.
 ### `informe_periodo` (20260920130000)
