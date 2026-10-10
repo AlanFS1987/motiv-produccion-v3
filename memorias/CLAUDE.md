@@ -238,6 +238,7 @@ frontend/src/
     ranking.ts / logros.ts / stats-avatar.ts   soportan rol operario+responsable
     dashboard-jefe.ts / dashboard-detallada.ts / dashboard-incidencias.ts / dashboard-calidad.ts / dashboard-rectificado.ts
     dashboard-alimentacion.ts / alimentacion-calculos.ts   consulta + cálculos puros de la pestaña Alimentación (21)
+    horno-formato.ts / balance-horno-calculos.ts   hornos por formato, clasificado por turno y balance horno vs clasificación (21)
     admin-usuarios.ts / admin-partes.ts / admin-cierre-fabrica.ts / admin-checklist.ts /
     admin-engrase.ts / admin-gamificacion.ts / admin-gestion-usuarios.ts
     pantalla-carrusel.ts / ceria.ts / nora.ts
@@ -257,13 +258,14 @@ frontend/src/
     operario/                  OperarioApp, InicioOperarioScreen (+Ranking/StatsAvatar/Logros), MiLinea, Historial, Limpieza, Verificacion*
     jefe/                      JefeApp, VistaRapida, VistaDetallada, Incidencias, Informes,
                                jefe/programacion/ (Consultar/ConsultarFila/DialogoAnadirNota/Revisar/AvisosRevisar/Screen)
-    admin/                     AdminApp, AjustarLetras, CorreccionPartes, PruebaCamara,
+    admin/                     AdminApp, HornosFormatoScreen (pestaña Hornos, 21), AjustarLetras, CorreccionPartes, PruebaCamara,
                                CierreFabrica, Checklist, GestionUsuarios, ChatAcceso,
                                Gamificacion, Notas, PuntosEngrase, FrasesNota, AdminNuevoParte
                                (Programación reutiliza jefe/programacion/ProgramacionScreen)
     calidad/                   CalidadApp, CalidadLotesScreen
-    alimentacion/               AlimentacionPanel, FiltrosAlimentacion, NubesAlimentacion,
-                               TemporalAlimentacion, TooltipAlimentacion (21)
+    alimentacion/               AlimentacionPanel, FiltrosAlimentacion,
+                               CurvaVelocidadAlimentacion, BalanceHornoAlimentacion,
+                               TooltipAlimentacion (21)
     rectificado/                RectificadoApp, VistaRapida/VistaDetallada de rectificado
     produccion/                 ProduccionApp (8 pestañas, reutiliza componentes de jefe/ y calidad/)
     mecanico/                   MecanicoApp, IncidenciasMecanicoScreen, AlmacenScreen, EngraseScreen

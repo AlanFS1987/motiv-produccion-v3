@@ -175,7 +175,7 @@ export async function crearParteInicial(
     .eq("turno_id", turnoId)
     .eq("linea_id", lineaId)
     .maybeSingle();
-  if (asignacionError) throw asignacionError;
+  if (asignacionError) throw new Error(asignacionError.message);
 
   const { data, error } = await supabase
     .from("parte")
@@ -205,7 +205,7 @@ export async function crearParteInicial(
     .select("id")
     .single();
 
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return data as { id: string };
 }
 
@@ -224,7 +224,7 @@ export async function actualizarVerificacionCaja(
       verificacion_caja_detalle: detalle ?? null,
     })
     .eq("id", parteId);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }
 
 /** Subconjunto de LoteCompleto con los 4 campos de código de barras (3.8). */
@@ -242,7 +242,7 @@ export async function obtenerCodigosBarrasParaParte(parteId: string): Promise<Co
     .select("lote:lote_id ( codbar_caja, codbar_pieza, cod_upec, codbar_saso )")
     .eq("id", parteId)
     .single();
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   const lote = Array.isArray(data.lote) ? data.lote[0] : data.lote;
   return {
     codbarCaja: lote?.codbar_caja ?? null,
@@ -268,7 +268,7 @@ export async function actualizarVerificacionCodbar(
       verificacion_codbar_detalle: detalle ?? null,
     })
     .eq("id", parteId);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }
 
 export interface CompletarParteInput {
@@ -316,7 +316,7 @@ export async function completarParte(input: CompletarParteInput): Promise<void> 
     })
     .eq("id", parteId);
 
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }
 
 /**
@@ -327,7 +327,7 @@ export async function completarParte(input: CompletarParteInput): Promise<void> 
  */
 export async function cerrarSinProduccion(parteId: string): Promise<void> {
   const { error } = await supabase.from("parte").update({ completado: true, completado_at: new Date().toISOString() }).eq("id", parteId);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }
 
 /**
@@ -347,7 +347,7 @@ export async function obtenerPartePendiente(turnoId: string, lineaId: string): P
     .limit(1)
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   if (!data) return null;
   return mapearFilaAParteResumen(data);
 }
@@ -366,7 +366,7 @@ export async function obtenerPartesPendientesPorLinea(turnoId: string): Promise<
     .eq("completado", false)
     .order("created_at", { ascending: false });
 
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 
   const resultado: Record<string, ParteResumen> = {};
   for (const fila of data ?? []) {
@@ -492,7 +492,7 @@ export async function obtenerPartesCompletadosHoy(turnoId: string, lineaId: stri
     .eq("completado", true)
     .order("completado_at", { ascending: false });
 
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return (data ?? []).map(mapearFilaAParteDetalle);
 }
 
@@ -627,22 +627,17 @@ export async function corregirParte(
     .select("id")
     .single();
 
-  if (errorInsert) throw errorInsert;
+  if (errorInsert) throw new Error(errorInsert.message);
 
   // NO se hace un UPDATE manual de vigente=false aquí: el trigger
-  // trg_parte_corregir (fn_marcar_corregido_no_vigente, 0004_core.sql)
-  // ya lo hace automáticamente al insertar. Repetirlo a mano era
-  // redundante — y, además, engañoso: esa función NO es
-  // `security definer`, corre con los permisos de quien llama, así
-  // que está sujeta a las mismas políticas RLS que un UPDATE manual
-  // (responsable_id = auth.uid() y dentro de la ventana de 1h). Si
-  // algún día esta función se llama fuera de esas condiciones (ej.
-  // un futuro panel de administrador corrigiendo el parte de otro
-  // responsable), NI el trigger NI el UPDATE manual podrían marcar el
-  // original — y PostgREST no da error cuando un UPDATE no afecta
-  // ninguna fila por RLS, así que el `if (errorUpdate)` de antes
-  // nunca lo habría detectado. Se verifica aquí de verdad, leyendo el
-  // resultado en vez de confiar en que un segundo UPDATE lo repare.
+  // trg_parte_corregir (fn_marcar_corregido_no_vigente) ya lo hace
+  // automáticamente al insertar. Esa función es SECURITY DEFINER
+  // (search_path public), así que no depende de las políticas RLS de
+  // quien llama. Su UPDATE anidado sobre el original lo permite
+  // fn_parte_restringir_columnas_update gracias a pg_trigger_depth() > 1;
+  // el UPDATE directo de un responsable sobre vigente/completado/
+  // completado_at sigue bloqueado. Aun así se verifica aquí de verdad,
+  // leyendo el resultado, en vez de confiar en que el trigger lo hizo.
   const { data: verificacion, error: errorVerificacion } = await supabase
     .from("parte")
     .select("vigente")
@@ -673,7 +668,7 @@ export async function contarPartesCompletadosPorLinea(turnoId: string): Promise<
     .eq("vigente", true)
     .eq("completado", true);
 
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 
   const resultado: Record<string, number> = {};
   for (const fila of data ?? []) {
@@ -723,7 +718,7 @@ export async function obtenerLoteCompleto(loteId: string): Promise<LoteCompleto>
     .eq("id", loteId)
     .single();
 
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 
   const producto = Array.isArray(data.producto) ? data.producto[0] : data.producto;
   const modelo = Array.isArray(producto?.modelo) ? producto.modelo[0] : producto?.modelo;
@@ -757,7 +752,7 @@ export async function obtenerLoteCompleto(loteId: string): Promise<LoteCompleto>
 /** Detalle de un parte por su id directamente — para "Ver-editar" desde la lista desplegada. */
 export async function obtenerParteDetalle(parteId: string): Promise<ParteDetalle> {
   const { data, error } = await supabase.from("parte").select(SELECT_PARTE_DETALLE).eq("id", parteId).single();
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return mapearFilaAParteDetalle(data);
 }
 export interface SugerenciaContinuar {
@@ -785,7 +780,7 @@ export async function obtenerSugerenciasContinuarPorLinea(
     .select("created_at")
     .eq("id", turnoActualId)
     .single();
-  if (errorTurnoActual) throw errorTurnoActual;
+  if (errorTurnoActual) throw new Error(errorTurnoActual.message);
 
   const { data: turnoAnterior, error: errorAnterior } = await supabase
     .from("turno")
@@ -794,7 +789,7 @@ export async function obtenerSugerenciasContinuarPorLinea(
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (errorAnterior) throw errorAnterior;
+  if (errorAnterior) throw new Error(errorAnterior.message);
   if (!turnoAnterior) return {};
 
   const { data, error } = await supabase
@@ -804,7 +799,7 @@ export async function obtenerSugerenciasContinuarPorLinea(
     .eq("vigente", true)
     .eq("completado", true)
     .order("completado_at", { ascending: false });
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 
   const resultado: Record<string, SugerenciaContinuar> = {};
   for (const fila of data ?? []) {

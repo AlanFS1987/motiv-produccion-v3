@@ -1,35 +1,31 @@
 // frontend/src/components/alimentacion/AlimentacionPanel.tsx
-// Pestaña "Alimentación": relación entre la velocidad a la que
-// trabaja cada línea (piezas/min a plena), el tiempo que pasa a plena
-// y lo que realmente sale del turno. Pensado para encontrar el punto
-// óptimo de alimentación.
+// Pestaña "Alimentación": relación entre la velocidad conseguida a
+// plena de cada línea, el tiempo que pasa a plena y lo que sale por
+// turno, para encontrar el punto óptimo de alimentación.
 //
 // Componente autocontenido y sin props: se monta igual en JefeApp,
 // AdminApp, ProduccionApp o donde haga falta (mismo patrón que
-// InformesScreen). Tres gráficas con filtros comunes (formato,
-// líneas, periodo): dos nubes de puntos y una evolución temporal.
+// InformesScreen). Filtros comunes (formato, líneas, periodo, solo
+// turnos comparables) y la curva de velocidad conseguida.
 //
 // Reglas (memorias/21-alimentacion.md):
-//  - Minutos REALES, sin el suelo de 480 del % de rendimiento oficial.
+//  - Base de TIEMPO ALIMENTABLE = total − banco − máquina; las reglas de
+//    qué turnos entran viven en REGLAS_TURNOS (alimentacion-calculos.ts).
 //  - Solo turnos+línea de UN único formato; los mixtos se cuentan aparte.
-//  - "Consigna" = piezas ÷ minutos a plena (lo que la máquina consigue,
-//    no lo que se le pidió: la consigna real no se captura).
+//  - "Velocidad conseguida" = piezas ÷ minutos a plena (lo que la máquina
+//    consigue, no lo que se le pidió: la consigna real no se captura).
 //  - Al agrupar se suman piezas y minutos y se divide al final.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
-import { clasificarTurnos, sumarDias } from "../../lib/alimentacion-calculos";
-import {
-  DIAS_MINIMOS_CARGA,
-  obtenerFormatosAlimentacion,
-  obtenerTurnosAlimentacion,
-  RANGO_MINUTOS_VALIDOS,
-  type TurnoLineaAlimentacion,
-} from "../../lib/dashboard-alimentacion";
+import { clasificarAlimentables, sumarDias } from "../../lib/alimentacion-calculos";
+import { construirBalance, nivelHornoPorLinea } from "../../lib/balance-horno-calculos";
+import { listarHornoFormato, obtenerClasificadoPlanta, type ClasificadoTurnoFormato, type HornoFormato } from "../../lib/horno-formato";
+import { obtenerFormatosAlimentacion, obtenerTurnosAlimentacion, type TurnoLineaAlimentacion } from "../../lib/dashboard-alimentacion";
 import { hoyLocalISO } from "../../lib/fechas";
-import { FiltrosAlimentacion, MAX_LINEAS, type LineaDisponible, type RangoNubes } from "./FiltrosAlimentacion";
-import { NubesAlimentacion } from "./NubesAlimentacion";
-import { TemporalAlimentacion } from "./TemporalAlimentacion";
+import { FiltrosAlimentacion, MAX_LINEAS, type LineaDisponible, type RangoDias } from "./FiltrosAlimentacion";
+import { CurvaVelocidadAlimentacion } from "./CurvaVelocidadAlimentacion";
+import { BalanceHornoAlimentacion } from "./BalanceHornoAlimentacion";
 
 const FORMATO_POR_DEFECTO = "600x1200"; // el que más líneas comparte
 
@@ -43,8 +39,13 @@ function mensajeDeError(err: unknown): string {
 export function AlimentacionPanel() {
   const [formatos, setFormatos] = useState<string[]>([]);
   const [formato, setFormato] = useState<string>("");
-  const [rango, setRango] = useState<RangoNubes>(180);
+  const [rango, setRango] = useState<RangoDias>(180);
   const [filas, setFilas] = useState<TurnoLineaAlimentacion[]>([]);
+  const [soloComparables, setSoloComparables] = useState(false);
+  const [hornos, setHornos] = useState<HornoFormato[]>([]);
+  const [clasificadoPlanta, setClasificadoPlanta] = useState<ClasificadoTurnoFormato[]>([]); // todos los formatos
+  // Los datos del horno son un complemento: si fallan (p. ej. migración sin aplicar) no tumban la curva.
+  const [avisoHorno, setAvisoHorno] = useState<string | null>(null);
   const [lineasElegidas, setLineasElegidas] = useState<string[] | null>(null); // null = las primeras MAX_LINEAS
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,12 +66,19 @@ export function AlimentacionPanel() {
       });
   }, []);
 
-  const cargar = useCallback(async (f: string, r: RangoNubes) => {
+  // Parámetros de los hornos por formato (una vez).
+  useEffect(() => {
+    listarHornoFormato()
+      .then(setHornos)
+      .catch((err) => setAvisoHorno(`No se pudo cargar la tabla de hornos: ${mensajeDeError(err)}`));
+  }, []);
+
+  const cargar = useCallback(async (f: string, r: RangoDias) => {
     const numero = ++peticionActual.current;
     setCargando(true);
     setError(null);
     try {
-      const desde = sumarDias(hoyLocalISO(), -Math.max(r, DIAS_MINIMOS_CARGA));
+      const desde = sumarDias(hoyLocalISO(), -r);
       const datos = await obtenerTurnosAlimentacion(f, desde);
       if (numero === peticionActual.current) setFilas(datos);
     } catch (err) {
@@ -83,6 +91,19 @@ export function AlimentacionPanel() {
   useEffect(() => {
     if (formato) void cargar(formato, rango);
   }, [formato, rango, cargar]);
+
+  // Clasificado de TODA la planta (todos los formatos) para el balance: la inferencia de qué formato
+  // cuece cada horno los necesita juntos. Solo depende del periodo, no del formato elegido.
+  useEffect(() => {
+    let vigente = true;
+    setClasificadoPlanta([]);
+    obtenerClasificadoPlanta(sumarDias(hoyLocalISO(), -rango))
+      .then((d) => vigente && setClasificadoPlanta(d))
+      .catch((err) => vigente && setAvisoHorno(`No se pudo cargar el clasificado de la planta: ${mensajeDeError(err)}`));
+    return () => {
+      vigente = false;
+    };
+  }, [rango]);
 
   // ── Derivados ──────────────────────────────────────────────────
 
@@ -102,18 +123,35 @@ export function AlimentacionPanel() {
     return filas.filter((f) => ids.has(f.lineaId));
   }, [filas, lineasActivas]);
 
-  // Temporal: todo lo cargado (≥ trimestre). Nubes y resumen: solo el rango elegido.
-  const validosTemporal = useMemo(() => clasificarTurnos(filasDeLineasActivas).validos, [filasDeLineasActivas]);
-
-  const clasificacionNubes = useMemo(() => {
+  // Curva de velocidad conseguida: base de tiempo alimentable, dentro del periodo elegido.
+  const clasificacionAlimentable = useMemo(() => {
     const desdeRango = sumarDias(hoyLocalISO(), -rango);
-    return clasificarTurnos(filasDeLineasActivas.filter((f) => f.fecha >= desdeRango));
-  }, [filasDeLineasActivas, rango]);
+    return clasificarAlimentables(
+      filasDeLineasActivas.filter((f) => f.fecha >= desdeRango),
+      soloComparables,
+    );
+  }, [filasDeLineasActivas, rango, soloComparables]);
+
+  // Nivel medio de piezas por línea y turno que sostiene el horno (fecha de hoy).
+  const referenciaHorno = useMemo(() => {
+    const n = formato ? nivelHornoPorLinea(hornos, formato, hoyLocalISO()) : null;
+    return n ? { piezasTurnoPorLinea: n.piezasTurnoPorLinea, lineas: n.parametros.lineas, hornos: n.parametros.hornos } : null;
+  }, [hornos, formato]);
+
+  // Balance horno vs clasificación: toda la planta (no depende del filtro de líneas).
+  const balance = useMemo(() => (formato ? construirBalance(clasificadoPlanta, hornos, formato) : null), [clasificadoPlanta, hornos, formato]);
+  const avisoBalance = useMemo(() => {
+    if (avisoHorno) return avisoHorno;
+    if (cargando || !formato || clasificadoPlanta.length === 0) return null;
+    if (!balance) return `Sin clasificación de ${formato} en el periodo, o falta su horno en la tabla de hornos (pestaña Hornos del administrador).`;
+    return null;
+  }, [avisoHorno, cargando, formato, clasificadoPlanta, balance]);
 
   // ── Handlers ───────────────────────────────────────────────────
 
   function cambiarFormato(f: string) {
     setLineasElegidas(null); // otro formato, otras líneas disponibles
+    setAvisoHorno(null);
     setFormato(f);
   }
 
@@ -136,6 +174,8 @@ export function AlimentacionPanel() {
         onToggleLinea={alternarLinea}
         rango={rango}
         onRango={setRango}
+        soloComparables={soloComparables}
+        onSoloComparables={setSoloComparables}
       />
 
       {error && (
@@ -152,15 +192,8 @@ export function AlimentacionPanel() {
       ) : (
         !error && (
           <>
-            <p className="text-xs text-[var(--texto-secundario)]">
-              <strong className="text-[var(--texto)]">{clasificacionNubes.validos.length}</strong> turnos incluidos ·{" "}
-              {clasificacionNubes.excluidosMezcla} excluidos por mezcla de formatos · {clasificacionNubes.excluidosMinutos} por minutos fuera de{" "}
-              {RANGO_MINUTOS_VALIDOS.min}–{RANGO_MINUTOS_VALIDOS.max}. Minutos reales, sin suelo de 480; solo turnos de un único formato.
-            </p>
-
-            <NubesAlimentacion turnos={clasificacionNubes.validos} lineas={lineasActivas} />
-
-            <TemporalAlimentacion turnosValidos={validosTemporal} lineas={lineasActivas} formato={formato} />
+            <CurvaVelocidadAlimentacion clasificacion={clasificacionAlimentable} lineas={lineasActivas} referenciaHorno={referenciaHorno} />
+            <BalanceHornoAlimentacion formato={formato} balance={balance} aviso={avisoBalance} />
           </>
         )
       )}

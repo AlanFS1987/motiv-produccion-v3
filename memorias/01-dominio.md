@@ -169,6 +169,13 @@ partes que se creen a partir de ese momento.
    `completado_at` (política RLS); después, solo el administrador,
    sin límite de tiempo (pantalla y permisos en `09`).
 
+   El UPDATE interno `vigente = false` lo hace `fn_marcar_corregido_no_vigente`
+   (SECURITY DEFINER, `search_path public`) desde el trigger AFTER INSERT.
+   `fn_parte_restringir_columnas_update` lo deja pasar con
+   `pg_trigger_depth() > 1` (migración `20261010125500`); el UPDATE directo
+   de un responsable sobre `completado`/`completado_at`/`vigente` sigue
+   rechazado. Antes de esa migración el responsable no podía corregir (400).
+
    El formulario de corrección (`FotoPantallaMaquina` modo
    `"corregir"`) aplica las mismas dos reglas bloqueantes que la
    captura inicial (`piezas_entradas > 0`, `minutos_total > 0`) — por

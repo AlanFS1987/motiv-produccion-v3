@@ -1,14 +1,13 @@
 // frontend/src/components/alimentacion/FiltrosAlimentacion.tsx
-// Filtros comunes a las tres gráficas: formato (obligatorio), líneas
-// (máximo MAX_LINEAS) y periodo que abarcan las nubes de puntos. Los
-// turnos con varios formatos NO entran (se cuentan aparte en el
-// resumen del panel).
+// Filtros comunes a todas las gráficas de la pestaña: formato
+// (obligatorio), líneas, periodo y "solo turnos comparables". Los turnos
+// con varios formatos NO entran (se cuentan aparte en el resumen).
 
-import { colorDeLinea } from "../../lib/alimentacion-calculos";
+import { colorDeLinea, REGLAS_TURNOS } from "../../lib/alimentacion-calculos";
 
-export const MAX_LINEAS = 4;
-export const RANGOS_NUBES = [90, 180, 365] as const;
-export type RangoNubes = (typeof RANGOS_NUBES)[number];
+export const MAX_LINEAS = 6; // todas las líneas de la planta
+export const RANGOS_DIAS = [90, 180, 365] as const;
+export type RangoDias = (typeof RANGOS_DIAS)[number];
 
 export interface LineaDisponible {
   id: string;
@@ -24,6 +23,8 @@ export function FiltrosAlimentacion({
   onToggleLinea,
   rango,
   onRango,
+  soloComparables,
+  onSoloComparables,
 }: {
   formatos: string[];
   formato: string;
@@ -31,8 +32,10 @@ export function FiltrosAlimentacion({
   lineasDisponibles: LineaDisponible[];
   lineasSeleccionadas: string[];
   onToggleLinea: (id: string) => void;
-  rango: RangoNubes;
-  onRango: (r: RangoNubes) => void;
+  rango: RangoDias;
+  onRango: (r: RangoDias) => void;
+  soloComparables: boolean;
+  onSoloComparables: (v: boolean) => void;
 }) {
   const llenas = lineasSeleccionadas.length >= MAX_LINEAS;
 
@@ -55,18 +58,29 @@ export function FiltrosAlimentacion({
         </label>
 
         <label className="flex flex-col gap-1 text-xs text-[var(--texto-secundario)]">
-          Periodo de las nubes
+          Periodo
           <select
             value={rango}
-            onChange={(e) => onRango(Number(e.target.value) as RangoNubes)}
+            onChange={(e) => onRango(Number(e.target.value) as RangoDias)}
             className="rounded-lg border border-[var(--borde)] bg-[var(--fondo)] px-2 py-1.5 text-sm text-[var(--texto)]"
           >
-            {RANGOS_NUBES.map((r) => (
+            {RANGOS_DIAS.map((r) => (
               <option key={r} value={r}>
                 Últimos {r} días
               </option>
             ))}
           </select>
+        </label>
+
+        <label
+          className="flex items-center gap-2 pb-1.5 text-sm text-[var(--texto)]"
+          title={`Turnos de ${REGLAS_TURNOS.comparable.minTotal} a ${REGLAS_TURNOS.comparable.maxTotal} min registrados y como máximo ${REGLAS_TURNOS.comparable.maxBancoMasMaquina} min entre banco y máquina`}
+        >
+          <input type="checkbox" checked={soloComparables} onChange={(e) => onSoloComparables(e.target.checked)} />
+          Solo turnos comparables
+          <span className="text-xs text-[var(--texto-tenue)]">
+            ({REGLAS_TURNOS.comparable.minTotal}–{REGLAS_TURNOS.comparable.maxTotal} min, banco+máquina ≤ {REGLAS_TURNOS.comparable.maxBancoMasMaquina})
+          </span>
         </label>
       </div>
 

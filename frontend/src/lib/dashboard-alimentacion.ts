@@ -35,26 +35,16 @@ export interface TurnoLineaAlimentacion {
 }
 
 /**
- * Referencias que se dibujan como líneas horizontales (piezas/min).
- * Valores tomados de la gráfica de trabajo (01/10/2026) — revisar y
- * ajustar aquí si cambian; es el único sitio donde viven.
+ * Referencias en piezas/min (valores tomados de la gráfica de trabajo,
+ * 01/10/2026 — revisar y ajustar aquí si cambian; único sitio donde viven).
+ * "consignaPropuesta" es una velocidad a plena y se dibuja como línea
+ * vertical. El nivel necesario para el horno ya no vive aquí: sale de la
+ * tabla horno_formato (balance-horno-calculos.ts). La línea del límite
+ * Griffon se retiró.
  */
 export const REFERENCIAS_PIEZAS_MIN = {
-  hornoNecesario: 12.15,
-  limiteGriffon: 11.9,
   consignaPropuesta: 13,
 } as const;
-
-/**
- * Un turno+línea solo entra en las gráficas si sus minutos totales
- * están en este rango. Por encima suele ser una estadística de
- * apiladores sin resetear (08-dashboard-jefe.md); por debajo, línea
- * casi parada. PROVISIONAL: umbrales por confirmar con producción.
- */
-export const RANGO_MINUTOS_VALIDOS = { min: 360, max: 540 } as const;
-
-/** Días que se traen como mínimo: cubre el trimestre (13 semanas) completo. */
-export const DIAS_MINIMOS_CARGA = 91;
 
 const TAM_PAGINA = 1000; // límite por defecto de filas por petición en PostgREST
 
